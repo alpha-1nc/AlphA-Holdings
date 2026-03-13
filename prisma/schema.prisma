@@ -1,11 +1,107 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// AlphA Holdings - Prisma Schema
+// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ── 통화 Enum ─────────────────────────────────────────────
+enum Currency {
+  USD
+  KRW
+  JPY
+}
+
+// ── 계좌 유형 Enum ────────────────────────────────────────
+enum AccountType {
+  US_DIRECT   // 미국 직투
+  ISA         // 한국 ISA
+  JP_DIRECT   // 일본 직투
+  CASH        // 현금성 자산
+}
+
+// ── 리포트 유형 Enum ───────────────────────────────────────
+enum ReportType {
+  MONTHLY
+  QUARTERLY
+}
+
+// ── 리포트 상태 Enum (임시저장 vs 작성 완료) ─────────────────
+enum ReportStatus {
+  DRAFT      // 임시저장: 수치 데이터만 입력, 텍스트 보완 예정
+  PUBLISHED  // 작성 완료: 모든 필수 필드 검증 통과
+}
+
+// ── 투자 리포트 (다중 통화 지원) ─────────────────────────
+model Report {
+  id              Int             @id @default(autoincrement())
+
+  // 리포트 기본 정보
+  type            ReportType                        // MONTHLY / QUARTERLY
+  periodLabel     String                            // "2026-03", "2026-Q1" 등 표시용
+
+  // 환율 스냅샷
+  usdRate         Float                             // 리포트 기준 USD/KRW 환율
+  jpyRate         Float                             // 리포트 기준 JPY/KRW 환율 (100엔 기준)
+
+  // 원화 환산 총액
+  totalInvestedKrw  Float                           // 총투자금 (원화 환산)
+  totalCurrentKrw   Float                           // 현재평가금 (원화 환산)
+
+  // 운용 프로필
+  profile         String          @default("AlphA Holdings Portfolio") // 운용 프로필 ("AlphA Holdings Portfolio" / "MindongFolio")
+
+  // 리포트 상태 (임시저장 / 작성 완료)
+  status          ReportStatus    @default(DRAFT)
+
+  // 텍스트 기록
+  summary         String?                           // 월/분기 증시 요약
+  journal         String?                           // 투자 일지 / 느낀 점
+  strategy        String?                           // 다음 전략
+  earningsReview  String?                           // 분기별 어닝/실적 리뷰 (QUARTERLY 전용)
+
+  // 관계
+  portfolioItems  PortfolioItem[]
+  newInvestments  NewInvestment[]
+
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// ── 리포트 기준 포트폴리오 항목 (다중 통화) ───────────────
+model PortfolioItem {
+  id               Int          @id @default(autoincrement())
+
+  reportId         Int
+  report           Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  ticker           String                            // 종목 코드 (ex. AAPL, 삼성전자)
+  sector           String?                           // 섹터 분류 (Technology, Financials, Consumer Discretionary 등)
+  accountType      AccountType                       // US_DIRECT / ISA / JP_DIRECT / CASH
+  originalCurrency Currency                          // 원래 통화: USD / KRW / JPY
+  originalAmount   Float                             // 원래 통화 기준 평가금액
+  krwAmount        Float                             // 원화 환산 평가금액
+
+  createdAt        DateTime     @default(now())
+}
+
+// ── 신규 투자금 (리포트별, 계좌별) ───────────────────────────────
+model NewInvestment {
+  id               Int          @id @default(autoincrement())
+
+  reportId         Int
+  report           Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  accountType      AccountType                       // US_DIRECT / ISA / JP_DIRECT / CASH
+  originalCurrency Currency                          // 원래 통화: USD / KRW / JPY
+  originalAmount   Float                             // 원래 통화 기준 신규 투자금
+  krwAmount        Float                             // 원화 환산 신규 투자금
+
+  createdAt        DateTime     @default(now())
 }
