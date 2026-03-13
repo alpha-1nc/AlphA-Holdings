@@ -265,14 +265,8 @@ export default function NewMonthlyReportPage() {
         <div className="mx-auto max-w-2xl px-4 py-12">
             {/* Header */}
             <div className="mb-10 space-y-6">
-                {/* Top bar: Back button + Type selector */}
-                <div className="flex items-center justify-between">
-                    <Link
-                        href="/"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
-                    </Link>
+                {/* Top bar: Type selector */}
+                <div className="flex items-center justify-end">
                     <div className="inline-flex rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
                         <Link
                             href="/reports/new"

@@ -102,12 +102,17 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
                 </div>
             </div>
 
-            {/* Legend */}
+            {/* Legend: 종목명 (코드) - 메타 있는 경우만 코드 병기 */}
             <div className="flex flex-wrap justify-center gap-x-3 gap-y-1.5">
                 {dataWithPct.map((d) => (
                     <div key={d.ticker} className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400">
                         <span className="h-2 w-2 rounded-full shrink-0" style={{ background: d.color }} />
-                        <span>{d.ticker}</span>
+                        <span>
+                            {d.name}
+                            {d.name !== d.ticker && (
+                                <span className="ml-0.5 font-mono text-neutral-500 dark:text-neutral-500">({d.ticker})</span>
+                            )}
+                        </span>
                         <span className="text-neutral-400 dark:text-neutral-500">{d.pct.toFixed(1)}%</span>
                     </div>
                 ))}

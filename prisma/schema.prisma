@@ -82,6 +82,7 @@ model PortfolioItem {
   report           Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   ticker           String                            // 종목 코드 (ex. AAPL, 삼성전자)
+  logoUrl          String?                           // 사용자 지정 종목 대표 이미지 URL (붙여넣기)
   sector           String?                           // 섹터 분류 (Technology, Financials, Consumer Discretionary 등)
   accountType      AccountType                       // US_DIRECT / ISA / JP_DIRECT / CASH
   originalCurrency Currency                          // 원래 통화: USD / KRW / JPY

@@ -6,9 +6,12 @@ import { BarChart3 } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import { getTickerColor } from "@/constants/brandColors";
-import type { Report, PortfolioItem } from "@/generated/prisma";
+import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
 
-type ReportWithItems = Report & { portfolioItems: PortfolioItem[] };
+type ReportWithItems = Report & { 
+    portfolioItems: PortfolioItem[];
+    newInvestments?: NewInvestment[];
+};
 
 const krw = (n: number) =>
     new Intl.NumberFormat("ko-KR", {

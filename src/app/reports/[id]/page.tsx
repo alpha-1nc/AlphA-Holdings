@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Globe, Wallet } from "lucide-react";
 import { getReportById } from "@/app/actions/reports";
+import { getTickerDisplayName } from "@/lib/ticker-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
-import { TickerLogoServer } from "@/components/dashboard/ticker-logo-server";
+import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
 
 const krw = (n: number) =>
@@ -78,7 +79,7 @@ export default async function ReportDetailPage(props: {
 
     const snapshotsForChart = portfolioItems.map((item) => ({
         ticker: item.ticker,
-        name: item.ticker,
+        name: getTickerDisplayName(item.ticker),
         value: item.krwAmount,
     }));
 
@@ -182,10 +183,19 @@ export default async function ReportDetailPage(props: {
                                                     className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] items-center gap-2 px-3 py-2.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <TickerLogoServer ticker={item.ticker} />
+                                                        <TickerAvatar
+                                                            ticker={item.ticker}
+                                                            logoUrl={(item as { logoUrl?: string | null }).logoUrl}
+                                                            size={28}
+                                                        />
                                                         <div>
-                                                            <p className="font-mono text-[11px] font-semibold uppercase text-neutral-700 dark:text-neutral-200">
-                                                                {item.ticker}
+                                                            <p className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
+                                                                {getTickerDisplayName(item.ticker)}
+                                                                {getTickerDisplayName(item.ticker) !== item.ticker && (
+                                                                    <span className="ml-1 font-mono text-[10px] font-normal uppercase text-neutral-500 dark:text-neutral-400">
+                                                                        ({item.ticker})
+                                                                    </span>
+                                                                )}
                                                             </p>
                                                             <p className="text-[10px] text-neutral-400 dark:text-neutral-500">{pct}%</p>
                                                         </div>

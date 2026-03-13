@@ -176,3 +176,12 @@ export function getTickerMetadata(ticker: string): TickerMetadata | null {
     const key = ticker.trim().toUpperCase();
     return TICKER_METADATA[key] ?? TICKER_METADATA[ticker] ?? null;
 }
+
+/**
+ * 표시용 종목명 반환. 메타데이터에 등록된 경우 종목명, 없으면 티커 코드 반환
+ * (한국/일본 주식 숫자 코드 → 종목명 변환에 활용)
+ */
+export function getTickerDisplayName(ticker: string): string {
+    const meta = getTickerMetadata(ticker);
+    return meta?.name ?? ticker ?? "";
+}

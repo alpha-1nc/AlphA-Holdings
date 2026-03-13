@@ -74,3 +74,20 @@ npm run dev
 ## 라이선스
 
 Private
+
+안전하게 푸시하는 방법:
+# 1. 변경된 파일 확인
+git status
+
+# 2. 데이터베이스 파일이 있는지 확인 (없어야 정상)
+git status | grep "\.db"
+
+# 3. 스테이징
+git add .
+
+# 4. 다시 한 번 확인 (데이터베이스 파일이 없어야 함)
+git status
+
+# 5. 커밋 및 푸시
+git commit -m "커밋 메시지"
+git push

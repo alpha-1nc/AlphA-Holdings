@@ -224,6 +224,7 @@ export interface CreateReportPayload {
   portfolioItems: {
     ticker: string;
     sector?: string;
+    logoUrl?: string | null;
     accountType: "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
     originalCurrency: "USD" | "KRW" | "JPY";
     originalAmount: number;

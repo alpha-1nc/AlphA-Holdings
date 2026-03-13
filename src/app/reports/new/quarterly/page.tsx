@@ -12,7 +12,7 @@ import {
     type WorkspaceProfile,
 } from "@/lib/profile";
 import { TickerSearchInput } from "@/components/dashboard/ticker-search-input";
-import { getTickerDomain } from "@/lib/ticker-metadata";
+import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 type AccountType = "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
@@ -88,6 +88,7 @@ interface PortfolioRow {
     sector: string;
     amount: string;
     cashCurrency?: CashCurrency;
+    logoUrl?: string | null;
 }
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -111,6 +112,7 @@ function newRow(): PortfolioRow {
         sector: "",
         amount: "",
         cashCurrency: "KRW",
+        logoUrl: null,
     };
 }
 
@@ -130,52 +132,6 @@ function toKRW(row: PortfolioRow, usdRate: number, jpyRate: number): number {
     }
 }
 
-/* ── Ticker Logo ──────────────────────────────────────────────────────────*/
-function TickerLogo({ ticker, size = 28 }: { ticker: string; size?: number }) {
-    const [imgReady, setImgReady] = useState(false);
-    const [imgError, setImgError] = useState(false);
-    const prevTicker = useRef("");
-
-    useEffect(() => {
-        if (prevTicker.current !== ticker) {
-            setImgReady(false);
-            setImgError(false);
-            prevTicker.current = ticker;
-        }
-    }, [ticker]);
-
-    if (!ticker.trim()) return null;
-
-    // ticker-metadata.ts에 domain이 명시적으로 등록된 경우에만 src 생성
-    const domain = getTickerDomain(ticker);
-    const src = domain ? `https://unavatar.io/${domain}?fallback=false` : null;
-    const sizeClass = size === 28 ? "h-7 w-7" : "h-6 w-6";
-
-    // domain 없거나 이미지 에러 → <img> 마운트하지 않음
-    const mountImg = Boolean(src && !imgError);
-
-    return (
-        <span className={`relative inline-flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-neutral-200 dark:ring-neutral-700`}>
-            <span className="absolute inset-0 flex items-center justify-center bg-neutral-100 text-[9px] font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                style={{ opacity: imgReady ? 0 : 1, transition: "opacity 150ms ease" }}
-            >
-                {ticker.trim().slice(0, 2).toUpperCase()}
-            </span>
-            {mountImg && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                    src={src!}
-                    alt=""
-                    aria-hidden
-                    className="absolute inset-0 h-full w-full object-cover"
-                    style={{ opacity: imgReady ? 1 : 0, transition: "opacity 150ms ease" }}
-                    onLoad={() => setImgReady(true)}
-                    onError={() => setImgError(true)}
-                />
-            )}
-        </span>
-    );
-}
 
 /* ── Shared style tokens ─────────────────────────────────────────────────*/
 const inputCls = [
@@ -367,7 +323,15 @@ function PortfolioRowItem({
             {!isCash && (
                 <div className="flex items-center justify-between border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
                     <div className="flex items-center gap-2">
-                        {row.ticker && <TickerLogo ticker={row.ticker} size={24} />}
+                        {row.ticker && (
+                            <TickerAvatar
+                                ticker={row.ticker}
+                                logoUrl={row.logoUrl}
+                                size={24}
+                                editable
+                                onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
+                            />
+                        )}
                         <select
                             value={row.sector}
                             onChange={(e) => onChange({ sector: e.target.value })}
@@ -435,8 +399,10 @@ export default function NewQuarterlyReportPage() {
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
     const removeRow = useCallback((id: string) => setRows((prev) => prev.filter((r) => r.id !== id)), []);
     const updateRow = useCallback(
-        (id: string, patch: Partial<Omit<PortfolioRow, "id">>) =>
-            setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))),
+        (id: string, patch: Partial<Omit<PortfolioRow, "id">>) => {
+            console.log(`[updateRow] id: ${id}, patch:`, patch);
+            setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+        },
         [],
     );
 
@@ -501,14 +467,19 @@ export default function NewQuarterlyReportPage() {
                 journal: "",
                 strategy,
                 earningsReview,
-                portfolioItems: validRows.map((r) => ({
-                    ticker: r.accountType === "CASH" ? ACCOUNT_LABELS[r.accountType] : (r.ticker || ACCOUNT_LABELS[r.accountType]),
-                    sector: r.accountType === "CASH" ? undefined : (r.sector || undefined),
-                    accountType: r.accountType,
-                    originalCurrency: getEffectiveCurrency(r) as "USD" | "KRW" | "JPY",
-                    originalAmount: parseNumber(r.amount),
-                    krwAmount: toKRW(r, usdRate, jpyRate),
-                })),
+                portfolioItems: validRows.map((r) => {
+                    const item = {
+                        ticker: r.accountType === "CASH" ? ACCOUNT_LABELS[r.accountType] : (r.ticker || ACCOUNT_LABELS[r.accountType]),
+                        sector: r.accountType === "CASH" ? undefined : (r.sector || undefined),
+                        accountType: r.accountType,
+                        originalCurrency: getEffectiveCurrency(r) as "USD" | "KRW" | "JPY",
+                        originalAmount: parseNumber(r.amount),
+                        krwAmount: toKRW(r, usdRate, jpyRate),
+                        logoUrl: r.logoUrl?.trim() || null,
+                    };
+                    console.log(`[portfolioItems] ticker: ${item.ticker}, logoUrl:`, item.logoUrl?.substring(0, 50));
+                    return item;
+                }),
                 newInvestments: [],
             });
             toast.success(asDraft ? "임시 저장되었습니다." : "분기별 리포트가 저장되었습니다.");
@@ -526,14 +497,8 @@ export default function NewQuarterlyReportPage() {
         <div className="mx-auto max-w-2xl px-4 py-12">
             {/* Header */}
             <div className="mb-10 space-y-6">
-                {/* Top bar: Back button + Type selector */}
-                <div className="flex items-center justify-between">
-                    <Link
-                        href="/"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
-                    >
-                        <ArrowLeft className="h-5 w-5" />
-                    </Link>
+                {/* Top bar: Type selector */}
+                <div className="flex items-center justify-end">
                     <div className="inline-flex rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
                         <Link
                             href="/reports/new"

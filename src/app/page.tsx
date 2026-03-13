@@ -11,6 +11,7 @@ import {
 import { Globe, Wallet, BarChart3 } from "lucide-react";
 import { getReportsByProfilePublished } from "@/app/actions/reports";
 import { getTickerColor, FALLBACK_COLORS } from "@/constants/brandColors";
+import { getTickerDisplayName } from "@/lib/ticker-metadata";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
 
@@ -130,7 +131,7 @@ function SectorTooltip({ active, payload }: {
                 <div className="mt-1.5 flex flex-wrap gap-1">
                     {item.payload.tickers.map((t) => (
                         <span key={t} className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-                            {t}
+                            {getTickerDisplayName(t)}
                         </span>
                     ))}
                 </div>
@@ -173,7 +174,7 @@ function TickerDonut({ items, totalKrw, includeCash }: { items: PortfolioItem[];
     const displayTotal = includeCash ? totalKrw : totalExCash;
 
     const nonCashData = nonCashItems.map((item, idx) => ({
-        name: item.ticker,
+        name: getTickerDisplayName(item.ticker),
         value: item.krwAmount,
         color: getTickerColor(item.ticker, idx),
     }));
@@ -502,22 +503,6 @@ export default function DashboardPage() {
                     {/* Tab */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
-                        <div className="flex rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
-                            {(["monthly", "quarterly"] as const).map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={[
-                                        "rounded-lg px-3 py-1.5 text-xs font-medium transition-all",
-                                        activeTab === tab
-                                            ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white"
-                                            : "text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200",
-                                    ].join(" ")}
-                                >
-                                    {tab === "monthly" ? "월별" : "분기별"}
-                                </button>
-                            ))}
-                        </div>
                     </div>
 
                     {/* ComposedChart: 총 투자금(Bar) · 총 평가금(Line) */}
