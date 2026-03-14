@@ -8,6 +8,7 @@ import {
     type WorkspaceProfile,
     PROFILE_STORAGE_KEY 
 } from "@/lib/profile";
+import { getAppVersion } from "@/lib/version";
 
 export default function SettingsPage() {
     const [profile, setProfile] = useState<WorkspaceProfile>("alpha-ceo");
@@ -96,6 +97,28 @@ export default function SettingsPage() {
                                 리포트 내역 내보내기 (CSV)
                             </a>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* ── Section: 앱 정보 ───────────────────────────────────────────── */}
+            <section className="mt-16 pt-8 border-t border-neutral-200 dark:border-neutral-800">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                            AlphA Holdings
+                        </p>
+                        <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
+                            포트폴리오 관리 및 투자 리포트 작성 플랫폼
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                            v{getAppVersion()}
+                        </p>
+                        <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
+                            버전
+                        </p>
                     </div>
                 </div>
             </section>
