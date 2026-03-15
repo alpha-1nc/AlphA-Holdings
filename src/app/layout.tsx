@@ -14,6 +14,15 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "AlphA Holdings — Report Archive",
   description: "스냅샷 기반 개인 투자 리포트 아카이브",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "256x256" },
+    ],
+    apple: [
+      { url: "/apple-icon.png", type: "image/png", sizes: "180x180" },
+    ],
+  },
 };
 
 export default function RootLayout({

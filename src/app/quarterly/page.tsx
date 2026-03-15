@@ -162,14 +162,17 @@ export default function QuarterlyReportPage() {
                         Quarterly Reports
                     </h2>
                     <p className="mt-1 text-sm text-neutral-500">
-                        분기별 투자 스냅샷 아카이브 · {getProfileLabel(profileId as "alpha-ceo" | "partner")}
+                        분기별 투자 스냅샷 아카이브
+                        <span className="hidden md:inline"> · </span>
+                        <br className="md:hidden" />
+                        <span>{getProfileLabel(profileId as "alpha-ceo" | "partner")}</span>
                     </p>
                 </div>
                 <Link
                     href="/reports/new/quarterly"
                     className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
                 >
-                    + 새 리포트 작성
+                    + 새리포트
                 </Link>
             </div>
 
