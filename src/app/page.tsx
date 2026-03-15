@@ -356,8 +356,8 @@ export default function DashboardPage() {
 
     if (loading) {
         return (
-            <div className="p-6 lg:p-8">
-                <div className="mb-8">
+            <div className="p-0">
+                <div className="mb-6 md:mb-8">
                     <div className="h-7 w-48 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
                     <div className="mt-2 h-4 w-72 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-700" />
                 </div>
@@ -468,12 +468,12 @@ export default function DashboardPage() {
     const latestQuarterly = quarterlyReports[quarterlyReports.length - 1];
 
     return (
-        <div className="p-6 lg:p-8 space-y-10">
+        <div className="w-full max-w-[100vw] space-y-8 overflow-hidden p-0 md:space-y-10">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+            <div className="flex items-start gap-3">
+                <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-2xl">
                             투자 현황 대시보드
                         </h1>
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${profileId === "alpha-ceo"
@@ -483,7 +483,7 @@ export default function DashboardPage() {
                             {getProfileLabel(profileId as "alpha-ceo" | "partner")}
                         </span>
                     </div>
-                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                    <p className="mt-1 break-words text-sm text-neutral-500 dark:text-neutral-400">
                         가장 최근 리포트({latest.periodLabel}) 기준 &middot; 총{" "}
                         <strong className="text-neutral-700 dark:text-neutral-300">{reports.length}개</strong> 리포트
                     </p>
@@ -499,18 +499,18 @@ export default function DashboardPage() {
 
             {/* Chart Section */}
             {chartReports.length > 0 && (
-                <div className="space-y-6">
+                <div className="space-y-4 md:space-y-6">
                     {/* Tab */}
                     <div className="flex items-center justify-between">
                         <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
                     </div>
 
                     {/* ComposedChart: 총 투자금(Bar) · 총 평가금(Line) */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                         <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                             총 투자금 · 총 평가금
                         </p>
-                        <div className="h-64">
+                        <div className="h-52 md:h-64">
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
@@ -527,11 +527,11 @@ export default function DashboardPage() {
 
                     {/* 계좌별 신규 투자금 스택 차트 */}
                     {newInvestmentData.some((d) => d["신규 투자금"] > 0) && (
-                        <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 계좌별 신규 투자금
                             </p>
-                            <div className="h-64">
+                            <div className="h-52 md:h-64">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart
                                         data={newInvestmentData.map((d) => {
@@ -571,11 +571,11 @@ export default function DashboardPage() {
                     {/* Two charts side by side: 누적 수익금 + 수익률 (LineChart with gradient fill) */}
                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         {/* 누적 수익금 */}
-                        <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 누적 수익금
                             </p>
-                            <div className="h-52">
+                            <div className="h-48 md:h-52">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                                         <defs>
@@ -596,11 +596,11 @@ export default function DashboardPage() {
                         </div>
 
                         {/* 수익률 */}
-                        <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                             <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 수익률 (%)
                             </p>
-                            <div className="h-52">
+                            <div className="h-48 md:h-52">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                                         <defs>
@@ -629,10 +629,10 @@ export default function DashboardPage() {
 
             {/* Portfolio Composition — based on latest quarterly report */}
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
                         <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">포트폴리오 구성</h2>
-                        <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
+                        <p className="mt-0.5 break-words text-xs text-neutral-400 dark:text-neutral-500">
                             최신 분기별 리포트 기준
                             {latestQuarterly && (
                                 <span className="ml-1 font-medium text-neutral-600 dark:text-neutral-300">
@@ -644,7 +644,7 @@ export default function DashboardPage() {
                     {latestQuarterly && (
                         <Link
                             href={`/reports/${latestQuarterly.id}`}
-                            className="text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition"
+                            className="shrink-0 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition"
                         >
                             리포트 보기 →
                         </Link>
@@ -652,7 +652,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                     {/* 종목별 비중 도넛 */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                         <div className="mb-4 flex items-start justify-between">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
@@ -695,7 +695,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* 섹터별 비중 도넛 */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                         <div className="mb-4">
                             <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 섹터별 비중

@@ -45,11 +45,11 @@ function NavIconButton({ href, icon: Icon, label, isActive }: NavIconButtonProps
                 <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
             </Link>
 
-            {/* Tooltip */}
+            {/* Tooltip — hidden on touch devices */}
             <div
                 className={clsx(
                     "pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap",
-                    "rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg",
+                    "hidden rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg sm:block",
                     "dark:bg-white dark:text-neutral-900",
                     "transition-all duration-150",
                     hovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
@@ -70,10 +70,10 @@ export function TopNavbar() {
 
     return (
         <header className="sticky top-0 z-50 w-full border-b border-neutral-200/60 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-950/85">
-            <div className="mx-auto flex h-[68px] max-w-screen-2xl items-center justify-between px-8">
+            <div className="mx-auto flex h-[68px] max-w-screen-2xl items-center justify-between px-4 md:px-8">
                 {/* Logo + Brand */}
-                <Link href="/" className="flex items-center gap-3 select-none group">
-                    <div className="relative flex h-9 w-9 items-center justify-center transition-transform duration-200 group-hover:scale-105">
+                <Link href="/" className="flex items-center gap-2.5 select-none group">
+                    <div className="relative flex h-9 w-9 shrink-0 items-center justify-center transition-transform duration-200 group-hover:scale-105">
                         <Image
                             src={logo}
                             alt="AlphA Holdings logo"
@@ -92,7 +92,7 @@ export function TopNavbar() {
                         />
                     </div>
                     <span
-                        className="text-[17px] font-bold tracking-tight text-neutral-900 dark:text-neutral-50 transition-opacity duration-200 group-hover:opacity-80"
+                        className="hidden text-[17px] font-bold tracking-tight text-neutral-900 dark:text-neutral-50 transition-opacity duration-200 group-hover:opacity-80 sm:block"
                         style={{ fontFamily: "var(--font-inter), sans-serif", letterSpacing: "-0.025em" }}
                     >
                         AlphA Holdings
@@ -100,7 +100,7 @@ export function TopNavbar() {
                 </Link>
 
                 {/* Icon Navigation */}
-                <nav className="flex items-center gap-1.5">
+                <nav className="flex items-center gap-0.5 md:gap-1.5">
                     {navItems.map(({ href, icon, label }) => {
                         const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
                         return (
@@ -137,11 +137,11 @@ export function TopNavbar() {
                             )}
                         </button>
 
-                        {/* Theme Tooltip */}
+                        {/* Theme Tooltip — hidden on touch devices */}
                         <div
                             className={clsx(
                                 "pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap",
-                                "rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg",
+                                "hidden rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg sm:block",
                                 "dark:bg-white dark:text-neutral-900",
                                 "transition-all duration-150",
                                 themeHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
