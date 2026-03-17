@@ -186,7 +186,8 @@ export default async function ReportDetailPage(props: {
                                                         <TickerAvatar
                                                             ticker={item.ticker}
                                                             logoUrl={(item as { logoUrl?: string | null }).logoUrl}
-                                                            size={28}
+                                                            size={40}
+                                                            roundedSquare
                                                         />
                                                         <div>
                                                             <p className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">

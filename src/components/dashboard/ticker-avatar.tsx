@@ -16,6 +16,8 @@ interface TickerAvatarProps {
     ticker: string;
     logoUrl?: string | null;
     size?: number;
+    /** 둥근 사각형 (기업 분석 리포트 스타일) — 기본은 원형 */
+    roundedSquare?: boolean;
     /** 편집 가능 시 클릭하여 이미지 URL/붙여넣기 */
     editable?: boolean;
     onLogoChange?: (url: string | null) => void;
@@ -25,6 +27,7 @@ export function TickerAvatar({
     ticker,
     logoUrl,
     size = 28,
+    roundedSquare = false,
     editable = false,
     onLogoChange,
 }: TickerAvatarProps) {
@@ -38,7 +41,11 @@ export function TickerAvatar({
     const initial = displayName ? displayName[0] : ticker?.trim().slice(0, 1)?.toUpperCase() || "?";
 
     const hasValidLogo = logoUrl?.trim() && !imgError;
-    const sizeClass = size === 28 ? "h-7 w-7" : "h-6 w-6";
+    const sizeClass =
+        size >= 40 ? "h-10 w-10" :
+        size >= 36 ? "h-9 w-9" :
+        size >= 32 ? "h-8 w-8" :
+        size === 28 ? "h-7 w-7" : "h-6 w-6";
 
     useEffect(() => {
         if (prevLogoUrl.current !== logoUrl) {
@@ -87,9 +94,10 @@ export function TickerAvatar({
         }
     };
 
+    const shapeClass = roundedSquare ? "rounded-xl" : "rounded-full";
     const avatarEl = (
         <span
-            className={`relative inline-flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-neutral-200 dark:ring-neutral-700 ${
+            className={`relative inline-flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden ${shapeClass} ring-1 ring-neutral-200 dark:ring-neutral-700 ${
                 editable ? "cursor-pointer transition hover:ring-neutral-400 dark:hover:ring-neutral-500" : ""
             }`}
             onClick={editable ? () => setDialogOpen(true) : undefined}
@@ -101,8 +109,8 @@ export function TickerAvatar({
             {/* 아바타: 이미지 또는 첫 글자 */}
             <span
                 className="absolute inset-0 flex items-center justify-center bg-neutral-100 font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                style={{
-                    fontSize: Math.max(10, Math.floor(size * 0.4)),
+                    style={{
+                        fontSize: Math.max(10, Math.floor(size * 0.45)),
                     opacity: hasValidLogo ? 0 : 1,
                 }}
                 aria-hidden={hasValidLogo || undefined}

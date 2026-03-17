@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Home, PenLine, Settings, Moon, Sun, BarChart2, TrendingUp } from "lucide-react";
+import { Home, PenLine, Settings, Moon, Sun, BarChart2, TrendingUp, FileSearch } from "lucide-react";
 import { useTheme } from "@/components/layout/theme-provider";
 import clsx from "clsx";
 import { useState } from "react";
@@ -14,6 +14,7 @@ const navItems = [
     { href: "/", icon: Home, label: "홈" },
     { href: "/monthly", icon: BarChart2, label: "월별 리포트" },
     { href: "/quarterly", icon: TrendingUp, label: "분기별 리포트" },
+    { href: "/analysis", icon: FileSearch, label: "투자 분석" },
     { href: "/reports/new", icon: PenLine, label: "새 리포트" },
     { href: "/settings", icon: Settings, label: "설정" },
 ];

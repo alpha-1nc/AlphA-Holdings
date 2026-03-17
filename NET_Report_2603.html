@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Cloudflare (NET) 장기 투자 분석 보고서</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --primary:#f6821f;--bg:#0d1117;--surface:#161b22;--surface2:#21262d;
+  --border:#30363d;--text:#e6edf3;--muted:#8b949e;
+  --green:#3fb950;--red:#f85149;--yellow:#d29922;--blue:#58a6ff;--purple:#bc8cff;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+/* HEADER */
+header{background:linear-gradient(135deg,#0d1117,#1a1f2e,#0d1117);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.hdr{max-width:1300px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.hlogo{display:flex;align-items:center;gap:12px}
+.hicon{width:38px;height:38px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;color:#fff}
+.htitle h1{font-size:1.1rem;font-weight:700}
+.htitle p{font-size:.72rem;color:var(--muted)}
+.hbadge{background:linear-gradient(135deg,#1a7f37,#2ea043);color:#fff;padding:8px 22px;border-radius:20px;font-weight:800;font-size:.95rem;letter-spacing:1px;box-shadow:0 0 20px rgba(46,160,67,.4);animation:pg 2s infinite}
+@keyframes pg{0%,100%{box-shadow:0 0 20px rgba(46,160,67,.4)}50%{box-shadow:0 0 35px rgba(46,160,67,.7)}}
+/* NAV */
+nav{background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto}
+.nav-inner{max-width:1300px;margin:0 auto;padding:0 24px;display:flex;gap:2px}
+.nb{padding:11px 14px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.82rem;font-weight:500;white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s}
+.nb:hover{color:var(--text)}
+.nb.active{color:var(--primary);border-bottom-color:var(--primary)}
+/* MAIN */
+main{max-width:1300px;margin:0 auto;padding:28px 24px}
+.sec{display:none}.sec.active{display:block}
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:28px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;position:relative;overflow:hidden;transition:transform .2s,border-color .2s}
+.kpi:hover{transform:translateY(-2px);border-color:var(--primary)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--ac,var(--primary))}
+.kl{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.kv{font-size:1.5rem;font-weight:700}
+.kc{font-size:.78rem;margin-top:3px}
+.up{color:var(--green)}.down{color:var(--red)}.neu{color:var(--muted)}
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:22px}
+.card h3{font-size:.95rem;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.icon{width:26px;height:26px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:860px){.g2,.g3{grid-template-columns:1fr}}
+/* CHARTS */
+.cw{position:relative;height:260px}
+.cwl{position:relative;height:320px}
+/* TABLES */
+.dt{width:100%;border-collapse:collapse;font-size:.85rem}
+.dt th{background:var(--surface2);color:var(--muted);font-weight:600;padding:9px 13px;text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px}
+.dt td{padding:9px 13px;border-bottom:1px solid var(--border);color:var(--text)}
+.dt tr:last-child td{border-bottom:none}
+.dt tr:hover td{background:rgba(255,255,255,.03)}
+/* SCORE BARS */
+.sr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sl{width:170px;font-size:.82rem;color:var(--muted);flex-shrink:0}
+.sbw{flex:1;background:var(--surface2);border-radius:4px;height:7px;overflow:hidden}
+.sb{height:100%;border-radius:4px;transition:width 1s ease}
+.sn{width:50px;text-align:right;font-size:.82rem;font-weight:600}
+/* TAGS */
+.tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.72rem;font-weight:600}
+.tg{background:rgba(63,185,80,.15);color:var(--green)}
+.tr{background:rgba(248,81,73,.15);color:var(--red)}
+.ty{background:rgba(210,153,34,.15);color:var(--yellow)}
+.tb{background:rgba(88,166,255,.15);color:var(--blue)}
+.tp{background:rgba(188,140,255,.15);color:var(--purple)}
+.to{background:rgba(246,130,31,.15);color:var(--primary)}
+/* VERDICT */
+.vbox{background:linear-gradient(135deg,rgba(26,127,55,.2),rgba(46,160,67,.1));border:2px solid var(--green);border-radius:16px;padding:40px;text-align:center;margin-bottom:28px}
+.vlabel{font-size:.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px;margin-bottom:14px}
+.vtext{font-size:4rem;font-weight:900;color:var(--green);letter-spacing:4px;text-shadow:0 0 40px rgba(63,185,80,.5);margin-bottom:14px}
+.vsub{font-size:.95rem;color:var(--muted);max-width:600px;margin:0 auto;line-height:1.7}
+/* HIGHLIGHT */
+.hl{background:rgba(246,130,31,.08);border:1px solid rgba(246,130,31,.3);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.hl p{font-size:.85rem;line-height:1.7}
+.hl strong{color:var(--primary)}
+.hlr{background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:10px;padding:14px 18px;margin-bottom:14px}
+.hlr p{font-size:.85rem;line-height:1.7}
+.hlr strong{color:var(--red)}
+/* RISK ITEMS */
+.rg{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.ri{background:var(--surface2);border-radius:10px;padding:14px;border-left:4px solid var(--rc,var(--border))}
+.ri h4{font-size:.88rem;font-weight:600;margin-bottom:5px}
+.ri p{font-size:.78rem;color:var(--muted);line-height:1.5}
+.rh{--rc:var(--red)}.rm{--rc:var(--yellow)}.rl{--rc:var(--green)}
+/* MOAT */
+.mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.mi{background:var(--surface2);border-radius:10px;padding:14px;text-align:center;border:1px solid var(--border);transition:border-color .2s}
+.mi:hover{border-color:var(--primary)}
+.mi-icon{font-size:1.8rem;margin-bottom:6px}
+.mi-title{font-size:.82rem;font-weight:600;margin-bottom:3px}
+.mi-desc{font-size:.74rem;color:var(--muted)}
+/* TIMELINE */
+.tl{position:relative;padding-left:22px}
+.tl::before{content:'';position:absolute;left:7px;top:0;bottom:0;width:2px;background:var(--border)}
+.tli{position:relative;margin-bottom:18px}
+.tli::before{content:'';position:absolute;left:-19px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--primary);border:2px solid var(--bg)}
+.tly{font-size:.72rem;color:var(--primary);font-weight:700;margin-bottom:2px}
+.tlt{font-size:.82rem;color:var(--muted)}
+/* SECTION TITLES */
+.stitle{font-size:1.4rem;font-weight:700;margin-bottom:6px}
+.ssub{font-size:.88rem;color:var(--muted);margin-bottom:24px}
+/* FOOTER */
+footer{background:var(--surface);border-top:1px solid var(--border);padding:22px;text-align:center;color:var(--muted);font-size:.78rem;margin-top:40px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+<div class="hdr">
+  <div class="hlogo">
+    <div class="hicon">CF</div>
+    <div class="htitle">
+      <h1>Cloudflare (NYSE: NET) — 장기 투자 분석 보고서</h1>
+      <p>FY2025 실적 기반 · DCA 전략 평가 · 2026년 3월 기준 최신 데이터</p>
+    </div>
+  </div>
+  <div class="hbadge">최종 판정: BUY</div>
+</div>
+</header>
+<nav>
+<div class="nav-inner">
+  <button class="nb active" onclick="show('overview',this)">📊 개요</button>
+  <button class="nb" onclick="show('business',this)">🏢 비즈니스</button>
+  <button class="nb" onclick="show('financials',this)">💰 재무분석</button>
+  <button class="nb" onclick="show('industry',this)">🌐 산업&경쟁</button>
+  <button class="nb" onclick="show('valuation',this)">📈 밸류에이션</button>
+  <button class="nb" onclick="show('risks',this)">⚠️ 리스크</button>
+  <button class="nb" onclick="show('longterm',this)">🚀 장기전망</button>
+  <button class="nb" onclick="show('dca',this)">💎 DCA전략</button>
+  <button class="nb" onclick="show('verdict',this)">🏆 최종판정</button>
+</div>
+</nav>
+<main>
+<!-- ===== OVERVIEW ===== -->
+<div id="s-overview" class="sec active">
+<div class="stitle">Cloudflare (NET) 투자 분석 개요</div>
+<div class="ssub">FY2025 연간 실적 기반 · 2026년 3월 17일 기준 최신 데이터</div>
+<div class="kpi-grid">
+  <div class="kpi" style="--ac:var(--primary)"><div class="kl">FY2025 연간 매출</div><div class="kv">$2.17B</div><div class="kc up">▲ +29.8% YoY</div></div>
+  <div class="kpi" style="--ac:var(--green)"><div class="kl">Q4 2025 성장률</div><div class="kv">+34%</div><div class="kc up">▲ 3분기 연속 가속</div></div>
+  <div class="kpi" style="--ac:var(--blue)"><div class="kl">Non-GAAP 영업이익률</div><div class="kv">14.0%</div><div class="kc up">▲ 전년 13.8%</div></div>
+  <div class="kpi" style="--ac:var(--purple)"><div class="kl">잉여현금흐름(FCF)</div><div class="kv">$260M</div><div class="kc up">▲ FCF마진 12%</div></div>
+  <div class="kpi" style="--ac:var(--green)"><div class="kl">순매출유지율(NRR)</div><div class="kv">120%</div><div class="kc up">▲ +9% YoY</div></div>
+  <div class="kpi" style="--ac:var(--yellow)"><div class="kl">현금 및 유가증권</div><div class="kv">$4.1B</div><div class="kc neu">강력한 재무 건전성</div></div>
+  <div class="kpi" style="--ac:var(--blue)"><div class="kl">$100K+ ARR 고객</div><div class="kv">4,298</div><div class="kc up">▲ +23% YoY</div></div>
+  <div class="kpi" style="--ac:var(--red)"><div class="kl">P/S 비율 (TTM)</div><div class="kv">~34x</div><div class="kc down">▼ 고평가 구간</div></div>
+</div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">📈</span>연간 매출 성장 추이</h3><div class="cw"><canvas id="c-rev"></canvas></div></div>
+  <div class="card"><h3><span class="icon">💵</span>FCF 마진 개선 추이</h3><div class="cw"><canvas id="c-fcf"></canvas></div></div>
+</div>
+<div class="card">
+  <h3><span class="icon">⭐</span>투자 핵심 지표 종합 평가 (10점 만점)</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px">
+    <div>
+      <div class="sr"><span class="sl">비즈니스 모델 강도</span><div class="sbw"><div class="sb" style="width:90%;background:var(--green)"></div></div><span class="sn">9/10</span></div>
+      <div class="sr"><span class="sl">매출 성장 일관성</span><div class="sbw"><div class="sb" style="width:88%;background:var(--green)"></div></div><span class="sn">8.8/10</span></div>
+      <div class="sr"><span class="sl">경쟁 해자(Moat)</span><div class="sbw"><div class="sb" style="width:80%;background:var(--blue)"></div></div><span class="sn">8/10</span></div>
+      <div class="sr"><span class="sl">AI 시대 포지셔닝</span><div class="sbw"><div class="sb" style="width:92%;background:var(--green)"></div></div><span class="sn">9.2/10</span></div>
+    </div>
+    <div>
+      <div class="sr"><span class="sl">수익성 개선 속도</span><div class="sbw"><div class="sb" style="width:72%;background:var(--yellow)"></div></div><span class="sn">7.2/10</span></div>
+      <div class="sr"><span class="sl">밸류에이션 매력도</span><div class="sbw"><div class="sb" style="width:40%;background:var(--red)"></div></div><span class="sn">4/10</span></div>
+      <div class="sr"><span class="sl">DCA 적합성</span><div class="sbw"><div class="sb" style="width:78%;background:var(--blue)"></div></div><span class="sn">7.8/10</span></div>
+      <div class="sr"><span class="sl">장기 성장 잠재력</span><div class="sbw"><div class="sb" style="width:88%;background:var(--green)"></div></div><span class="sn">8.8/10</span></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== BUSINESS ===== -->
+<div id="s-business" class="sec">
+<div class="stitle">비즈니스 모델 분석</div>
+<div class="ssub">Cloudflare가 무엇을 하고, 어떻게 돈을 버는가</div>
+<div class="hl"><p>Cloudflare는 단순한 CDN 회사가 아닙니다. <strong>인터넷 인프라 플랫폼</strong>으로 진화하여 보안·네트워크·개발자 플랫폼을 하나의 글로벌 네트워크 위에서 제공합니다. CEO Matthew Prince: <em>"AI 에이전트가 웹의 새로운 사용자라면, Cloudflare는 그들이 실행되는 플랫폼이자 통과하는 네트워크입니다."</em></p></div>
+<div class="g2">
+  <div class="card">
+    <h3><span class="icon">🏗️</span>핵심 제품 포트폴리오</h3>
+    <table class="dt">
+      <thead><tr><th>카테고리</th><th>주요 제품</th><th>성장 동력</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag tb">Application Services</span></td><td>CDN, WAF, DDoS, Bot 관리</td><td>AI 트래픽 급증</td></tr>
+        <tr><td><span class="tag tp">Zero Trust / SASE</span></td><td>Access, Gateway, CASB, Email</td><td>기업 보안 현대화</td></tr>
+        <tr><td><span class="tag to">Network Services</span></td><td>Magic Transit, Magic WAN</td><td>WAN 현대화</td></tr>
+        <tr><td><span class="tag tg">Developer Platform</span></td><td>Workers, R2, D1, Workers AI</td><td>AI 에이전트 인프라</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3><span class="icon">💡</span>수익 모델 구조</h3>
+    <div style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px;font-size:.82rem">구독 기반 SaaS</span><div style="flex:1;background:var(--surface2);border-radius:4px;height:10px"><div style="width:75%;height:100%;background:var(--primary);border-radius:4px"></div></div><span style="width:40px;text-align:right;font-size:.8rem;color:var(--muted)">~75%</span></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px;font-size:.82rem">사용량 기반 과금</span><div style="flex:1;background:var(--surface2);border-radius:4px;height:10px"><div style="width:20%;height:100%;background:var(--blue);border-radius:4px"></div></div><span style="width:40px;text-align:right;font-size:.8rem;color:var(--muted)">~20%</span></div>
+      <div style="display:flex;align-items:center;gap:10px"><span style="width:130px;font-size:.82rem">엔터프라이즈 계약</span><div style="flex:1;background:var(--surface2);border-radius:4px;height:10px"><div style="width:5%;height:100%;background:var(--purple);border-radius:4px"></div></div><span style="width:40px;text-align:right;font-size:.8rem;color:var(--muted)">~5%</span></div>
+    </div>
+    <p style="font-size:.8rem;color:var(--muted);line-height:1.6">무료 플랜 → 유료 전환 플라이휠: 수백만 무료 사용자가 네트워크 효과를 강화하고 기업 고객으로 전환. 2025년 기준 332,000+ 유료 고객.</p>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">🛡️</span>경쟁 해자(Moat) 분석</h3>
+  <div class="mg">
+    <div class="mi"><div class="mi-icon">🌐</div><div class="mi-title">글로벌 네트워크</div><div class="mi-desc">300+ PoP, 100+ 국가, 11,000+ 네트워크 피어링. 구축에 10년+ 소요</div></div>
+    <div class="mi"><div class="mi-icon">🔄</div><div class="mi-title">플랫폼 플라이휠</div><div class="mi-desc">더 많은 트래픽 → 더 강한 보안 → 더 많은 고객 → 반복</div></div>
+    <div class="mi"><div class="mi-icon">🔒</div><div class="mi-title">높은 전환 비용</div><div class="mi-desc">DNS·CDN·보안·네트워크 통합 시 전환 비용 매우 높음</div></div>
+    <div class="mi"><div class="mi-icon">💰</div><div class="mi-title">가격 경쟁력</div><div class="mi-desc">Egress 무료 정책으로 AWS/GCP 대비 비용 절감 탁월</div></div>
+    <div class="mi"><div class="mi-icon">🤖</div><div class="mi-title">AI 인프라 선점</div><div class="mi-desc">Workers AI, AI Gateway로 에이전트 인터넷 인프라 선점</div></div>
+    <div class="mi"><div class="mi-icon">📊</div><div class="mi-title">데이터 네트워크 효과</div><div class="mi-desc">일일 수조 건 요청 처리로 위협 데이터 축적. 복제 불가</div></div>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">🚀</span>AI 에이전트 인터넷 전략 — 핵심 성장 동력</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">Workers AI 추론 요청 성장</div><div style="font-size:1.6rem;font-weight:700;color:var(--green)">+4,000%</div><div style="font-size:.72rem;color:var(--muted)">Q1 2025 YoY</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">AI 에이전트 트래픽</div><div style="font-size:1.6rem;font-weight:700;color:var(--green)">2배↑</div><div style="font-size:.72rem;color:var(--muted)">2026년 1월 기준</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">역대 최대 ACV 계약</div><div style="font-size:1.6rem;font-weight:700;color:var(--primary)">$42.5M</div><div style="font-size:.72rem;color:var(--muted)">Q4 2025 단일 계약/년</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:14px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">최대 단일 계약</div><div style="font-size:1.6rem;font-weight:700;color:var(--primary)">$130M</div><div style="font-size:.72rem;color:var(--muted)">2025년 체결</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== FINANCIALS ===== -->
+<div id="s-financials" class="sec">
+<div class="stitle">재무 심층 분석</div>
+<div class="ssub">FY2021~FY2025 재무 데이터 기반 트렌드 분석</div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">📊</span>연간 매출 & 성장률</h3><div class="cwl"><canvas id="c-revg"></canvas></div></div>
+  <div class="card"><h3><span class="icon">💹</span>마진 개선 추이</h3><div class="cwl"><canvas id="c-margin"></canvas></div></div>
+</div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">💰</span>잉여현금흐름(FCF) 추이</h3><div class="cw"><canvas id="c-fcft"></canvas></div></div>
+  <div class="card"><h3><span class="icon">👥</span>고객 성장 지표</h3><div class="cw"><canvas id="c-cust"></canvas></div></div>
+</div>
+<div class="card">
+  <h3><span class="icon">📋</span>연간 재무 요약표</h3>
+  <div style="overflow-x:auto">
+    <table class="dt">
+      <thead><tr><th>지표</th><th>FY2021</th><th>FY2022</th><th>FY2023</th><th>FY2024</th><th>FY2025</th><th>FY2026E</th></tr></thead>
+      <tbody>
+        <tr><td><strong>매출 ($M)</strong></td><td>656</td><td>975</td><td>1,297</td><td>1,670</td><td><strong style="color:var(--primary)">2,168</strong></td><td><span class="tag tb">~2,790</span></td></tr>
+        <tr><td><strong>YoY 성장률</strong></td><td class="up">+52.3%</td><td class="up">+48.6%</td><td class="up">+33.0%</td><td class="up">+28.8%</td><td class="up"><strong>+29.8%</strong></td><td class="up">~+28.7%</td></tr>
+        <tr><td><strong>GAAP 매출총이익률</strong></td><td>77.6%</td><td>76.2%</td><td>76.3%</td><td>77.3%</td><td><strong>74.5%</strong></td><td>~75%</td></tr>
+        <tr><td><strong>Non-GAAP 영업이익률</strong></td><td>N/A</td><td>5.8%</td><td>11.7%</td><td>13.8%</td><td><strong style="color:var(--green)">14.0%</strong></td><td>~13.6%</td></tr>
+        <tr><td><strong>GAAP 순손실 ($M)</strong></td><td class="down">-260</td><td class="down">-193</td><td class="down">-184</td><td class="down">-79</td><td class="down"><strong>-102</strong></td><td class="neu">개선 예상</td></tr>
+        <tr><td><strong>FCF ($M)</strong></td><td class="down">-28</td><td class="down">-20</td><td class="up">140</td><td class="up">195</td><td class="up"><strong style="color:var(--green)">261</strong></td><td class="up">~400+</td></tr>
+        <tr><td><strong>FCF 마진</strong></td><td class="down">-4.3%</td><td class="down">-2.1%</td><td class="up">10.8%</td><td class="up">11.7%</td><td class="up"><strong style="color:var(--green)">12.0%</strong></td><td class="up">~14%+</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">⚠️</span>주식기반보상(SBC) 분석 — 핵심 우려 사항</h3>
+  <div class="g2">
+    <div><div class="cw"><canvas id="c-sbc"></canvas></div></div>
+    <div>
+      <div class="hlr"><p><strong>SBC 문제:</strong> 연간 SBC가 매출의 ~21%에 달합니다. Non-GAAP 이익이 실제 주주 이익을 과대 표시할 수 있습니다.</p></div>
+      <table class="dt" style="margin-top:10px">
+        <thead><tr><th>연도</th><th>SBC ($M)</th><th>매출 대비</th></tr></thead>
+        <tbody>
+          <tr><td>FY2022</td><td>~$290M</td><td>~29.7%</td></tr>
+          <tr><td>FY2023</td><td>~$360M</td><td>~27.8%</td></tr>
+          <tr><td>FY2024</td><td>~$390M</td><td>~23.4%</td></tr>
+          <tr><td>FY2025</td><td>~$451M</td><td><span class="tag tr">~20.8%</span></td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:.78rem;color:var(--muted);margin-top:10px;line-height:1.6">긍정적: SBC 비율이 매출 대비 점진적으로 감소 추세. 주식 희석율도 연 2% 수준으로 관리 중.</p>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== INDUSTRY ===== -->
+<div id="s-industry" class="sec">
+<div class="stitle">산업 분석 & 경쟁 환경</div>
+<div class="ssub">CDN, 사이버보안, 엣지 컴퓨팅 시장 분석</div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">🌍</span>시장 규모 및 성장 전망</h3><div class="cwl"><canvas id="c-market"></canvas></div></div>
+  <div class="card">
+    <h3><span class="icon">🎯</span>Cloudflare TAM 확장</h3>
+    <div style="padding:8px 0">
+      <div style="background:var(--surface2);border-radius:10px;padding:18px;margin-bottom:10px;text-align:center"><div style="font-size:.78rem;color:var(--muted)">현재 TAM (2025)</div><div style="font-size:2.2rem;font-weight:700;color:var(--primary)">$181B</div><div style="font-size:.78rem;color:var(--muted)">현재 매출 침투율: ~1.2%</div></div>
+      <div style="background:var(--surface2);border-radius:10px;padding:18px;text-align:center"><div style="font-size:.78rem;color:var(--muted)">예상 TAM (2028)</div><div style="font-size:2.2rem;font-weight:700;color:var(--green)">$231B</div><div style="font-size:.78rem;color:var(--muted)">CAGR ~8.5% (Gartner 기반)</div></div>
+      <div style="margin-top:10px;padding:10px;background:rgba(246,130,31,.08);border-radius:8px;border:1px solid rgba(246,130,31,.2)"><p style="font-size:.78rem;color:var(--muted)">AI 에이전트 인터넷 추가 TAM 포함 시 훨씬 더 큰 기회 존재</p></div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">⚔️</span>경쟁사 비교 분석</h3>
+  <div style="overflow-x:auto">
+    <table class="dt">
+      <thead><tr><th>회사</th><th>시가총액</th><th>매출 성장률</th><th>P/S 비율</th><th>강점</th><th>Cloudflare 대비</th></tr></thead>
+      <tbody>
+        <tr><td><strong style="color:var(--primary)">Cloudflare (NET)</strong></td><td>~$74B</td><td><span class="tag tg">+30%</span></td><td><span class="tag tr">~34x</span></td><td>통합 플랫폼, AI 인프라</td><td><span class="tag tg">기준</span></td></tr>
+        <tr><td>Akamai (AKAM)</td><td>~$13B</td><td><span class="tag ty">+5%</span></td><td><span class="tag tg">~3x</span></td><td>엔터프라이즈 레거시</td><td><span class="tag tr">성장 열위</span></td></tr>
+        <tr><td>Fastly (FSLY)</td><td>~$1B</td><td><span class="tag ty">+10%</span></td><td><span class="tag ty">~4x</span></td><td>개발자 친화적</td><td><span class="tag tr">규모 열위</span></td></tr>
+        <tr><td>Zscaler (ZS)</td><td>~$30B</td><td><span class="tag tg">+22%</span></td><td><span class="tag ty">~14x</span></td><td>Zero Trust 강자</td><td><span class="tag ty">보안 경쟁</span></td></tr>
+        <tr><td>Palo Alto (PANW)</td><td>~$120B</td><td><span class="tag tg">+14%</span></td><td><span class="tag ty">~13x</span></td><td>종합 보안 포트폴리오</td><td><span class="tag ty">보안 경쟁</span></td></tr>
+        <tr><td>AWS CloudFront</td><td>N/A</td><td>N/A</td><td>N/A</td><td>AWS 생태계 통합</td><td><span class="tag ty">플랫폼 경쟁</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">🏆</span>Cloudflare의 지속 가능한 경쟁 우위</h3>
+  <div class="g2">
+    <div>
+      <h4 style="color:var(--green);margin-bottom:10px;font-size:.88rem">✅ 강점</h4>
+      <div class="tl">
+        <div class="tli"><div class="tly">네트워크 효과</div><div class="tlt">11,000+ 네트워크 피어링. 재구축에 10년 이상 소요. 경쟁사 복제 불가</div></div>
+        <div class="tli"><div class="tly">플랫폼 통합</div><div class="tlt">CDN+보안+네트워크+개발자 플랫폼을 단일 콘솔에서 제공</div></div>
+        <div class="tli"><div class="tly">AI 인프라 선점</div><div class="tlt">Workers AI, AI Gateway, MCP 서버 지원으로 에이전트 인터넷 선점</div></div>
+        <div class="tli"><div class="tly">무료 플랜 플라이휠</div><div class="tlt">수백만 무료 사용자가 네트워크 강화 + 기업 고객 전환 파이프라인</div></div>
+      </div>
+    </div>
+    <div>
+      <h4 style="color:var(--red);margin-bottom:10px;font-size:.88rem">⚠️ 약점</h4>
+      <div class="tl">
+        <div class="tli"><div class="tly" style="color:var(--red)">대형 클라우드 위협</div><div class="tlt">AWS, Azure, GCP가 자체 CDN/보안 서비스 강화. 번들링 전략</div></div>
+        <div class="tli"><div class="tly" style="color:var(--red)">엔터프라이즈 침투 한계</div><div class="tlt">대형 엔터프라이즈 영업 사이클 길고 Zscaler와 치열한 경쟁</div></div>
+        <div class="tli"><div class="tly" style="color:var(--red)">그로스 마진 하락</div><div class="tlt">AI 트래픽 증가로 네트워크 비용 상승. 74.5%로 하락 추세</div></div>
+        <div class="tli"><div class="tly" style="color:var(--red)">보안 침해 사고</div><div class="tlt">2025년 SaaS 공급망 공격으로 데이터 침해 경험</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== VALUATION ===== -->
+<div id="s-valuation" class="sec">
+<div class="stitle">밸류에이션 분석</div>
+<div class="ssub">현재 주가가 정당한가? 역사적 밸류에이션과 비교</div>
+<div class="kpi-grid">
+  <div class="kpi" style="--ac:var(--red)"><div class="kl">현재 주가 (2026.03)</div><div class="kv">~$210</div><div class="kc neu">52주: $89~$260</div></div>
+  <div class="kpi" style="--ac:var(--red)"><div class="kl">P/S 비율 (TTM)</div><div class="kv">~34x</div><div class="kc down">▼ 고평가 구간</div></div>
+  <div class="kpi" style="--ac:var(--yellow)"><div class="kl">Forward P/E</div><div class="kv">~187x</div><div class="kc neu">Non-GAAP EPS $1.12E</div></div>
+  <div class="kpi" style="--ac:var(--green)"><div class="kl">시가총액</div><div class="kv">~$74B</div><div class="kc up">▲ 1년 +54%</div></div>
+  <div class="kpi" style="--ac:var(--blue)"><div class="kl">애널리스트 목표주가</div><div class="kv">$234</div><div class="kc up">▲ +11.5% 업사이드</div></div>
+  <div class="kpi" style="--ac:var(--purple)"><div class="kl">2026 매출 가이던스</div><div class="kv">$2.79B</div><div class="kc up">▲ +28.7% YoY</div></div>
+</div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">📉</span>역사적 P/S 비율 추이</h3><div class="cwl"><canvas id="c-ps"></canvas></div></div>
+  <div class="card">
+    <h3><span class="icon">🎯</span>밸류에이션 시나리오 분석</h3>
+    <div style="margin-bottom:14px">
+      <div style="background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);border-radius:8px;padding:13px;margin-bottom:9px"><div style="font-size:.78rem;color:var(--green);font-weight:700;margin-bottom:3px">강세 시나리오 (2030)</div><div style="font-size:1.2rem;font-weight:700">$400~$600</div><div style="font-size:.72rem;color:var(--muted)">매출 $6B+, P/S 20x, FCF 마진 20%+</div></div>
+      <div style="background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.3);border-radius:8px;padding:13px;margin-bottom:9px"><div style="font-size:.78rem;color:var(--blue);font-weight:700;margin-bottom:3px">기본 시나리오 (2030)</div><div style="font-size:1.2rem;font-weight:700">$250~$400</div><div style="font-size:.72rem;color:var(--muted)">매출 $5B, P/S 15x, FCF 마진 18%</div></div>
+      <div style="background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.3);border-radius:8px;padding:13px"><div style="font-size:.78rem;color:var(--red);font-weight:700;margin-bottom:3px">약세 시나리오 (2030)</div><div style="font-size:1.2rem;font-weight:700">$100~$150</div><div style="font-size:.72rem;color:var(--muted)">성장 20% 이하 둔화, 밸류에이션 압축</div></div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">⚖️</span>밸류에이션 공정성 평가</h3>
+  <div class="hl"><p>현재 P/S 34x는 <strong>절대적으로 비싸지만</strong>, 성장률 대비 평가(PEG 방식)로 보면 정당화 가능한 구간입니다. 연 30% 성장하는 $2B+ 규모 기업에 P/S 34x는 역사적으로 고점이지만, AI 인프라 재평가가 진행 중입니다. DCA 투자자는 <strong>현재 가격이 고점임을 인지하고 분할 매수</strong>로 평균 단가를 낮추는 전략이 적합합니다.</p></div>
+  <table class="dt">
+    <thead><tr><th>비교 기준</th><th>Cloudflare</th><th>업계 평균</th><th>평가</th></tr></thead>
+    <tbody>
+      <tr><td>P/S 비율</td><td>~34x</td><td>~8-12x</td><td><span class="tag tr">고평가</span></td></tr>
+      <tr><td>매출 성장률</td><td>~30%</td><td>~15%</td><td><span class="tag tg">우월</span></td></tr>
+      <tr><td>FCF 마진</td><td>12%</td><td>~15%</td><td><span class="tag ty">개선 중</span></td></tr>
+      <tr><td>NRR</td><td>120%</td><td>~110%</td><td><span class="tag tg">우월</span></td></tr>
+      <tr><td>Rule of 40</td><td>~42</td><td>~30</td><td><span class="tag tg">우월</span></td></tr>
+    </tbody>
+  </table>
+</div>
+</div>
+
+<!-- ===== RISKS ===== -->
+<div id="s-risks" class="sec">
+<div class="stitle">리스크 분석</div>
+<div class="ssub">장기 투자 시 인지해야 할 핵심 리스크 요인</div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">📊</span>리스크 레이더 차트</h3><div class="cwl"><canvas id="c-risk"></canvas></div></div>
+  <div class="card">
+    <h3><span class="icon">⚖️</span>리스크 수준 평가</h3>
+    <div style="margin-top:8px">
+      <div style="font-size:.78rem;color:var(--red);font-weight:700;margin-bottom:8px">🔴 높은 리스크</div>
+      <div class="sr"><span class="sl">밸류에이션 압축</span><div class="sbw"><div class="sb" style="width:85%;background:var(--red)"></div></div><span class="sn">8.5/10</span></div>
+      <div class="sr"><span class="sl">SBC 희석 효과</span><div class="sbw"><div class="sb" style="width:75%;background:var(--red)"></div></div><span class="sn">7.5/10</span></div>
+      <div style="font-size:.78rem;color:var(--yellow);font-weight:700;margin:12px 0 8px">🟡 중간 리스크</div>
+      <div class="sr"><span class="sl">대형 클라우드 경쟁</span><div class="sbw"><div class="sb" style="width:65%;background:var(--yellow)"></div></div><span class="sn">6.5/10</span></div>
+      <div class="sr"><span class="sl">마진 압박</span><div class="sbw"><div class="sb" style="width:60%;background:var(--yellow)"></div></div><span class="sn">6.0/10</span></div>
+      <div class="sr"><span class="sl">거시경제 리스크</span><div class="sbw"><div class="sb" style="width:55%;background:var(--yellow)"></div></div><span class="sn">5.5/10</span></div>
+      <div style="font-size:.78rem;color:var(--green);font-weight:700;margin:12px 0 8px">🟢 낮은 리스크</div>
+      <div class="sr"><span class="sl">기술 파괴 리스크</span><div class="sbw"><div class="sb" style="width:30%;background:var(--green)"></div></div><span class="sn">3.0/10</span></div>
+      <div class="sr"><span class="sl">재무 건전성 리스크</span><div class="sbw"><div class="sb" style="width:20%;background:var(--green)"></div></div><span class="sn">2.0/10</span></div>
+    </div>
+  </div>
+</div>
+<div class="rg">
+  <div class="ri rh"><h4>🔴 밸류에이션 압축 리스크</h4><p>P/S 34x는 성장 둔화 또는 금리 상승 시 급격히 압축될 수 있습니다. 성장률이 20% 이하로 떨어지면 주가 50%+ 하락 가능성 존재.</p></div>
+  <div class="ri rh"><h4>🔴 SBC 주주 희석</h4><p>연간 $450M+ SBC는 실질 주주 가치를 희석합니다. GAAP 기준으로는 여전히 손실 기업. 매출 대비 SBC 비율 감소 추세이나 여전히 높은 수준.</p></div>
+  <div class="ri rm"><h4>🟡 대형 클라우드 경쟁</h4><p>AWS, Azure, GCP가 자체 CDN/보안/네트워크 서비스를 번들로 제공. 특히 이미 클라우드를 사용하는 고객에게 전환 인센티브 제공 가능.</p></div>
+  <div class="ri rm"><h4>🟡 실행 리스크</h4><p>60개 이상의 제품을 동시에 개발·판매하는 복잡성. 영업 효율성 유지와 제품 집중도 사이의 균형이 중요한 도전 과제.</p></div>
+  <div class="ri rm"><h4>🟡 그로스 마진 하락</h4><p>AI 트래픽 급증으로 네트워크 비용 상승. 그로스 마진이 77%에서 74.5%로 하락. 장기적으로 70% 이하로 떨어질 경우 수익성 우려.</p></div>
+  <div class="ri rl"><h4>🟢 기술 파괴 리스크</h4><p>Cloudflare 자체가 인터넷 인프라의 일부. 인터넷이 존재하는 한 CDN/보안 필요성은 지속. AI 전환에서도 오히려 수혜 포지션.</p></div>
+  <div class="ri rl"><h4>🟢 재무 건전성 리스크</h4><p>현금 $4.1B 보유, 부채 최소화. 경기 침체에도 5년 이상 버틸 수 있는 재무 여력. FCF 흑자 전환으로 자금 조달 필요성 감소.</p></div>
+  <div class="ri rm"><h4>🟡 CEO 주식 매도</h4><p>Matthew Prince CEO의 최근 주식 매각은 단기적 부정 신호. 다만 계획된 매도 프로그램(10b5-1)의 일환으로 해석 가능.</p></div>
+</div>
+</div>
+
+<!-- ===== LONGTERM ===== -->
+<div id="s-longterm" class="sec">
+<div class="stitle">장기 성장 잠재력</div>
+<div class="ssub">10년 후 Cloudflare는 어디에 있을까?</div>
+<div class="hl"><p>Cloudflare는 단순한 CDN 회사에서 <strong>인터넷 인프라 플랫폼</strong>으로 진화하고 있습니다. AI 에이전트 시대에 모든 AI 요청이 Cloudflare 네트워크를 통과할 가능성이 높습니다. 이는 AWS가 클라우드 컴퓨팅에서 차지한 위치를 Cloudflare가 엣지/AI 인프라에서 차지할 수 있음을 의미합니다.</p></div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">📈</span>매출 성장 시나리오 (2025-2035)</h3><div class="cwl"><canvas id="c-scen"></canvas></div></div>
+  <div class="card">
+    <h3><span class="icon">🔮</span>10년 후 가능성 평가</h3>
+    <div style="margin-top:8px">
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:6px">인터넷 인프라 지배 기업 가능성</div>
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;background:var(--border);border-radius:4px;height:10px;overflow:hidden"><div style="width:75%;height:100%;background:linear-gradient(90deg,var(--green),var(--primary));border-radius:4px"></div></div><span style="font-size:1rem;font-weight:700;color:var(--green)">75%</span></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:6px">AI 인프라 핵심 플레이어 가능성</div>
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;background:var(--border);border-radius:4px;height:10px;overflow:hidden"><div style="width:80%;height:100%;background:linear-gradient(90deg,var(--blue),var(--purple));border-radius:4px"></div></div><span style="font-size:1rem;font-weight:700;color:var(--blue)">80%</span></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:10px">
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:6px">$10B+ 매출 달성 가능성 (2035)</div>
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;background:var(--border);border-radius:4px;height:10px;overflow:hidden"><div style="width:65%;height:100%;background:linear-gradient(90deg,var(--yellow),var(--primary));border-radius:4px"></div></div><span style="font-size:1rem;font-weight:700;color:var(--yellow)">65%</span></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px">
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:6px">GAAP 흑자 전환 (2027-2028)</div>
+        <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;background:var(--border);border-radius:4px;height:10px;overflow:hidden"><div style="width:70%;height:100%;background:linear-gradient(90deg,var(--green),var(--blue));border-radius:4px"></div></div><span style="font-size:1rem;font-weight:700;color:var(--green)">70%</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">🌟</span>Cloudflare의 장기 성장 동력</h3>
+  <div class="g3">
+    <div style="background:var(--surface2);border-radius:10px;padding:14px"><div style="font-size:1.4rem;margin-bottom:6px">🤖</div><div style="font-size:.88rem;font-weight:600;margin-bottom:4px">AI 에이전트 인터넷</div><div style="font-size:.78rem;color:var(--muted);line-height:1.5">모든 AI 에이전트가 통과하는 네트워크. Workers AI 추론 요청 4,000% 성장. 에이전트 인터넷의 AWS가 될 가능성.</div></div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px"><div style="font-size:1.4rem;margin-bottom:6px">🔒</div><div style="font-size:.88rem;font-weight:600;margin-bottom:4px">Zero Trust / SASE 확장</div><div style="font-size:.78rem;color:var(--muted);line-height:1.5">SASE 시장 CAGR 23.6%. Zero Trust 시장 CAGR 16.5%. 기업 보안 현대화 필수 인프라.</div></div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px"><div style="font-size:1.4rem;margin-bottom:6px">🌐</div><div style="font-size:.88rem;font-weight:600;margin-bottom:4px">글로벌 확장</div><div style="font-size:.78rem;color:var(--muted);line-height:1.5">APAC +50% YoY 성장. 신흥 시장 인터넷 인프라 수요 급증. 글로벌 네트워크 확장 지속.</div></div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px"><div style="font-size:1.4rem;margin-bottom:6px">💼</div><div style="font-size:.88rem;font-weight:600;margin-bottom:4px">엔터프라이즈 업셀</div><div style="font-size:.78rem;color:var(--muted);line-height:1.5">$1M+ ARR 고객 55% 증가. 대형 계약 ACV 역대 최고. 엔터프라이즈 침투율 아직 낮음.</div></div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px"><div style="font-size:1.4rem;margin-bottom:6px">⚡</div><div style="font-size:.88rem;font-weight:600;margin-bottom:4px">개발자 플랫폼</div><div style="font-size:.78rem;color:var(--muted);line-height:1.5">Workers, R2, D1으로 서버리스 생태계 구축. 개발자 채택 → 기업 계약 전환 파이프라인.</div></div>
+    <div style="background:var(--surface2);border-radius:10px;padding:14px"><div style="font-size:1.4rem;margin-bottom:6px">📊</div><div style="font-size:.88rem;font-weight:600;margin-bottom:4px">운영 레버리지</div><div style="font-size:.78rem;color:var(--muted);line-height:1.5">매출 성장에 따른 FCF 마진 개선 가속. 2030년 FCF $1.7B 예상. 수익성 전환 임박.</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ===== DCA ===== -->
+<div id="s-dca" class="sec">
+<div class="stitle">DCA 전략 평가</div>
+<div class="ssub">매일 정기 매수 전략으로 Cloudflare에 투자하는 것이 적합한가?</div>
+<div class="hl"><p>DCA(Dollar Cost Averaging) 전략은 <strong>시장 타이밍을 제거하고 장기적으로 평균 매입 단가를 낮추는 전략</strong>입니다. 고성장 기업에 DCA를 적용할 때 핵심은 "10년 후에도 이 회사가 더 크고 강해질 것인가?"입니다. Cloudflare에 대한 답은 <strong>조건부 YES</strong>입니다.</p></div>
+<div class="g2">
+  <div class="card"><h3><span class="icon">💰</span>DCA 시뮬레이션 ($100/월, 10년)</h3><div class="cwl"><canvas id="c-dca"></canvas></div></div>
+  <div class="card">
+    <h3><span class="icon">📋</span>DCA 전략 적합성 평가</h3>
+    <table class="dt">
+      <thead><tr><th>평가 기준</th><th>점수</th><th>판단</th></tr></thead>
+      <tbody>
+        <tr><td>성장 일관성</td><td><span class="tag tg">9/10</span></td><td>7년 연속 25%+ 성장</td></tr>
+        <tr><td>사업 내구성</td><td><span class="tag tg">9/10</span></td><td>인터넷 인프라 필수재화</td></tr>
+        <tr><td>경쟁 해자</td><td><span class="tag tb">8/10</span></td><td>네트워크 효과 강력</td></tr>
+        <tr><td>현재 밸류에이션</td><td><span class="tag tr">4/10</span></td><td>P/S 34x 고평가</td></tr>
+        <tr><td>DCA 단가 평균화 효과</td><td><span class="tag tb">8/10</span></td><td>변동성 활용 가능</td></tr>
+        <tr><td>10년 복리 잠재력</td><td><span class="tag tg">8.5/10</span></td><td>연 15-25% 복리 가능</td></tr>
+        <tr><td><strong>종합 DCA 적합성</strong></td><td><span class="tag tg"><strong>7.8/10</strong></span></td><td><strong>DCA 적합</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">📌</span>DCA 투자 시 핵심 고려사항</h3>
+  <div class="g3">
+    <div style="background:rgba(63,185,80,.08);border:1px solid rgba(63,185,80,.3);border-radius:10px;padding:14px">
+      <div style="font-size:.88rem;font-weight:700;color:var(--green);margin-bottom:8px">✅ DCA 유리한 점</div>
+      <ul style="font-size:.8rem;color:var(--muted);line-height:1.8;list-style:none;padding:0">
+        <li>• 높은 변동성 → 평균 단가 낮출 기회</li>
+        <li>• 장기 성장 궤적 명확</li>
+        <li>• 시장 타이밍 불필요</li>
+        <li>• 복리 효과 극대화</li>
+        <li>• 감정적 투자 방지</li>
+      </ul>
+    </div>
+    <div style="background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.3);border-radius:10px;padding:14px">
+      <div style="font-size:.88rem;font-weight:700;color:var(--red);margin-bottom:8px">⚠️ DCA 주의할 점</div>
+      <ul style="font-size:.8rem;color:var(--muted);line-height:1.8;list-style:none;padding:0">
+        <li>• 현재 고평가 구간에서 시작</li>
+        <li>• 단기 -30~50% 조정 가능</li>
+        <li>• SBC로 인한 희석 지속</li>
+        <li>• GAAP 손실 기업</li>
+        <li>• 금리 상승 시 타격</li>
+      </ul>
+    </div>
+    <div style="background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.3);border-radius:10px;padding:14px">
+      <div style="font-size:.88rem;font-weight:700;color:var(--blue);margin-bottom:8px">💡 DCA 전략 제안</div>
+      <ul style="font-size:.8rem;color:var(--muted);line-height:1.8;list-style:none;padding:0">
+        <li>• 포트폴리오 5-10% 비중 권장</li>
+        <li>• 조정 시 매수량 증가</li>
+        <li>• 최소 5년 이상 보유 계획</li>
+        <li>• 분기 실적 모니터링 필수</li>
+        <li>• 성장 둔화 시 재평가</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">🧮</span>장기 DCA 수익 시나리오 ($100/월, 10년)</h3>
+  <div style="overflow-x:auto">
+    <table class="dt">
+      <thead><tr><th>시나리오</th><th>연평균 수익률</th><th>10년 후 자산가치</th><th>투자 원금</th><th>수익률</th></tr></thead>
+      <tbody>
+        <tr><td><span class="tag tg">강세</span></td><td class="up">+25%/년</td><td class="up"><strong>$45,000~$55,000</strong></td><td>$12,000</td><td class="up">+275~358%</td></tr>
+        <tr><td><span class="tag tb">기본</span></td><td class="up">+15%/년</td><td class="up"><strong>$26,000~$30,000</strong></td><td>$12,000</td><td class="up">+117~150%</td></tr>
+        <tr><td><span class="tag ty">보수</span></td><td class="neu">+8%/년</td><td class="neu"><strong>$17,000~$19,000</strong></td><td>$12,000</td><td class="neu">+42~58%</td></tr>
+        <tr><td><span class="tag tr">약세</span></td><td class="down">-5%/년</td><td class="down"><strong>$9,000~$11,000</strong></td><td>$12,000</td><td class="down">-8~25%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ===== VERDICT ===== -->
+<div id="s-verdict" class="sec">
+<div class="stitle">최종 투자 판정</div>
+<div class="ssub">장기 DCA 투자자를 위한 종합 결론</div>
+<div class="vbox">
+  <div class="vlabel">장기 DCA 투자 최종 판정</div>
+  <div class="vtext">BUY</div>
+  <div class="vsub">단, 현재 고평가 구간을 인지하고 분할 매수 전략으로 접근할 것.<br>포트폴리오의 5~10% 비중으로 10년 이상 보유를 전제로 한 판정.</div>
+</div>
+<div class="g2">
+  <div class="card">
+    <h3><span class="icon">🐂</span>매수 근거 (Bull Case)</h3>
+    <div class="tl">
+      <div class="tli"><div class="tly">성장 재가속</div><div class="tlt">Q4 2025 34% 성장으로 2021년 이후 최고. 3분기 연속 가속화. AI 에이전트 수요가 새로운 성장 엔진.</div></div>
+      <div class="tli"><div class="tly">AI 인프라 선점</div><div class="tlt">Workers AI 추론 요청 4,000% 성장. 에이전트 인터넷의 핵심 인프라. 경쟁사 복제 어려운 네트워크 효과.</div></div>
+      <div class="tli"><div class="tly">TAM $181B → $231B</div><div class="tlt">현재 매출 침투율 1.2%에 불과. SASE, Zero Trust, 엣지 컴퓨팅 모두 20%+ CAGR 성장 중.</div></div>
+      <div class="tli"><div class="tly">FCF 개선 가속</div><div class="tlt">FCF $261M (12% 마진), 2030년 $1.7B 예상. 운영 레버리지 발현. GAAP 흑자 전환 2027-2028 예상.</div></div>
+      <div class="tli"><div class="tly">NRR 120% + RPO +48%</div><div class="tlt">기존 고객 확장 강력. 미래 매출 가시성 높음. $1M+ ARR 고객 55% 증가.</div></div>
+      <div class="tli"><div class="tly">현금 $4.1B 요새</div><div class="tlt">강력한 재무 건전성으로 경기 침체에도 지속 투자 가능. 인수합병 여력 충분.</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3><span class="icon">🐻</span>주의 사항 (Bear Case)</h3>
+    <div class="tl">
+      <div class="tli"><div class="tly" style="color:var(--red)">P/S 34x 고평가</div><div class="tlt">성장 둔화 시 밸류에이션 급격히 압축 가능. 현재 주가에서 -30~50% 조정 가능성 배제 불가.</div></div>
+      <div class="tli"><div class="tly" style="color:var(--red)">SBC 희석 지속</div><div class="tlt">연간 $450M+ SBC는 실질 주주 가치 희석. GAAP 기준 손실 지속. 매출 대비 SBC 비율 20% 여전히 높음.</div></div>
+      <div class="tli"><div class="tly" style="color:var(--red)">대형 클라우드 위협</div><div class="tlt">AWS, Azure, GCP의 번들링 전략이 중소기업 고객 이탈 유발 가능. 가격 경쟁 심화.</div></div>
+      <div class="tli"><div class="tly" style="color:var(--red)">그로스 마진 하락</div><div class="tlt">AI 트래픽 증가로 네트워크 비용 상승. 그로스 마진 74.5%로 하락. 장기 목표 달성 불확실.</div></div>
+      <div class="tli"><div class="tly" style="color:var(--red)">실행 복잡성</div><div class="tlt">60개+ 제품 동시 개발·판매의 복잡성. 영업 효율성 유지 어려움.</div></div>
+      <div class="tli"><div class="tly" style="color:var(--red)">거시경제 리스크</div><div class="tlt">금리 상승 시 고성장 기술주 밸류에이션 압축. 경기 침체 시 IT 지출 삭감.</div></div>
+    </div>
+  </div>
+</div>
+<div class="card">
+  <h3><span class="icon">📝</span>워런 버핏 / 테리 스미스 관점의 종합 평가</h3>
+  <div class="hl"><p><strong>워런 버핏 관점:</strong> "좋은 기업을 적정 가격에 사는 것이 적정 기업을 좋은 가격에 사는 것보다 낫다." Cloudflare는 분명히 <strong>좋은 기업</strong>입니다. 그러나 P/S 34x는 버핏이 선호하는 "적정 가격"을 훨씬 초과합니다. DCA 전략으로 평균 단가를 낮추는 접근이 필요합니다.</p></div>
+  <div class="hl"><p><strong>테리 스미스 관점:</strong> "좋은 기업을 찾아 합리적인 가격에 사고 그냥 두어라." Cloudflare는 <strong>높은 ROCE, 강력한 경쟁 해자, 복리 성장 능력</strong>을 갖추고 있습니다. GAAP 기준 수익성 부재는 스미스의 기준에 미달이지만, FCF 기준으로는 합격.</p></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:14px">
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:3px">비즈니스 품질</div><div style="font-size:1.8rem;font-weight:700;color:var(--green)">A</div><div style="font-size:.72rem;color:var(--muted)">최상위 수준</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:3px">성장 잠재력</div><div style="font-size:1.8rem;font-weight:700;color:var(--green)">A</div><div style="font-size:.72rem;color:var(--muted)">AI 시대 핵심</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:3px">현재 밸류에이션</div><div style="font-size:1.8rem;font-weight:700;color:var(--red)">D</div><div style="font-size:.72rem;color:var(--muted)">고평가 구간</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:3px">DCA 적합성</div><div style="font-size:1.8rem;font-weight:700;color:var(--blue)">B+</div><div style="font-size:.72rem;color:var(--muted)">조건부 적합</div></div>
+    <div style="background:var(--surface2);border-radius:8px;padding:12px;text-align:center"><div style="font-size:.72rem;color:var(--muted);margin-bottom:3px">10년 복리 기대</div><div style="font-size:1.8rem;font-weight:700;color:var(--green)">A-</div><div style="font-size:.72rem;color:var(--muted)">높은 기대</div></div>
+  </div>
+</div>
+<div style="background:var(--surface2);border-radius:10px;padding:14px;margin-top:8px">
+  <p style="font-size:.76rem;color:var(--muted);line-height:1.7"><strong style="color:var(--yellow)">⚠️ 면책 조항:</strong> 이 보고서는 교육 목적의 분석 자료이며 투자 권유가 아닙니다. 모든 투자 결정은 개인의 재무 상황, 리스크 허용 범위, 독립적인 조사를 바탕으로 이루어져야 합니다. 과거 성과가 미래 수익을 보장하지 않습니다. 데이터 기준: 2026년 3월 17일.</p>
+</div>
+</div>
+</main>
+<footer>
+  <p>Cloudflare (NET) 장기 투자 분석 보고서 · FY2025 실적 기반 · 2026년 3월 17일</p>
+  <p style="margin-top:4px;font-size:.72rem">데이터 출처: Cloudflare IR, StockAnalysis, Yahoo Finance, GuruFocus, Macrotrends, SaaStr</p>
+</footer>
+<script>
+// Navigation
+function show(id,btn){
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('s-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+// Chart defaults
+Chart.defaults.color='#8b949e';
+Chart.defaults.borderColor='#30363d';
+Chart.defaults.font.family="'Segoe UI',sans-serif";
+const C={o:'#f6821f',g:'#3fb950',b:'#58a6ff',p:'#bc8cff',r:'#f85149',y:'#d29922'};
+
+// ── OVERVIEW CHARTS ──
+(function(){
+  // Revenue bar
+  new Chart(document.getElementById('c-rev'),{
+    type:'bar',
+    data:{
+      labels:['2019','2020','2021','2022','2023','2024','2025','2026E'],
+      datasets:[{
+        label:'연간 매출 ($B)',
+        data:[0.287,0.431,0.656,0.975,1.297,1.670,2.168,2.790],
+        backgroundColor:['#f6821f33','#f6821f44','#f6821f55','#f6821f66','#f6821f77','#f6821f88','#f6821f','#3fb95077'],
+        borderColor:['#f6821f','#f6821f','#f6821f','#f6821f','#f6821f','#f6821f','#f6821f','#3fb950'],
+        borderWidth:2,borderRadius:5
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v+'B'}},x:{grid:{display:false}}}}
+  });
+  // FCF line
+  new Chart(document.getElementById('c-fcf'),{
+    type:'line',
+    data:{
+      labels:['2021','2022','2023','2024','2025'],
+      datasets:[{
+        label:'FCF 마진',
+        data:[-4.3,-2.1,10.8,11.7,12.0],
+        borderColor:C.g,backgroundColor:'rgba(63,185,80,.12)',fill:true,tension:.4,
+        pointBackgroundColor:C.g,pointRadius:5
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}
+  });
+})();
+
+// ── FINANCIAL CHARTS ──
+(function(){
+  // Revenue + Growth
+  new Chart(document.getElementById('c-revg'),{
+    type:'bar',
+    data:{
+      labels:['2020','2021','2022','2023','2024','2025','2026E'],
+      datasets:[
+        {label:'매출 ($B)',data:[0.431,0.656,0.975,1.297,1.670,2.168,2.790],
+         backgroundColor:'rgba(246,130,31,.7)',borderColor:C.o,borderWidth:2,borderRadius:4,yAxisID:'y'},
+        {label:'YoY 성장률',data:[50.2,52.3,48.6,33.0,28.8,29.8,28.7],type:'line',
+         borderColor:C.g,backgroundColor:'rgba(63,185,80,.1)',fill:false,tension:.4,pointRadius:5,yAxisID:'y1'}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v+'B'},position:'left'},
+              y1:{grid:{display:false},ticks:{callback:v=>v+'%'},position:'right'},
+              x:{grid:{display:false}}}}
+  });
+  // Margin
+  new Chart(document.getElementById('c-margin'),{
+    type:'line',
+    data:{
+      labels:['2021','2022','2023','2024','2025'],
+      datasets:[
+        {label:'GAAP 매출총이익률',data:[77.6,76.2,76.3,77.3,74.5],borderColor:C.b,fill:false,tension:.3,pointRadius:5},
+        {label:'Non-GAAP 영업이익률',data:[null,5.8,11.7,13.8,14.0],borderColor:C.g,fill:false,tension:.3,pointRadius:5},
+        {label:'FCF 마진',data:[-4.3,-2.1,10.8,11.7,12.0],borderColor:C.o,fill:false,tension:.3,pointRadius:5,borderDash:[5,5]}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}
+  });
+  // FCF trend
+  new Chart(document.getElementById('c-fcft'),{
+    type:'bar',
+    data:{
+      labels:['2021','2022','2023','2024','2025','2026E','2030E'],
+      datasets:[{
+        label:'FCF ($M)',
+        data:[-28,-20,140,195,261,400,1700],
+        backgroundColor:(ctx)=>{const v=ctx.raw;return v<0?'rgba(248,81,73,.6)':'rgba(63,185,80,.7)'},
+        borderColor:(ctx)=>{const v=ctx.raw;return v<0?C.r:C.g},
+        borderWidth:2,borderRadius:4
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v+'M'}},x:{grid:{display:false}}}}
+  });
+  // Customer
+  new Chart(document.getElementById('c-cust'),{
+    type:'line',
+    data:{
+      labels:['Q4 2022','Q4 2023','Q4 2024','Q4 2025'],
+      datasets:[
+        {label:'$100K+ ARR 고객',data:[2439,2556,3495,4298],borderColor:C.o,backgroundColor:'rgba(246,130,31,.1)',fill:true,tension:.4,pointRadius:5,yAxisID:'y'},
+        {label:'$1M+ ARR 고객',data:[null,null,173,269],borderColor:C.p,fill:false,tension:.4,pointRadius:5,yAxisID:'y1'}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},position:'left'},y1:{grid:{display:false},position:'right'},x:{grid:{display:false}}}}
+  });
+  // SBC
+  new Chart(document.getElementById('c-sbc'),{
+    type:'bar',
+    data:{
+      labels:['FY2022','FY2023','FY2024','FY2025'],
+      datasets:[
+        {label:'SBC ($M)',data:[290,360,390,451],backgroundColor:'rgba(248,81,73,.6)',borderColor:C.r,borderWidth:2,borderRadius:4,yAxisID:'y'},
+        {label:'SBC/매출 비율',data:[29.7,27.8,23.4,20.8],type:'line',borderColor:C.y,fill:false,tension:.3,pointRadius:5,yAxisID:'y1'}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v+'M'},position:'left'},
+              y1:{grid:{display:false},ticks:{callback:v=>v+'%'},position:'right',min:0,max:35},
+              x:{grid:{display:false}}}}
+  });
+})();
+
+// ── INDUSTRY CHARTS ──
+(function(){
+  new Chart(document.getElementById('c-market'),{
+    type:'bar',
+    data:{
+      labels:['SASE','Zero Trust','CDN','엣지 컴퓨팅','Cloudflare TAM'],
+      datasets:[
+        {label:'2025 시장 규모 ($B)',data:[15.5,37,20,168,181],backgroundColor:'rgba(88,166,255,.6)',borderColor:C.b,borderWidth:2,borderRadius:4},
+        {label:'2030 예상 규모 ($B)',data:[44.7,92.4,40,249,231],backgroundColor:'rgba(63,185,80,.6)',borderColor:C.g,borderWidth:2,borderRadius:4}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v+'B'}},x:{grid:{display:false}}}}
+  });
+})();
+
+// ── VALUATION CHARTS ──
+(function(){
+  new Chart(document.getElementById('c-ps'),{
+    type:'line',
+    data:{
+      labels:['2020','2021 고점','2022','2023','2024','2025','현재(2026)'],
+      datasets:[{
+        label:'P/S 비율',
+        data:[40,110,15,20,22,30,34],
+        borderColor:C.o,backgroundColor:'rgba(246,130,31,.15)',fill:true,tension:.4,
+        pointBackgroundColor:[C.o,C.r,C.g,C.y,C.y,C.o,C.r],pointRadius:7
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>v+'x'}},x:{grid:{display:false}}}}
+  });
+})();
+
+// ── RISK CHARTS ──
+(function(){
+  new Chart(document.getElementById('c-risk'),{
+    type:'radar',
+    data:{
+      labels:['밸류에이션','SBC 희석','경쟁 리스크','마진 압박','거시경제','기술 파괴','재무 건전성','실행 리스크'],
+      datasets:[
+        {label:'리스크 수준',data:[8.5,7.5,6.5,6.0,5.5,3.0,2.0,6.0],borderColor:C.r,backgroundColor:'rgba(248,81,73,.15)',pointBackgroundColor:C.r,pointRadius:4},
+        {label:'기회 수준',data:[4.0,3.0,7.5,6.0,5.0,9.0,9.5,7.0],borderColor:C.g,backgroundColor:'rgba(63,185,80,.15)',pointBackgroundColor:C.g,pointRadius:4}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{r:{min:0,max:10,grid:{color:'#30363d'},angleLines:{color:'#30363d'},ticks:{display:false},pointLabels:{font:{size:11},color:'#8b949e'}}}}
+  });
+})();
+
+// ── LONGTERM CHARTS ──
+(function(){
+  const yrs=['2025','2026','2027','2028','2029','2030','2031','2032','2033','2034','2035'];
+  const bull=[2.17,2.82,3.67,4.77,6.20,8.06,10.48,13.62,17.71,23.02,29.93];
+  const base=[2.17,2.65,3.23,3.94,4.81,5.87,7.16,8.74,10.66,13.00,15.86];
+  const cons=[2.17,2.50,2.87,3.30,3.80,4.37,5.03,5.78,6.65,7.65,8.80];
+  new Chart(document.getElementById('c-scen'),{
+    type:'line',
+    data:{
+      labels:yrs,
+      datasets:[
+        {label:'강세 (+30% CAGR)',data:bull,borderColor:C.g,fill:false,tension:.3,pointRadius:3},
+        {label:'기본 (+22% CAGR)',data:base,borderColor:C.b,fill:false,tension:.3,pointRadius:3,borderWidth:3},
+        {label:'보수 (+15% CAGR)',data:cons,borderColor:C.y,fill:false,tension:.3,pointRadius:3,borderDash:[5,5]}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v+'B'}},x:{grid:{display:false}}}}
+  });
+})();
+
+// ── DCA CHARTS ──
+(function(){
+  const months=Array.from({length:121},(_, i)=>i);
+  function dcaCalc(annualReturn){
+    let total=0;
+    const vals=[];
+    for(let m=0;m<121;m++){
+      total=total*(1+annualReturn/12)+100;
+      vals.push(Math.round(total));
+    }
+    return vals;
+  }
+  const labels=months.map(m=>{
+    if(m%12===0) return `${m/12}년`;
+    return '';
+  });
+  new Chart(document.getElementById('c-dca'),{
+    type:'line',
+    data:{
+      labels:labels,
+      datasets:[
+        {label:'강세 (+25%/년)',data:dcaCalc(0.25),borderColor:C.g,fill:false,tension:.3,pointRadius:0,borderWidth:2},
+        {label:'기본 (+15%/년)',data:dcaCalc(0.15),borderColor:C.b,fill:false,tension:.3,pointRadius:0,borderWidth:2},
+        {label:'보수 (+8%/년)',data:dcaCalc(0.08),borderColor:C.y,fill:false,tension:.3,pointRadius:0,borderWidth:2,borderDash:[5,5]},
+        {label:'원금',data:months.map(m=>m*100),borderColor:'#30363d',fill:false,tension:0,pointRadius:0,borderWidth:1,borderDash:[3,3]}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{boxWidth:12}}},
+      scales:{y:{grid:{color:'#30363d55'},ticks:{callback:v=>'$'+v.toLocaleString()}},x:{grid:{display:false}}}}
+  });
+})();
+</script>
+</body>
+</html>
