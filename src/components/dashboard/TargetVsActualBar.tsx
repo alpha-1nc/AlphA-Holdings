@@ -1,0 +1,171 @@
+"use client";
+
+import type { RoleAllocationItem } from "@/lib/role-allocation";
+import { ROLE_COLORS } from "@/lib/role-allocation";
+
+interface TargetVsActualBarProps {
+  data: RoleAllocationItem[];
+}
+
+function getDiffColor(diff: number): string {
+  const abs = Math.abs(diff);
+  if (abs < 5) return "text-neutral-500 dark:text-neutral-400";
+  if (diff > 0) return "text-orange-500 dark:text-orange-400"; // 초과
+  return "text-blue-500 dark:text-blue-400"; // 부족
+}
+
+function getBarAccentColor(diff: number): string {
+  const abs = Math.abs(diff);
+  if (abs < 5) return "#10B981"; // 정상 범위 — 초록
+  if (diff > 0) return "#F97316"; // 초과 — 주황
+  return "#3B82F6"; // 부족 — 파랑
+}
+
+function getDiffLabel(diff: number): string {
+  const abs = Math.abs(diff);
+  if (abs < 5) return "정상";
+  if (diff > 0) return `+${diff.toFixed(1)}% 초과`;
+  return `${diff.toFixed(1)}% 부족`;
+}
+
+interface RoleRowProps {
+  item: RoleAllocationItem;
+}
+
+function RoleRow({ item }: RoleRowProps) {
+  const diff = item.actualWeight - item.targetWeight;
+  const diffColor = getDiffColor(diff);
+  const accentColor = getBarAccentColor(diff);
+  const roleColor = ROLE_COLORS[item.role];
+
+  // Clamp display values to [0, 100] — 0% actual weight도 안전하게 처리
+  const actualPct = Math.min(
+    100,
+    Math.max(0, Number(item.actualWeight) || 0),
+  );
+  const targetPct = Math.min(
+    100,
+    Math.max(0, Number(item.targetWeight) || 0),
+  );
+
+  // Target marker position (as % of bar width)
+  const targetMarkerLeft = targetPct;
+
+  const hasTarget = (Number(item.targetWeight) || 0) > 0;
+
+  return (
+    <div className="space-y-1.5">
+      {/* Label row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ background: roleColor }}
+          />
+          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+            {item.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {hasTarget && (
+            <span className={`text-[10px] font-medium ${diffColor}`}>
+              {getDiffLabel(diff)}
+            </span>
+          )}
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+            현재 {item.actualWeight.toFixed(1)}%
+            {hasTarget && ` / 목표 ${item.targetWeight.toFixed(1)}%`}
+          </span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="relative h-4 w-full overflow-visible rounded-full bg-neutral-100 dark:bg-neutral-800">
+        {/* Actual weight fill */}
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+          style={{
+            width: `${actualPct}%`,
+            background: accentColor,
+            opacity: 0.85,
+          }}
+        />
+
+        {/* Target marker — vertical line (actual 0%여도 목표 위치에 정상 표시) */}
+        {hasTarget && targetMarkerLeft > 0 && (
+          <div
+            className="absolute inset-y-[-3px] w-[2px] rounded-full bg-neutral-600 dark:bg-neutral-300 z-10"
+            style={{ left: `calc(${targetMarkerLeft}% - 1px)` }}
+            title={`목표 ${item.targetWeight.toFixed(1)}%`}
+          />
+        )}
+      </div>
+
+      {/* Sub-legend */}
+      {hasTarget && (
+        <div className="flex items-center gap-3 pl-0.5">
+          <div className="flex items-center gap-1">
+            <span
+              className="inline-block h-2 w-3 rounded-sm opacity-85"
+              style={{ background: accentColor }}
+            />
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              현재 {item.actualWeight.toFixed(1)}%
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-3 w-[2px] rounded-full bg-neutral-500 dark:bg-neutral-400" />
+            <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+              목표 {item.targetWeight.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function TargetVsActualBar({ data }: TargetVsActualBarProps) {
+  if (!data.length) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
+        <p className="text-sm text-neutral-400 dark:text-neutral-500">
+          설정에서 종목별 역할과 목표 비중을 지정하면
+        </p>
+        <p className="text-sm text-neutral-400 dark:text-neutral-500">
+          리밸런싱 힌트가 표시됩니다
+        </p>
+      </div>
+    );
+  }
+
+  const hasAnyTarget = data.some((d) => d.targetWeight > 0);
+  const totalTarget = data.reduce((s, d) => s + d.targetWeight, 0);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {data.map((item) => (
+        <RoleRow key={item.role} item={item} />
+      ))}
+
+      {/* Total target weight hint */}
+      {hasAnyTarget && (
+        <div className="mt-1 flex items-center justify-between border-t border-neutral-100 pt-3 dark:border-neutral-800">
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+            목표 비중 합계
+          </span>
+          <span
+            className={`text-[10px] font-semibold ${
+              Math.abs(totalTarget - 100) < 1
+                ? "text-emerald-500 dark:text-emerald-400"
+                : "text-amber-500 dark:text-amber-400"
+            }`}
+          >
+            {totalTarget.toFixed(1)}%
+            {Math.abs(totalTarget - 100) >= 1 && " (100% 아님)"}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

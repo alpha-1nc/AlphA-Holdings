@@ -10,10 +10,16 @@ import {
 } from "recharts";
 import { Globe, Wallet, BarChart3 } from "lucide-react";
 import { getReportsByProfilePublished } from "@/app/actions/reports";
+import { getPortfolioStrategies } from "@/app/actions/strategy";
 import { getTickerColor, FALLBACK_COLORS } from "@/constants/brandColors";
 import { getTickerDisplayName } from "@/lib/ticker-metadata";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
-import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
+import type { WorkspaceProfile } from "@/lib/profile";
+import { computeRoleAllocation } from "@/lib/role-allocation";
+import { RoleAllocationChart } from "@/components/dashboard/RoleAllocationChart";
+import { TargetVsActualBar } from "@/components/dashboard/TargetVsActualBar";
+import { AiBriefingBanner } from "@/components/dashboard/AiBriefingBanner";
+import type { Report, PortfolioItem, NewInvestment, PortfolioStrategy } from "@/generated/prisma";
 
 type ReportWithItems = Report & { 
     portfolioItems: PortfolioItem[];
@@ -336,6 +342,7 @@ function SectorDonut({ items, totalKrw }: { items: PortfolioItem[]; totalKrw: nu
 export default function DashboardPage() {
     const [profileId, setProfileId] = useState<string>("alpha-ceo");
     const [reports, setReports] = useState<ReportWithItems[]>([]);
+    const [strategies, setStrategies] = useState<PortfolioStrategy[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"monthly" | "quarterly">("monthly");
     const [includeCash, setIncludeCash] = useState(false);
@@ -349,8 +356,14 @@ export default function DashboardPage() {
         if (!profileId) return;
         setLoading(true);
         const profileLabel = getProfileLabel(profileId as "alpha-ceo" | "partner");
-        getReportsByProfilePublished(profileLabel)
-            .then((data) => setReports(data as ReportWithItems[]))
+        Promise.all([
+            getReportsByProfilePublished(profileLabel),
+            getPortfolioStrategies(profileId as WorkspaceProfile),
+        ])
+            .then(([reportData, strategyData]) => {
+                setReports(reportData as ReportWithItems[]);
+                setStrategies(strategyData);
+            })
             .finally(() => setLoading(false));
     }, [profileId]);
 
@@ -467,6 +480,11 @@ export default function DashboardPage() {
     // ── 최신 분기별 리포트 (포트폴리오 도넛 차트용) ──────────────────
     const latestQuarterly = quarterlyReports[quarterlyReports.length - 1];
 
+    // ── 역할군 비중 계산 ──────────────────────────────────────────────
+    const roleAllocationData = latestQuarterly
+        ? computeRoleAllocation(latestQuarterly.portfolioItems, strategies)
+        : [];
+
     return (
         <div className="w-full max-w-[100vw] space-y-8 overflow-hidden p-0 md:space-y-10">
             {/* Header */}
@@ -496,6 +514,9 @@ export default function DashboardPage() {
                     <SummaryCard key={card.label} {...card} />
                 ))}
             </div>
+
+            {/* AI 브리핑 배너 */}
+            <AiBriefingBanner profileId={profileId as WorkspaceProfile} />
 
             {/* Chart Section */}
             {chartReports.length > 0 && (
@@ -720,6 +741,35 @@ export default function DashboardPage() {
                                 </Link>
                             </div>
                         )}
+                    </div>
+                </div>
+
+                {/* Insight Layer — 역할군 비중 + 목표 대비 괴리율 */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    {/* 역할군 비중 도넛 */}
+                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <div className="mb-4">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                역할군 비중
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                                Role Allocation · 설정에서 역할 지정 가능
+                            </p>
+                        </div>
+                        <RoleAllocationChart data={roleAllocationData} />
+                    </div>
+
+                    {/* 목표 대비 괴리율 */}
+                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <div className="mb-4">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                목표 대비 괴리율
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                                Target vs Actual · ±5% 초과 시 리밸런싱 힌트
+                            </p>
+                        </div>
+                        <TargetVsActualBar data={roleAllocationData} />
                     </div>
                 </div>
             </div>

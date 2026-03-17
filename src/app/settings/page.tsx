@@ -9,6 +9,7 @@ import {
     PROFILE_STORAGE_KEY 
 } from "@/lib/profile";
 import { getAppVersion } from "@/lib/version";
+import { PortfolioStrategyManager } from "@/components/settings/PortfolioStrategyManager";
 
 export default function SettingsPage() {
     const [profile, setProfile] = useState<WorkspaceProfile>("alpha-ceo");
@@ -68,6 +69,9 @@ export default function SettingsPage() {
                     대시보드 조회 및 리포트 작성 시 사용되는 기본 운용 주체입니다.
                 </p>
             </section>
+
+            {/* ── Section: 포트폴리오 전략 관리 ──────────────────────────────── */}
+            <PortfolioStrategyManager workspaceProfile={profile} />
 
             {/* ── Section: 데이터 백업 및 내보내기 ───────────────────────────── */}
             <section>

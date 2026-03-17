@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const titles: Record<string, string> = {
     "/": "Dashboard",
@@ -12,13 +13,18 @@ export function Navbar() {
     const pathname = usePathname();
     const title = titles[pathname] ?? "AlphA Holdings";
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+    const [dateStr, setDateStr] = useState<string>("");
+    useEffect(() => {
+        const now = new Date();
+        setDateStr(
+            now.toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+            })
+        );
+    }, []);
 
     return (
         <header className="sticky top-0 z-40 flex h-20 items-center justify-between border-b border-neutral-100/80 bg-white/80 px-8 backdrop-blur-xl dark:border-neutral-800/80 dark:bg-neutral-950/80">
@@ -30,7 +36,7 @@ export function Navbar() {
                     AlphA Holdings — Portfolio
                 </p>
             </div>
-            <p className="text-[11px] text-neutral-400 dark:text-neutral500">
+            <p className="text-[11px] text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
                 {dateStr}
             </p>
         </header>

@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
 import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
+import { AiCommentSection } from "@/components/reports/AiCommentSection";
+import { getProfileFromLabel } from "@/lib/profile";
 
 const krw = (n: number) =>
     new Intl.NumberFormat("ko-KR", {
@@ -84,6 +86,7 @@ export default async function ReportDetailPage(props: {
     }));
 
     const backHref = report.type === "MONTHLY" ? "/monthly" : "/quarterly";
+    const profileId = getProfileFromLabel(report.profile) ?? "alpha-ceo";
 
     return (
         <div className="space-y-8">
@@ -114,7 +117,7 @@ export default async function ReportDetailPage(props: {
                 <div className="flex flex-col items-end gap-3">
                     <div className="text-right text-xs text-neutral-500 dark:text-neutral-400">
                         <p>작성일</p>
-                        <p className="mt-1 font-medium text-neutral-800 dark:text-neutral-200">
+                        <p className="mt-1 font-medium text-neutral-800 dark:text-neutral-200" suppressHydrationWarning>
                             {new Date(report.createdAt).toLocaleDateString("ko-KR", {
                                 year: "numeric",
                                 month: "2-digit",
@@ -226,11 +229,11 @@ export default async function ReportDetailPage(props: {
                             <div className="mt-4 flex gap-3">
                                 <div className="flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-xs dark:bg-neutral-800/50">
                                     <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">USD/KRW</p>
-                                    <p className="mt-1 font-semibold text-neutral-700 dark:text-neutral-200">₩{(report.usdRate ?? 0).toLocaleString()}</p>
+                                    <p className="mt-1 font-semibold text-neutral-700 dark:text-neutral-200" suppressHydrationWarning>₩{(report.usdRate ?? 0).toLocaleString()}</p>
                                 </div>
                                 <div className="flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-xs dark:bg-neutral-800/50">
                                     <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">100 JPY/KRW</p>
-                                    <p className="mt-1 font-semibold text-neutral-700 dark:text-neutral-200">₩{(report.jpyRate ?? 0).toLocaleString()}</p>
+                                    <p className="mt-1 font-semibold text-neutral-700 dark:text-neutral-200" suppressHydrationWarning>₩{(report.jpyRate ?? 0).toLocaleString()}</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -304,7 +307,7 @@ export default async function ReportDetailPage(props: {
                         </div>
                         <div className="flex justify-between">
                             <span className="text-neutral-400">마지막 수정</span>
-                            <span className="font-medium">
+                            <span className="font-medium" suppressHydrationWarning>
                                 {new Date(report.updatedAt).toLocaleDateString("ko-KR", {
                                     year: "numeric",
                                     month: "2-digit",
@@ -315,6 +318,13 @@ export default async function ReportDetailPage(props: {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* AlphA AI 포트폴리오 분석 */}
+            <AiCommentSection
+                reportId={report.id}
+                profileId={profileId}
+                initialComment={report.reportAiComment ?? null}
+            />
         </div>
     );
 }

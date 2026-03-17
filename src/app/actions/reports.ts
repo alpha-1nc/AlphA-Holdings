@@ -196,6 +196,28 @@ function validateReportPayload(
   return { ok: true };
 }
 
+// ── 최신 리포트의 AI 코멘트 조회 (대시보드 배너용) ────────────────
+export async function getLatestAiComment(profile: string) {
+  const report = await prisma.report.findFirst({
+    where: {
+      profile,
+      status: "PUBLISHED",
+      reportAiComment: { isNot: null },
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      reportAiComment: true,
+    },
+  });
+  if (!report?.reportAiComment) return null;
+  return {
+    reportId: report.id,
+    periodLabel: report.periodLabel,
+    type: report.type,
+    comment: report.reportAiComment,
+  };
+}
+
 // ── 단일 리포트 조회 ───────────────────────────────────────
 export async function getReportById(id: number) {
   return prisma.report.findUnique({
@@ -203,6 +225,7 @@ export async function getReportById(id: number) {
     include: {
       portfolioItems: true,
       newInvestments: true,
+      reportAiComment: true,
     },
   });
 }

@@ -247,7 +247,7 @@ export default function AnalysisReportsPage() {
             return (
               <section key={periodStr}>
                 <div className="mb-4 flex items-center justify-between">
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400 dark:text-neutral-500">
+                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
                     {monthLabel}
                   </p>
                   <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
@@ -265,7 +265,17 @@ export default function AnalysisReportsPage() {
                         <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-blue-400 to-indigo-500" />
                         <div className="p-5 pt-6">
                           <div className="flex items-start justify-between gap-2">
-                            <CompanyLogo report={report} />
+                            <div
+                              className="shrink-0"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                            >
+                              <CompanyLogo report={report} />
+                            </div>
                             {report.verdict && (
                               <span
                                 className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${

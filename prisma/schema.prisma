@@ -38,6 +38,44 @@ enum ReportStatus {
   PUBLISHED  // 작성 완료: 모든 필수 필드 검증 통과
 }
 
+// ── 자산 역할군 Enum (판단 보조 / Insight) ───────────────────
+enum AssetRole {
+  CORE       // 코어
+  GROWTH     // 성장
+  BOOSTER    // 부스터
+  DEFENSIVE  // 방어
+  INDEX      // 지수
+}
+
+// ── 운용 프로필 (전략 관리용) ─────────────────────────────────
+model Profile {
+  id               String             @id @default(cuid())
+
+  label            String             @unique  // "AlphA Holdings Portfolio", "MindongFolio" 등
+
+  portfolioStrategies PortfolioStrategy[]
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+}
+
+// ── 포트폴리오 전략 (프로필별 종목 목표 비중·역할) ─────────────
+model PortfolioStrategy {
+  id               String             @id @default(cuid())
+
+  profileId        String
+  profile          Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  ticker           String             // 종목 심볼
+  role             AssetRole          @default(CORE)  // 역할군
+  targetWeight     Float              // 목표 비중 (%)
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  @@unique([profileId, ticker])
+}
+
 // ── 투자 리포트 (다중 통화 지원) ─────────────────────────
 model Report {
   id              Int             @id @default(autoincrement())
@@ -67,11 +105,28 @@ model Report {
   earningsReview  String?                           // 분기별 어닝/실적 리뷰 (QUARTERLY 전용)
 
   // 관계
-  portfolioItems  PortfolioItem[]
-  newInvestments  NewInvestment[]
+  portfolioItems   PortfolioItem[]
+  newInvestments   NewInvestment[]
+  reportAiComment ReportAiComment?
 
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+}
+
+// ── 리포트 AI 분석 결과 캐시 (월별/분기별) ─────────────────────────────
+model ReportAiComment {
+  id              String   @id @default(uuid())
+
+  reportId        Int      @unique
+  report         Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  monthlySummary String   // 현재 상태 요약
+  monthlyChange  String?  // 변화 설명
+  nextAction     String   // 다음 액션 (규칙 기반)
+  inputJson      Json     // AI 분석 입력 플래그 (규칙 엔진 결과)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 // ── 리포트 기준 포트폴리오 항목 (다중 통화) ───────────────

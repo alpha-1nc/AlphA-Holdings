@@ -45,7 +45,7 @@ function ReportCard({ report }: { report: ReportWithItems }) {
                     <div className="flex items-start justify-between gap-2 mb-3">
                         <div>
                             <div className="flex items-center gap-2">
-                                <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500">
+                                <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
                                     {new Date(report.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })}
                                 </p>
                                 {isDraft && (
