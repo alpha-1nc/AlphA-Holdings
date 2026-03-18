@@ -15,8 +15,8 @@ export const TICKER_METADATA: Record<string, TickerMetadata> = {
     // ── US 빅테크 ─────────────────────────────────────────────────────
     AAPL: { name: "Apple Inc.", domain: "apple.com", color: "#A3AAAE", sector: "Technology" },
     MSFT: { name: "Microsoft Corporation", domain: "microsoft.com", color: "#00A4EF", sector: "Technology" },
-    GOOGL: { name: "Alphabet Inc. (Class A)", domain: "google.com", color: "#4285F4", sector: "Technology" },
-    GOOG: { name: "Alphabet Inc. (Class C)", domain: "google.com", color: "#4285F4", sector: "Technology" },
+    GOOGL: { name: "Alphabet Inc. (Class A)", domain: "google.com", color: "#EA4335", sector: "Technology" },
+    GOOG: { name: "Alphabet Inc. (Class C)", domain: "google.com", color: "#EA4335", sector: "Technology" },
     AMZN: { name: "Amazon.com Inc.", domain: "amazon.com", color: "#FF9900", sector: "Consumer Discretionary" },
     META: { name: "Meta Platforms Inc.", domain: "meta.com", color: "#0866FF", sector: "Technology" },
     NVDA: { name: "NVIDIA Corporation", domain: "nvidia.com", color: "#76B900", sector: "Technology" },
@@ -128,6 +128,7 @@ export const TICKER_METADATA: Record<string, TickerMetadata> = {
     "379810": { name: "TIGER 미국S&P500(합성)", domain: "tigeretf.com", color: "#00A651", sector: "ETF" },
     "379790": { name: "KODEX 미국S&P500레버리지", domain: "samsungfund.com", color: "#FF6B00", sector: "ETF" },
     "102110": { name: "TIGER 미국나스닥100레버리지", domain: "tigeretf.com", color: "#003366", sector: "ETF" },
+    "371460": { name: "TIGER 미국S&P500", domain: "tigeretf.com", color: "#00A651", sector: "ETF / Index" },
 
     // ── 계좌/특수 타입 (차트용) ─────────────────────────────────────────
     "미국 직투": { name: "미국 직투", domain: "", color: "#3B82F6", sector: "Account" },
@@ -147,8 +148,7 @@ export const FALLBACK_COLORS: readonly string[] = [
  */
 export function getTickerColor(ticker: string, index: number): string {
     if (!ticker?.trim()) return FALLBACK_COLORS[0];
-    const key = ticker.trim().toUpperCase();
-    const meta = TICKER_METADATA[key] ?? TICKER_METADATA[ticker];
+    const meta = getTickerMetadata(ticker);
     if (meta?.color) return meta.color;
     return FALLBACK_COLORS[Math.abs(index) % FALLBACK_COLORS.length];
 }
@@ -158,23 +158,44 @@ export function getTickerColor(ticker: string, index: number): string {
  * - 등록된 티커 중 domain이 명시적으로 존재하는 경우에만 반환
  * - domain이 없거나 빈 문자열이면 null → 이니셜 아바타만 표시
  * - 미등록 티커는 추측 도메인을 만들지 않음 (Google 기본 이미지 노출 방지)
+ * - 한국/일본 숫자 코드 정규화 지원
  */
 export function getTickerDomain(ticker: string): string | null {
     if (!ticker?.trim()) return null;
-    const key = ticker.trim().toUpperCase();
-    const meta = TICKER_METADATA[key] ?? TICKER_METADATA[ticker];
-    // 메타데이터에 domain이 명시적으로 등록된 경우에만 반환
+    const meta = getTickerMetadata(ticker);
     if (meta?.domain && meta.domain.trim() !== "") return meta.domain.trim();
     return null;
 }
 
 /**
+ * 숫자 종목코드 정규화 (한국 6자리, 일본 4자리)
+ * - "5930" → "005930" (한국)
+ * - "8058" → "8058" (일본, 4자리 유지)
+ */
+function normalizeTickerKey(ticker: string): string[] {
+    const t = ticker.trim();
+    if (!t) return [];
+    const keys: string[] = [t, t.toUpperCase()];
+    const num = /^\d+$/.test(t) ? parseInt(t, 10) : NaN;
+    if (!Number.isNaN(num)) {
+        if (t.length <= 5) keys.push(String(num).padStart(6, "0")); // 한국 6자리
+        if (t.length >= 5 && t.length <= 6) keys.push(String(num)); // 선행 0 제거
+    }
+    return [...new Set(keys)];
+}
+
+/**
  * 티커 메타데이터 조회 (name, sector 등)
+ * 한국/일본 숫자 코드 지원 (포맷 변환 포함)
  */
 export function getTickerMetadata(ticker: string): TickerMetadata | null {
     if (!ticker?.trim()) return null;
-    const key = ticker.trim().toUpperCase();
-    return TICKER_METADATA[key] ?? TICKER_METADATA[ticker] ?? null;
+    const keysToTry = normalizeTickerKey(ticker);
+    for (const k of keysToTry) {
+        const meta = TICKER_METADATA[k];
+        if (meta) return meta;
+    }
+    return null;
 }
 
 /**

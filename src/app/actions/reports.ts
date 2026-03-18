@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import type { ReportType, ReportStatus } from "@/generated/prisma";
+import type { AssetRole, ReportType, ReportStatus } from "@/generated/prisma";
 
 export type ReportTypeInput = "MONTHLY" | "QUARTERLY";
 export type ReportStatusInput = "DRAFT" | "PUBLISHED";
@@ -248,6 +248,7 @@ export interface CreateReportPayload {
     ticker: string;
     sector?: string;
     logoUrl?: string | null;
+    role?: AssetRole;
     accountType: "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
     originalCurrency: "USD" | "KRW" | "JPY";
     originalAmount: number;

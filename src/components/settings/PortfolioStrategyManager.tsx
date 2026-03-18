@@ -35,6 +35,7 @@ const ROLE_BADGE_STYLES: Record<AssetRole, string> = {
     BOOSTER:   "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     DEFENSIVE: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
     INDEX:     "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
+    UNASSIGNED: "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400",
 };
 
 interface Props {
@@ -106,8 +107,8 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                 });
                 toast.success(
                     editingId
-                        ? `${trimmedTicker} 전략이 수정되었습니다.`
-                        : `${trimmedTicker} 전략이 추가되었습니다.`
+                        ? `${trimmedTicker} 목표가 수정되었습니다.`
+                        : `${trimmedTicker} 목표가 추가되었습니다.`
                 );
                 handleCancelEdit();
                 await loadStrategies();
@@ -121,7 +122,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
         startTransition(async () => {
             try {
                 await deletePortfolioStrategy(id);
-                toast.success(`${ticker} 전략이 삭제되었습니다.`);
+                toast.success(`${ticker} 목표가 삭제되었습니다.`);
                 await loadStrategies();
             } catch {
                 toast.error("삭제 중 오류가 발생했습니다.");
@@ -141,14 +142,14 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
     return (
         <section className="mb-10">
             <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                포트폴리오 전략
+                목표 포트폴리오
             </p>
 
             <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
                 {/* ── 입력 폼 ──────────────────────────────────────────── */}
                 <form onSubmit={handleSubmit} className="px-6 py-5">
                     <p className="mb-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                        {editingId ? "전략 수정" : "종목 전략 추가"}
+                        {editingId ? "목표 수정" : "종목 목표 추가"}
                     </p>
 
                     <div className="flex flex-wrap items-end gap-2">
@@ -247,7 +248,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
                 <div className="mx-6 h-px bg-neutral-100 dark:bg-neutral-800" />
 
-                {/* ── 전략 리스트 ───────────────────────────────────────── */}
+                {/* ── 목표 리스트 ───────────────────────────────────────── */}
                 <div className="px-6 py-4">
                     {loading ? (
                         <div className="space-y-2.5 py-1">
@@ -260,7 +261,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                         </div>
                     ) : strategies.length === 0 ? (
                         <p className="py-4 text-center text-sm text-neutral-400 dark:text-neutral-500">
-                            등록된 전략이 없습니다.
+                            등록된 목표가 없습니다.
                         </p>
                     ) : (
                         <div className="space-y-1">
@@ -357,7 +358,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
             </div>
 
             <p className="mt-3 px-1 text-xs text-neutral-400 dark:text-neutral-500">
-                현재 선택된 프로필의 종목별 역할과 목표 비중을 관리합니다.
+                현재 선택된 프로필의 종목별 목표 비중을 설정합니다.
             </p>
         </section>
     );

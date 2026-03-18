@@ -8,9 +8,17 @@ export interface RoleAllocationItem {
   role: RoleKey;
   label: string;
   actualWeight: number;   // % of total non-cash portfolio
-  targetWeight: number;   // % from PortfolioStrategy (sum of tickers in role)
+  targetWeight: number;   // Feature A: 항상 0 (Strategy 미참조). 하위 호환용 유지.
   krwAmount: number;
   tickers: string[];
+}
+
+/** 종목별 목표 대비 괴리율 (기능 B) */
+export interface TickerDeviationItem {
+  ticker: string;
+  targetWeight: number;
+  actualWeight: number;
+  diff: number;  // actualWeight - targetWeight
 }
 
 export const ROLE_LABELS: Record<RoleKey, string> = {
@@ -22,80 +30,57 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   UNASSIGNED: "미지정",
 };
 
+/** 역할별 고유 색상 - 서로 명확히 구별되도록 선정 */
 export const ROLE_COLORS: Record<RoleKey, string> = {
-  CORE: "#6366F1",
-  GROWTH: "#10B981",
-  BOOSTER: "#F59E0B",
-  DEFENSIVE: "#3B82F6",
-  INDEX: "#8B5CF6",
-  UNASSIGNED: "#A3A3A3",
+  CORE: "#2563EB",      // blue - 중심/안정
+  GROWTH: "#059669",    // emerald - 성장
+  BOOSTER: "#D97706",   // amber - 부스터
+  DEFENSIVE: "#0891B2", // cyan - 방어
+  INDEX: "#EC4899",     // pink - 지수
+  UNASSIGNED: "#6B7280", // gray - 미지정
 };
 
+const CASH_TICKER_PATTERNS = /^(KRW|USD|JPY|EUR|GBP|CNY|CASH|현금)$/i;
+
+function isCashLike(item: PortfolioItem): boolean {
+  const t = (item.ticker ?? "").trim();
+  const n = (item as { name?: string }).name ?? "";
+  if (!t && !n) return false;
+  return (
+    n.includes("현금") ||
+    n.includes("💵") ||
+    t.includes("현금") ||
+    t.includes("💵") ||
+    CASH_TICKER_PATTERNS.test(t) ||
+    t.toUpperCase() === "CASH"
+  );
+}
+
 /**
- * Merges portfolio items with strategy data to compute per-role actual vs target weights.
- * Cash (accountType === "CASH") is excluded from weight calculations.
- *
- * Target weight is summed from the full strategies array (regardless of holdings).
- * Roles with target >= 1% are always included, even when actual weight is 0%.
+ * 기능 A: 역할군 비중 — 최신 리포트의 PortfolioItem만 사용, Strategy 테이블 미참조.
+ * 각 아이템의 role 값 기준으로 실제 비중(%)을 그룹화하여 반환. (도넛 차트용)
  */
-export function computeRoleAllocation(
-  items: PortfolioItem[],
-  strategies: PortfolioStrategy[],
-): RoleAllocationItem[] {
+export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationItem[] {
   const nonCashItems = items.filter(
-    (i) => i.accountType !== "CASH" && i.krwAmount > 0,
+    (i) => i.accountType !== "CASH" && i.krwAmount > 0 && !isCashLike(i),
   );
   const totalKrw = nonCashItems.reduce((s, i) => s + i.krwAmount, 0);
-
-  // 1. Target weight per role — from FULL strategies array (보유 여부 무관)
-  const targetWeightByRole = new Map<RoleKey, number>();
-  for (const s of strategies) {
-    const role: RoleKey = s.role ?? "UNASSIGNED";
-    const current = targetWeightByRole.get(role) ?? 0;
-    targetWeightByRole.set(role, current + (s.targetWeight ?? 0));
-  }
-
-  // 2. Actual weight per role — from held items only
-  const strategyMap = new Map<string, PortfolioStrategy>();
-  for (const s of strategies) {
-    strategyMap.set(s.ticker.toUpperCase(), s);
-  }
-
-  // 현금성 티커 목록 — 이름/티커에 '현금', '💵', CASH 등이 포함된 항목은 미지정 분류 대상에서 완전 제외
-  const CASH_TICKER_PATTERNS = /^(KRW|USD|JPY|EUR|GBP|CNY|CASH|현금)$/i;
-  const isCashLike = (item: PortfolioItem): boolean => {
-    const t = (item.ticker ?? "").trim();
-    const n = (item as { name?: string }).name ?? "";
-    if (!t && !n) return false;
-    return (
-      n.includes("현금") ||
-      n.includes("💵") ||
-      t.includes("현금") ||
-      t.includes("💵") ||
-      CASH_TICKER_PATTERNS.test(t) ||
-      t.toUpperCase() === "CASH"
-    );
-  };
 
   const actualByRole = new Map<
     RoleKey,
     { krwAmount: number; tickers: string[] }
   >();
+
   for (const item of nonCashItems) {
-    if (isCashLike(item)) continue;
-    const strategy = strategyMap.get(item.ticker.toUpperCase());
-    const role: RoleKey = strategy?.role ?? "UNASSIGNED";
-    const existing = actualByRole.get(role) ?? {
-      krwAmount: 0,
-      tickers: [],
-    };
+    const itemRole = (item as { role?: AssetRole | null }).role;
+    const role: RoleKey = (itemRole != null ? (itemRole as RoleKey) : "UNASSIGNED");
+    const existing = actualByRole.get(role) ?? { krwAmount: 0, tickers: [] };
     actualByRole.set(role, {
       krwAmount: existing.krwAmount + item.krwAmount,
       tickers: [...existing.tickers, item.ticker],
     });
   }
 
-  // 3. Include roles: target >= 1% from strategies OR has actual holdings
   const roleOrder: RoleKey[] = [
     "CORE",
     "GROWTH",
@@ -107,28 +92,59 @@ export function computeRoleAllocation(
 
   return roleOrder
     .filter((role) => {
-      const targetFromStrategies = targetWeightByRole.get(role) ?? 0;
-      const actualData = actualByRole.get(role);
-      return (
-        targetFromStrategies >= 1 ||
-        (actualData != null && actualData.krwAmount > 0)
-      );
+      const data = actualByRole.get(role);
+      return data != null && data.krwAmount > 0;
     })
     .map((role) => {
-      const targetWeight = targetWeightByRole.get(role) ?? 0;
-      const actualData = actualByRole.get(role) ?? {
-        krwAmount: 0,
-        tickers: [],
-      };
+      const data = actualByRole.get(role) ?? { krwAmount: 0, tickers: [] };
       const actualWeight =
-        totalKrw > 0 ? (actualData.krwAmount / totalKrw) * 100 : 0;
+        totalKrw > 0 ? (data.krwAmount / totalKrw) * 100 : 0;
       return {
         role,
         label: ROLE_LABELS[role],
         actualWeight,
-        targetWeight,
-        krwAmount: actualData.krwAmount,
-        tickers: actualData.tickers,
+        targetWeight: 0,  // 기능 A: Strategy 미참조
+        krwAmount: data.krwAmount,
+        tickers: data.tickers,
       };
     });
+}
+
+/**
+ * 기능 B: 종목별 목표 대비 괴리율.
+ * PortfolioStrategy(목표 포트폴리오)의 개별 종목을 기준으로,
+ * 최신 리포트 PortfolioItem의 실제 비중을 매핑.
+ * 실제 보유율이 0%인 목표 종목도 포함.
+ */
+export function computeTickerDeviation(
+  items: PortfolioItem[],
+  strategies: PortfolioStrategy[],
+): TickerDeviationItem[] {
+  const nonCashItems = items.filter(
+    (i) => i.accountType !== "CASH" && i.krwAmount > 0,
+  );
+  const totalKrw = nonCashItems.reduce((s, i) => s + i.krwAmount, 0);
+
+  // 실제 비중: 티커별 krwAmount 합산 (동일 종목 여러 계좌 보유 시 합산)
+  const actualKrwByTicker = new Map<string, number>();
+  for (const item of nonCashItems) {
+    const key = item.ticker.trim().toUpperCase();
+    const current = actualKrwByTicker.get(key) ?? 0;
+    actualKrwByTicker.set(key, current + item.krwAmount);
+  }
+
+  return strategies.map((s) => {
+    const ticker = s.ticker.trim().toUpperCase();
+    const targetWeight = s.targetWeight ?? 0;
+    const actualKrw = actualKrwByTicker.get(ticker) ?? 0;
+    const actualWeight =
+      totalKrw > 0 ? (actualKrw / totalKrw) * 100 : 0;
+    const diff = actualWeight - targetWeight;
+    return {
+      ticker: s.ticker,
+      targetWeight,
+      actualWeight,
+      diff,
+    };
+  });
 }

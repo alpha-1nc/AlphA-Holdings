@@ -1,4 +1,4 @@
-// ── 포트폴리오 전략 관련 타입 (프론트엔드용) ────────────────────────
+// ── 목표 포트폴리오 관련 타입 (프론트엔드용) ────────────────────────
 
 import type { AssetRole, PortfolioStrategy, Profile } from "@/generated/prisma";
 
@@ -12,6 +12,7 @@ export const ASSET_ROLE_LABELS: Record<AssetRole, string> = {
   BOOSTER: "부스터",
   DEFENSIVE: "방어",
   INDEX: "지수",
+  UNASSIGNED: "미지정",
 };
 
 /** 전략 생성 입력 */

@@ -15,7 +15,7 @@ import { getTickerColor, FALLBACK_COLORS } from "@/constants/brandColors";
 import { getTickerDisplayName } from "@/lib/ticker-metadata";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { WorkspaceProfile } from "@/lib/profile";
-import { computeRoleAllocation } from "@/lib/role-allocation";
+import { computeRoleAllocation, computeTickerDeviation } from "@/lib/role-allocation";
 import { RoleAllocationChart } from "@/components/dashboard/RoleAllocationChart";
 import { TargetVsActualBar } from "@/components/dashboard/TargetVsActualBar";
 import { AiBriefingBanner } from "@/components/dashboard/AiBriefingBanner";
@@ -136,7 +136,7 @@ function SectorTooltip({ active, payload }: {
             {item.payload.tickers.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                     {item.payload.tickers.map((t) => (
-                        <span key={t} className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                        <span key={t} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                             {getTickerDisplayName(t)}
                         </span>
                     ))}
@@ -230,8 +230,8 @@ function TickerDonut({ items, totalKrw, includeCash }: { items: PortfolioItem[];
                 {data.map((d) => {
                     const pct = displayTotal > 0 ? ((d.value / displayTotal) * 100).toFixed(1) : "0";
                     return (
-                        <div key={d.name} className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400">
-                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: d.color }} />
+                        <div key={d.name} className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
                             <span>{d.name}</span>
                             <span className="text-neutral-400 dark:text-neutral-500">{pct}%</span>
                         </div>
@@ -245,18 +245,18 @@ function TickerDonut({ items, totalKrw, includeCash }: { items: PortfolioItem[];
 /* ── Sector Donut ────────────────────────────────────────────────────────*/
 const SECTOR_COLORS: Record<string, string> = {
     "Technology": "#6366F1",
-    "Financials": "#3B82F6",
+    "Financials": "#2563EB",
     "Consumer Discretionary": "#F59E0B",
-    "Consumer Staples": "#10B981",
+    "Consumer Staples": "#059669",
     "Healthcare": "#EC4899",
-    "Industrials": "#8B5CF6",
-    "Energy": "#EF4444",
-    "Materials": "#84CC16",
-    "Real Estate": "#F97316",
-    "Utilities": "#06B6D4",
-    "Communication Services": "#0EA5E9",
+    "Industrials": "#0D9488",
+    "Energy": "#DC2626",
+    "Materials": "#65A30D",
+    "Real Estate": "#7C3AED",
+    "Utilities": "#0891B2",
+    "Communication Services": "#EA580C",
     "ETF / Index": "#6B7280",
-    "기타": "#A3A3A3",
+    "기타": "#9CA3AF",
 };
 
 /** 현금 제외하여 섹터별 비중 계산 (CASH는 섹터 분류 없음) */
@@ -324,8 +324,8 @@ function SectorDonut({ items, totalKrw }: { items: PortfolioItem[]; totalKrw: nu
                 {data.map((d) => {
                     const pct = totalExCash > 0 ? ((d.value / totalExCash) * 100).toFixed(1) : "0";
                     return (
-                        <div key={d.name} className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400">
-                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: d.color }} />
+                        <div key={d.name} className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
+                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
                             <span>{d.name}</span>
                             <span className="text-neutral-400 dark:text-neutral-500">{pct}%</span>
                         </div>
@@ -480,10 +480,16 @@ export default function DashboardPage() {
     // ── 최신 분기별 리포트 (포트폴리오 도넛 차트용) ──────────────────
     const latestQuarterly = quarterlyReports[quarterlyReports.length - 1];
 
-    // ── 역할군 비중 계산 ──────────────────────────────────────────────
+    // ── 역할군 비중 계산 (기능 A: items만, 도넛 차트용) ───────────────────
     const roleAllocationData = latestQuarterly
-        ? computeRoleAllocation(latestQuarterly.portfolioItems, strategies)
+        ? computeRoleAllocation(latestQuarterly.portfolioItems)
         : [];
+
+    // ── 종목별 목표 대비 괴리율 (기능 B: 개별 종목 중심) ─────────────────
+    const tickerDeviationData =
+        latestQuarterly && strategies.length > 0
+            ? computeTickerDeviation(latestQuarterly.portfolioItems, strategies)
+            : [];
 
     return (
         <div className="w-full max-w-[100vw] space-y-8 overflow-hidden p-0 md:space-y-10">
@@ -671,10 +677,11 @@ export default function DashboardPage() {
                         </Link>
                     )}
                 </div>
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    {/* 종목별 비중 도넛 */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4 flex items-start justify-between">
+                {/* 2x2 그리드: [1,1]종목별 [1,2]목표대비괴리율 [2,1]역할별 [2,2]섹터별 */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+                    {/* [1행 1열 - 좌상단] 종목별 비중 (Ticker Allocation) */}
+                    <div className="flex min-h-[380px] flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <div className="mb-4 flex shrink-0 items-start justify-between">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                     종목별 비중
@@ -696,72 +703,30 @@ export default function DashboardPage() {
                                 ) : null;
                             })()}
                         </div>
-                        {latestQuarterly ? (
-                            <TickerDonut
-                                items={latestQuarterly.portfolioItems}
-                                totalKrw={latestQuarterly.totalCurrentKrw}
-                                includeCash={includeCash}
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                                <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트가 없습니다</p>
-                                <Link
-                                    href="/reports/new/quarterly"
-                                    className="mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition"
-                                >
-                                    분기별 리포트 작성 →
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 섹터별 비중 도넛 */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                섹터별 비중
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                                Sector Allocation · 호버 시 보유 종목 표시
-                            </p>
+                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                            {latestQuarterly ? (
+                                <TickerDonut
+                                    items={latestQuarterly.portfolioItems}
+                                    totalKrw={latestQuarterly.totalCurrentKrw}
+                                    includeCash={includeCash}
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                                    <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트가 없습니다</p>
+                                    <Link
+                                        href="/reports/new/quarterly"
+                                        className="mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition"
+                                    >
+                                        분기별 리포트 작성 →
+                                    </Link>
+                                </div>
+                            )}
                         </div>
-                        {latestQuarterly ? (
-                            <SectorDonut
-                                items={latestQuarterly.portfolioItems}
-                                totalKrw={latestQuarterly.totalCurrentKrw}
-                            />
-                        ) : (
-                            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                                <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트가 없습니다</p>
-                                <Link
-                                    href="/reports/new/quarterly"
-                                    className="mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition"
-                                >
-                                    분기별 리포트 작성 →
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Insight Layer — 역할군 비중 + 목표 대비 괴리율 */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    {/* 역할군 비중 도넛 */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                역할군 비중
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                                Role Allocation · 설정에서 역할 지정 가능
-                            </p>
-                        </div>
-                        <RoleAllocationChart data={roleAllocationData} />
                     </div>
 
-                    {/* 목표 대비 괴리율 */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4">
+                    {/* [1행 2열 - 우상단] 목표 대비 괴리율 (Target vs Actual) */}
+                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <div className="mb-4 shrink-0">
                             <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 목표 대비 괴리율
                             </p>
@@ -769,7 +734,54 @@ export default function DashboardPage() {
                                 Target vs Actual · ±5% 초과 시 리밸런싱 힌트
                             </p>
                         </div>
-                        <TargetVsActualBar data={roleAllocationData} />
+                        <div className="min-h-0 flex-1 overflow-auto">
+                            <TargetVsActualBar data={tickerDeviationData} />
+                        </div>
+                    </div>
+
+                    {/* [2행 1열 - 좌하단] 역할별 비중 (Role Allocation) */}
+                    <div className="flex min-h-[380px] flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <div className="mb-4 shrink-0">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                역할별 비중
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                                Role Allocation · 설정에서 역할 지정 가능
+                            </p>
+                        </div>
+                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                            <RoleAllocationChart data={roleAllocationData} />
+                        </div>
+                    </div>
+
+                    {/* [2행 2열 - 우하단] 섹터별 비중 (Sector Allocation) */}
+                    <div className="flex min-h-[380px] flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <div className="mb-4 shrink-0">
+                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                섹터별 비중
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                                Sector Allocation · 호버 시 보유 종목 표시
+                            </p>
+                        </div>
+                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                            {latestQuarterly ? (
+                                <SectorDonut
+                                    items={latestQuarterly.portfolioItems}
+                                    totalKrw={latestQuarterly.totalCurrentKrw}
+                                />
+                            ) : (
+                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+                                    <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트가 없습니다</p>
+                                    <Link
+                                        href="/reports/new/quarterly"
+                                        className="mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition"
+                                    >
+                                        분기별 리포트 작성 →
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

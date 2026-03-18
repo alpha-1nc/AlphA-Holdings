@@ -44,7 +44,7 @@ function RoleTooltip({
           {item.payload.tickers.map((t) => (
             <span
               key={t}
-              className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+              className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             >
               {getTickerDisplayName(t)}
             </span>
@@ -124,10 +124,10 @@ export function RoleAllocationChart({ data }: RoleAllocationChartProps) {
           return (
             <div
               key={d.role}
-              className="flex items-center gap-1 text-[10px] text-neutral-600 dark:text-neutral-400"
+              className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400"
             >
               <span
-                className="h-2 w-2 shrink-0 rounded-full"
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
                 style={{ background: ROLE_COLORS[d.role] }}
               />
               <span>{d.label}</span>

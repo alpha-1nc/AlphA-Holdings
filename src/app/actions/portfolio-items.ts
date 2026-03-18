@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import type { AccountType, Currency } from "@/generated/prisma";
+import type { AccountType, Currency, AssetRole } from "@/generated/prisma";
 
 // ── PortfolioItem 목록 조회 (reportId 기준) ────────────────
 export async function getPortfolioItems(reportId: number) {
@@ -20,8 +20,12 @@ export async function createPortfolioItem(data: {
     originalCurrency: Currency;
     originalAmount: number;
     krwAmount: number;
+    role?: AssetRole;
 }) {
-    await prisma.portfolioItem.create({ data });
+    const { role, ...rest } = data;
+    await prisma.portfolioItem.create({
+        data: { ...rest, ...(role != null ? { role } : {}) },
+    });
     revalidatePath("/");
     revalidatePath(`/reports/${data.reportId}`);
 }
@@ -35,6 +39,7 @@ export async function updatePortfolioItem(
         originalCurrency: Currency;
         originalAmount: number;
         krwAmount: number;
+        role: AssetRole;
     }>
 ) {
     const item = await prisma.portfolioItem.update({ where: { id }, data });

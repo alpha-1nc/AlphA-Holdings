@@ -70,7 +70,7 @@ export default function SettingsPage() {
                 </p>
             </section>
 
-            {/* ── Section: 포트폴리오 전략 관리 ──────────────────────────────── */}
+            {/* ── Section: 목표 포트폴리오 관리 ──────────────────────────────── */}
             <PortfolioStrategyManager workspaceProfile={profile} />
 
             {/* ── Section: 데이터 백업 및 내보내기 ───────────────────────────── */}

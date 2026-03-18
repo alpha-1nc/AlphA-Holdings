@@ -13,7 +13,9 @@ import {
 } from "@/lib/profile";
 import { TickerSearchInput } from "@/components/dashboard/ticker-search-input";
 import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
+import { ASSET_ROLE_LABELS } from "@/types/portfolio-strategy";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
+import type { AssetRole } from "@/generated/prisma";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 type AccountType = "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
@@ -86,12 +88,16 @@ function autoDetectSector(ticker: string): Sector | "" {
     return TICKER_SECTOR_MAP[upper] ?? "";
 }
 
+/* ── Asset Role 옵션 (PortfolioItem용) ───────────────────────────────────────*/
+const ASSET_ROLES: AssetRole[] = ["CORE", "GROWTH", "BOOSTER", "DEFENSIVE", "INDEX", "UNASSIGNED"];
+
 /* ── Types ──────────────────────────────────────────────────────────────── */
 interface PortfolioRow {
     id: string;
     accountType: AccountType;
     ticker: string;
     sector: string;
+    role: AssetRole;
     amount: string;
     cashCurrency?: CashCurrency;
     logoUrl?: string | null;
@@ -123,6 +129,7 @@ function newRow(): PortfolioRow {
         accountType: "US_DIRECT",
         ticker: "",
         sector: "",
+        role: "CORE",
         amount: "",
         cashCurrency: "KRW",
         logoUrl: null,
@@ -352,6 +359,7 @@ export default function EditReportPage() {
                     accountType,
                     ticker: item.ticker,
                     sector: (item as any).sector || "",
+                    role: ((item as any).role as AssetRole) || "CORE",
                     amount: String(item.originalAmount),
                     cashCurrency,
                     logoUrl: (item as any).logoUrl ?? null,
@@ -491,13 +499,13 @@ export default function EditReportPage() {
                         const item = {
                             ticker: r.accountType === "CASH" ? ACCOUNT_LABELS[r.accountType] : (r.ticker || ACCOUNT_LABELS[r.accountType]),
                             sector: r.accountType === "CASH" ? undefined : (r.sector || undefined),
+                            role: r.accountType === "CASH" ? undefined : (r.role ?? "CORE"),
                             accountType: r.accountType,
                             originalCurrency: getEffectiveCurrency(r) as "USD" | "KRW" | "JPY",
                             originalAmount: parseNumber(r.amount),
                             krwAmount: toKRW(r, usdRate, jpyRate),
                             logoUrl: r.logoUrl?.trim() || null,
                         };
-                        console.log(`[portfolioItems] ticker: ${item.ticker}, logoUrl:`, item.logoUrl?.substring(0, 50));
                         return item;
                     }),
                     newInvestments: [],
@@ -1091,6 +1099,15 @@ function PortfolioRowItem({
                             <option value="">섹터 선택...</option>
                             {SECTORS.map((s) => (
                                 <option key={s} value={s}>{s}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={row.role}
+                            onChange={(e) => onChange({ role: e.target.value as AssetRole })}
+                            className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
+                        >
+                            {(Object.keys(ASSET_ROLE_LABELS) as AssetRole[]).map((role) => (
+                                <option key={role} value={role}>{ASSET_ROLE_LABELS[role]}</option>
                             ))}
                         </select>
                         {row.sector && (

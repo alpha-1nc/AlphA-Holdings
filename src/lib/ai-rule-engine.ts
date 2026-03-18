@@ -1,7 +1,10 @@
 // ── AI 분석 입력용 규칙 엔진 ─────────────────────────────────────────────
 // 리포트·전략 데이터를 기반으로 Boolean 플래그 객체를 생성하여 AI 프롬프트에 전달
 
-import { computeRoleAllocation } from "./role-allocation";
+import {
+  computeTickerDeviation,
+  type RoleKey,
+} from "./role-allocation";
 import type { NewInvestment, PortfolioItem, PortfolioStrategy, Report } from "@/generated/prisma";
 
 export interface ReportWithItems extends Report {
@@ -32,7 +35,7 @@ export interface AiAnalysisFlags {
 const WEIGHT_TOLERANCE = 2;
 
 /**
- * 현재 리포트, 이전 리포트, 포트폴리오 전략을 입력받아
+ * 현재 리포트, 이전 리포트, 목표 포트폴리오를 입력받아
  * AI 분석용 Boolean 플래그 객체를 반환합니다.
  */
 export function buildAiAnalysisInput(
@@ -71,40 +74,62 @@ export function buildAiAnalysisInput(
     };
   }
 
-  const allocation = computeRoleAllocation(
+  const deviation = computeTickerDeviation(
     currentReport.portfolioItems,
-    strategies
+    strategies,
   );
 
   const totalKrw = currentReport.portfolioItems
     .filter((i) => i.accountType !== "CASH" && i.krwAmount > 0)
     .reduce((s, i) => s + i.krwAmount, 0);
 
-  // 역할군별 underweight/overweight 판단
-  const core = allocation.find((a) => a.role === "CORE");
-  const booster = allocation.find((a) => a.role === "BOOSTER");
-  const growth = allocation.find((a) => a.role === "GROWTH");
-  const defensive = allocation.find((a) => a.role === "DEFENSIVE");
+  const tickerToRole = new Map<string, RoleKey>();
+  for (const s of strategies) {
+    tickerToRole.set(
+      ((s as { ticker?: string }).ticker ?? "").trim().toUpperCase(),
+      ((s as { role?: string }).role ?? "UNASSIGNED") as RoleKey,
+    );
+  }
+
+  const roleTarget = new Map<RoleKey, number>();
+  const roleActual = new Map<RoleKey, number>();
+  for (const s of strategies) {
+    const role = ((s as { role?: string }).role ?? "UNASSIGNED") as RoleKey;
+    roleTarget.set(
+      role,
+      (roleTarget.get(role) ?? 0) + ((s as { targetWeight?: number }).targetWeight ?? 0),
+    );
+  }
+  for (const d of deviation) {
+    const role =
+      tickerToRole.get(d.ticker.trim().toUpperCase()) ?? ("UNASSIGNED" as RoleKey);
+    roleActual.set(role, (roleActual.get(role) ?? 0) + d.actualWeight);
+  }
+
+  const coreTarget = roleTarget.get("CORE") ?? 0;
+  const coreActual = roleActual.get("CORE") ?? 0;
+  const boosterTarget = roleTarget.get("BOOSTER") ?? 0;
+  const boosterActual = roleActual.get("BOOSTER") ?? 0;
+  const growthTarget = roleTarget.get("GROWTH") ?? 0;
+  const growthActual = roleActual.get("GROWTH") ?? 0;
+  const defensiveTarget = roleTarget.get("DEFENSIVE") ?? 0;
+  const defensiveActual = roleActual.get("DEFENSIVE") ?? 0;
 
   const isCoreUnderweight =
-    !!core &&
-    core.targetWeight > 0 &&
-    core.actualWeight < core.targetWeight - WEIGHT_TOLERANCE;
+    coreTarget > 0 &&
+    coreActual < coreTarget - WEIGHT_TOLERANCE;
 
   const isBoosterOverweight =
-    !!booster &&
-    booster.targetWeight > 0 &&
-    booster.actualWeight > booster.targetWeight + WEIGHT_TOLERANCE;
+    boosterTarget > 0 &&
+    boosterActual > boosterTarget + WEIGHT_TOLERANCE;
 
   const isGrowthUnderweight =
-    !!growth &&
-    growth.targetWeight > 0 &&
-    growth.actualWeight < growth.targetWeight - WEIGHT_TOLERANCE;
+    growthTarget > 0 &&
+    growthActual < growthTarget - WEIGHT_TOLERANCE;
 
   const isDefensiveUnderweight =
-    !!defensive &&
-    defensive.targetWeight > 0 &&
-    defensive.actualWeight < defensive.targetWeight - WEIGHT_TOLERANCE;
+    defensiveTarget > 0 &&
+    defensiveActual < defensiveTarget - WEIGHT_TOLERANCE;
 
   // 미분류 종목: ticker/symbol/name을 합쳐 전략 티커가 포함되는지 대소문자 무시 검사
   const isCashLike = (item: PortfolioItem): boolean =>

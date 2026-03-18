@@ -1,10 +1,11 @@
 "use client";
 
-import type { RoleAllocationItem } from "@/lib/role-allocation";
-import { ROLE_COLORS } from "@/lib/role-allocation";
+import type { TickerDeviationItem } from "@/lib/role-allocation";
+import { getTickerColor } from "@/constants/brandColors";
+import { getTickerMetadata } from "@/lib/ticker-metadata";
 
 interface TargetVsActualBarProps {
-  data: RoleAllocationItem[];
+  data: TickerDeviationItem[];
 }
 
 function getDiffColor(diff: number): string {
@@ -28,17 +29,17 @@ function getDiffLabel(diff: number): string {
   return `${diff.toFixed(1)}% 부족`;
 }
 
-interface RoleRowProps {
-  item: RoleAllocationItem;
+interface TickerRowProps {
+  item: TickerDeviationItem;
+  index: number;
 }
 
-function RoleRow({ item }: RoleRowProps) {
-  const diff = item.actualWeight - item.targetWeight;
+function TickerRow({ item, index }: TickerRowProps) {
+  const diff = item.diff;
   const diffColor = getDiffColor(diff);
   const accentColor = getBarAccentColor(diff);
-  const roleColor = ROLE_COLORS[item.role];
+  const tickerColor = getTickerColor(item.ticker, index);
 
-  // Clamp display values to [0, 100] — 0% actual weight도 안전하게 처리
   const actualPct = Math.min(
     100,
     Math.max(0, Number(item.actualWeight) || 0),
@@ -47,9 +48,6 @@ function RoleRow({ item }: RoleRowProps) {
     100,
     Math.max(0, Number(item.targetWeight) || 0),
   );
-
-  // Target marker position (as % of bar width)
-  const targetMarkerLeft = targetPct;
 
   const hasTarget = (Number(item.targetWeight) || 0) > 0;
 
@@ -60,10 +58,14 @@ function RoleRow({ item }: RoleRowProps) {
         <div className="flex items-center gap-1.5">
           <span
             className="h-2 w-2 shrink-0 rounded-full"
-            style={{ background: roleColor }}
+            style={{ background: tickerColor }}
           />
-          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">
-            {item.label}
+          <span className="font-mono text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+            {(() => {
+              const meta = getTickerMetadata(item.ticker);
+              const sym = item.ticker?.trim() || "";
+              return meta?.name ? `${sym} · ${meta.name}` : sym;
+            })()}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -91,11 +93,11 @@ function RoleRow({ item }: RoleRowProps) {
           }}
         />
 
-        {/* Target marker — vertical line (actual 0%여도 목표 위치에 정상 표시) */}
-        {hasTarget && targetMarkerLeft > 0 && (
+        {/* Target marker */}
+        {hasTarget && targetPct > 0 && (
           <div
             className="absolute inset-y-[-3px] w-[2px] rounded-full bg-neutral-600 dark:bg-neutral-300 z-10"
-            style={{ left: `calc(${targetMarkerLeft}% - 1px)` }}
+            style={{ left: `calc(${targetPct}% - 1px)` }}
             title={`목표 ${item.targetWeight.toFixed(1)}%`}
           />
         )}
@@ -130,7 +132,7 @@ export function TargetVsActualBar({ data }: TargetVsActualBarProps) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
         <p className="text-sm text-neutral-400 dark:text-neutral-500">
-          설정에서 종목별 역할과 목표 비중을 지정하면
+          설정에서 종목별 목표 비중을 지정하면
         </p>
         <p className="text-sm text-neutral-400 dark:text-neutral-500">
           리밸런싱 힌트가 표시됩니다
@@ -139,17 +141,16 @@ export function TargetVsActualBar({ data }: TargetVsActualBarProps) {
     );
   }
 
-  const hasAnyTarget = data.some((d) => d.targetWeight > 0);
   const totalTarget = data.reduce((s, d) => s + d.targetWeight, 0);
 
   return (
     <div className="flex flex-col gap-4">
-      {data.map((item) => (
-        <RoleRow key={item.role} item={item} />
+      {data.map((item, idx) => (
+        <TickerRow key={item.ticker} item={item} index={idx} />
       ))}
 
       {/* Total target weight hint */}
-      {hasAnyTarget && (
+      {totalTarget > 0 && (
         <div className="mt-1 flex items-center justify-between border-t border-neutral-100 pt-3 dark:border-neutral-800">
           <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
             목표 비중 합계

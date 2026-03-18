@@ -21,7 +21,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { createPortfolioItem } from "@/app/actions/portfolio-items";
-import type { AccountType, Currency } from "@/generated/prisma";
+import { ASSET_ROLE_LABELS } from "@/types/portfolio-strategy";
+import type { AccountType, Currency, AssetRole } from "@/generated/prisma";
 
 interface AddPortfolioItemDialogProps {
     reportId: number;
@@ -34,6 +35,7 @@ export function AddAssetDialog({ reportId, onSuccess }: AddPortfolioItemDialogPr
 
     const [ticker, setTicker] = useState("");
     const [accountType, setAccountType] = useState<AccountType>("US_DIRECT");
+    const [role, setRole] = useState<AssetRole>("CORE");
     const [originalCurrency, setOriginalCurrency] = useState<Currency>("USD");
     const [originalAmount, setOriginalAmount] = useState("");
     const [krwAmount, setKrwAmount] = useState("");
@@ -41,6 +43,7 @@ export function AddAssetDialog({ reportId, onSuccess }: AddPortfolioItemDialogPr
     function resetForm() {
         setTicker("");
         setAccountType("US_DIRECT");
+        setRole("CORE");
         setOriginalCurrency("USD");
         setOriginalAmount("");
         setKrwAmount("");
@@ -58,6 +61,7 @@ export function AddAssetDialog({ reportId, onSuccess }: AddPortfolioItemDialogPr
                 originalCurrency,
                 originalAmount: parseFloat(originalAmount),
                 krwAmount: parseFloat(krwAmount),
+                role,
             });
             resetForm();
             setOpen(false);
@@ -92,18 +96,31 @@ export function AddAssetDialog({ reportId, onSuccess }: AddPortfolioItemDialogPr
                         />
                     </div>
 
-                    {/* 계좌 유형 */}
-                    <div className="space-y-1.5">
-                        <Label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">계좌 유형</Label>
-                        <Select value={accountType} onValueChange={(v) => v && setAccountType(v as AccountType)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="US_DIRECT">미국 직투 (US_DIRECT)</SelectItem>
-                                <SelectItem value="ISA">한국 ISA</SelectItem>
-                                <SelectItem value="JP_DIRECT">일본 직투 (JP_DIRECT)</SelectItem>
-                                <SelectItem value="CASH">현금성 (CASH)</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    {/* 계좌 유형 & 역할 선택 */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">계좌 유형</Label>
+                            <Select value={accountType} onValueChange={(v) => v && setAccountType(v as AccountType)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="US_DIRECT">미국 직투 (US_DIRECT)</SelectItem>
+                                    <SelectItem value="ISA">한국 ISA</SelectItem>
+                                    <SelectItem value="JP_DIRECT">일본 직투 (JP_DIRECT)</SelectItem>
+                                    <SelectItem value="CASH">현금성 (CASH)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-neutral-600 dark:text-neutral-400">역할 선택</Label>
+                            <Select value={role} onValueChange={(v) => v && setRole(v as AssetRole)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {(Object.keys(ASSET_ROLE_LABELS) as AssetRole[]).map((r) => (
+                                        <SelectItem key={r} value={r}>{ASSET_ROLE_LABELS[r]}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
