@@ -2,10 +2,11 @@
 // 리포트·전략 데이터를 기반으로 Boolean 플래그 객체를 생성하여 AI 프롬프트에 전달
 
 import { computeRoleAllocation } from "./role-allocation";
-import type { PortfolioItem, PortfolioStrategy, Report } from "@/generated/prisma";
+import type { NewInvestment, PortfolioItem, PortfolioStrategy, Report } from "@/generated/prisma";
 
 export interface ReportWithItems extends Report {
   portfolioItems: PortfolioItem[];
+  newInvestments?: NewInvestment[];
 }
 
 export interface AiAnalysisFlags {
