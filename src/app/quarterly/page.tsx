@@ -6,6 +6,7 @@ import { BarChart3 } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import { getTickerColor } from "@/constants/brandColors";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
 
 type ReportWithItems = Report & { 
@@ -105,7 +106,10 @@ function ReportCard({ report }: { report: ReportWithItems }) {
                                     .map((item, idx) => (
                                         <span key={item.id} className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
                                             <span className="h-1.5 w-1.5 rounded-full" style={{ background: getTickerColor(item.ticker, idx) }} />
-                                            {item.ticker}
+                                            {getPortfolioItemDisplayLabel({
+                                                ticker: item.ticker,
+                                                displayName: item.displayName,
+                                            })}
                                         </span>
                                     ))}
                                 {report.portfolioItems.length > 5 && (

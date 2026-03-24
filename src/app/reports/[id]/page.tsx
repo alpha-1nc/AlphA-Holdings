@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Globe, Wallet } from "lucide-react";
 import { getReportById } from "@/app/actions/reports";
-import { getTickerDisplayName } from "@/lib/ticker-metadata";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
 import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
@@ -81,7 +81,10 @@ export default async function ReportDetailPage(props: {
 
     const snapshotsForChart = portfolioItems.map((item) => ({
         ticker: item.ticker,
-        name: getTickerDisplayName(item.ticker),
+        name: getPortfolioItemDisplayLabel({
+            ticker: item.ticker,
+            displayName: item.displayName,
+        }),
         value: item.krwAmount,
     }));
 
@@ -157,6 +160,57 @@ export default async function ReportDetailPage(props: {
                 ))}
             </div>
 
+            {/* 신규 투자금 (월별은 항상, 분기는 입력된 경우만) */}
+            {(report.type === "MONTHLY" || newInvestments.length > 0) && (
+                <Card className="border border-neutral-100 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/70">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                            신규 투자금
+                        </CardTitle>
+                        <p className="text-[11px] font-normal text-neutral-400 dark:text-neutral-500">
+                            {report.type === "MONTHLY"
+                                ? "해당 월에 계좌별로 새로 납입한 금액입니다."
+                                : "이 분기 리포트에 입력한 신규 납입액입니다."}
+                        </p>
+                    </CardHeader>
+                    <CardContent>
+                        {newInvestments.length === 0 ? (
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">이번 기간에 기록된 신규 투자금이 없습니다.</p>
+                        ) : (
+                            <div className="overflow-hidden rounded-xl border border-neutral-100 dark:border-neutral-800">
+                                <div className="grid grid-cols-[1fr_1fr] border-b border-neutral-100 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400 sm:grid-cols-[1fr_1fr_1fr]">
+                                    <div>계좌</div>
+                                    <div className="hidden sm:block text-right">통화</div>
+                                    <div className="text-right">원화 환산</div>
+                                </div>
+                                <div className="divide-y divide-neutral-100 text-xs dark:divide-neutral-800">
+                                    {newInvestments.map((inv) => (
+                                        <div
+                                            key={inv.id}
+                                            className="grid grid-cols-[1fr_1fr] items-center gap-2 px-3 py-2.5 sm:grid-cols-[1fr_1fr_1fr]"
+                                        >
+                                            <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
+                                                {ACCOUNT_ICONS[inv.accountType]}
+                                                {ACCOUNT_LABELS[inv.accountType] ?? inv.accountType}
+                                            </div>
+                                            <div className="hidden text-right text-neutral-500 dark:text-neutral-400 sm:block">
+                                                {inv.originalCurrency}
+                                            </div>
+                                            <div className="text-right font-medium text-neutral-800 dark:text-neutral-200">
+                                                {krw(inv.krwAmount)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-end border-t border-neutral-100 bg-neutral-50/80 px-3 py-2.5 text-xs font-semibold text-neutral-800 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-100">
+                                    합계 <span className="ml-2">{krw(totalNewInvestment)}</span>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
             {/* 포트폴리오 스냅샷 + 도넛 차트 (분기별 리포트만) */}
             {report.type === "QUARTERLY" && (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -180,6 +234,10 @@ export default async function ReportDetailPage(props: {
                                             const pct = totalCurrentKrw > 0
                                                 ? ((item.krwAmount / totalCurrentKrw) * 100).toFixed(1)
                                                 : "0";
+                                            const displayLabel = getPortfolioItemDisplayLabel({
+                                                ticker: item.ticker,
+                                                displayName: item.displayName,
+                                            });
                                             return (
                                                 <div
                                                     key={item.id}
@@ -188,14 +246,15 @@ export default async function ReportDetailPage(props: {
                                                     <div className="flex items-center gap-2">
                                                         <TickerAvatar
                                                             ticker={item.ticker}
+                                                            displayName={item.displayName}
                                                             logoUrl={(item as { logoUrl?: string | null }).logoUrl}
                                                             size={40}
                                                             roundedSquare
                                                         />
                                                         <div>
                                                             <p className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
-                                                                {getTickerDisplayName(item.ticker)}
-                                                                {getTickerDisplayName(item.ticker) !== item.ticker && (
+                                                                {displayLabel}
+                                                                {displayLabel.trim().toUpperCase() !== item.ticker.trim().toUpperCase() && (
                                                                     <span className="ml-1 font-mono text-[10px] font-normal uppercase text-neutral-500 dark:text-neutral-400">
                                                                         ({item.ticker})
                                                                     </span>
@@ -262,11 +321,18 @@ export default async function ReportDetailPage(props: {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        {[
-                            { title: "증시 요약", content: report.summary },
-                            { title: "느낀 점", content: report.journal },
-                            { title: "다음 전략", content: report.strategy },
-                        ].map(({ title, content }) => (
+                        {(report.type === "MONTHLY"
+                            ? [
+                                  { title: "증시 요약", content: report.summary },
+                                  { title: "느낀 점", content: report.journal },
+                              ]
+                            : [
+                                  { title: "증시 요약", content: report.summary },
+                                  { title: "느낀 점", content: report.journal },
+                                  { title: "다음 전략", content: report.strategy },
+                                  { title: "어닝/실적 리뷰", content: report.earningsReview },
+                              ]
+                        ).map(({ title, content }) => (
                             <div key={title}>
                                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
                                     {title}
@@ -287,10 +353,6 @@ export default async function ReportDetailPage(props: {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3 text-xs text-neutral-600 dark:text-neutral-300">
-                        <div className="flex justify-between">
-                            <span className="text-neutral-400">리포트 ID</span>
-                            <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">#{report.id}</span>
-                        </div>
                         {report.type === "QUARTERLY" && (
                             <div className="flex justify-between">
                                 <span className="text-neutral-400">종목 수</span>

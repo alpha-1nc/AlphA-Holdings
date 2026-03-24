@@ -16,6 +16,7 @@ export async function getPortfolioItems(reportId: number) {
 export async function createPortfolioItem(data: {
     reportId: number;
     ticker: string;
+    displayName?: string | null;
     accountType: AccountType;
     originalCurrency: Currency;
     originalAmount: number;
@@ -35,6 +36,7 @@ export async function updatePortfolioItem(
     id: number,
     data: Partial<{
         ticker: string;
+        displayName: string | null;
         accountType: AccountType;
         originalCurrency: Currency;
         originalAmount: number;

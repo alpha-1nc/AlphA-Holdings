@@ -3,7 +3,6 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import type { RoleAllocationItem } from "@/lib/role-allocation";
 import { ROLE_COLORS } from "@/lib/role-allocation";
-import { getTickerDisplayName } from "@/lib/ticker-metadata";
 
 const krwFmt = (n: number) =>
   new Intl.NumberFormat("ko-KR", {
@@ -20,7 +19,7 @@ function RoleTooltip({
   payload?: Array<{
     name: string;
     value: number;
-    payload: { color: string; tickers: string[]; krwAmount: number };
+    payload: { color: string; holdingLabels: string[]; krwAmount: number };
   }>;
 }) {
   if (!active || !payload?.length) return null;
@@ -39,14 +38,14 @@ function RoleTooltip({
       <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
         {krwFmt(item.payload.krwAmount)}
       </p>
-      {item.payload.tickers.length > 0 && (
+      {item.payload.holdingLabels.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
-          {item.payload.tickers.map((t) => (
+          {item.payload.holdingLabels.map((t, i) => (
             <span
-              key={t}
+              key={`${t}-${i}`}
               className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
             >
-              {getTickerDisplayName(t)}
+              {t}
             </span>
           ))}
         </div>
@@ -79,16 +78,16 @@ export function RoleAllocationChart({ data }: RoleAllocationChartProps) {
     name: d.label,
     value: d.krwAmount,
     color: ROLE_COLORS[d.role],
-    tickers: d.tickers,
+    holdingLabels: d.holdingLabels,
     krwAmount: d.krwAmount,
   }));
 
   const totalKrw = activeData.reduce((s, d) => s + d.krwAmount, 0);
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div className="relative h-52 w-full">
-        <ResponsiveContainer width="100%" height="100%">
+    <div className="flex w-full min-w-0 flex-col items-center gap-4">
+      <div className="relative h-52 w-full min-w-0">
+        <ResponsiveContainer width="100%" height="100%" debounce={50}>
           <PieChart>
             <Pie
               data={chartData}

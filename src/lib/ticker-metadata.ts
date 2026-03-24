@@ -206,3 +206,27 @@ export function getTickerDisplayName(ticker: string): string {
     const meta = getTickerMetadata(ticker);
     return meta?.name ?? ticker ?? "";
 }
+
+/** 한·일 등 숫자만으로 된 종목코드인지 (표시 시 이름 우선에 사용) */
+export function isNumericStockTicker(ticker: string): boolean {
+    return /^\d+$/.test((ticker ?? "").trim());
+}
+
+/**
+ * 포트폴리오 항목 UI 라벨.
+ * - 문자 티커(미국 등): 티커 코드 그대로
+ * - 숫자 코드: 저장된 displayName → ticker-metadata 종목명 → 티커
+ */
+export function getPortfolioItemDisplayLabel(item: {
+    ticker: string;
+    displayName?: string | null;
+}): string {
+    const t = (item.ticker ?? "").trim();
+    if (!t) return "";
+    if (isNumericStockTicker(t)) {
+        const saved = (item.displayName ?? "").trim();
+        if (saved) return saved;
+        return getTickerDisplayName(t);
+    }
+    return t;
+}

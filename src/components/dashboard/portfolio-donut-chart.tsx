@@ -69,9 +69,9 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
     }
 
     return (
-        <div className="flex flex-col items-center gap-4">
-            <div className="relative h-52 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+        <div className="flex w-full min-w-0 flex-col items-center gap-4">
+            <div className="relative h-52 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" debounce={50}>
                     <PieChart>
                         <Pie
                             data={dataWithPct}

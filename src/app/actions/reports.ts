@@ -159,6 +159,14 @@ function validateReportPayload(
     }
   }
 
+  // QUARTERLY: 신규 투입금 행 검증 (입력한 행만)
+  if (type === "QUARTERLY") {
+    const incompleteNewInv = newInvestments.filter((inv) => (inv.originalAmount || 0) <= 0);
+    if (incompleteNewInv.length > 0) {
+      return { ok: false, error: "신규 투입금이 비어 있는 행이 있습니다. 금액을 입력하거나 해당 행을 삭제해 주세요." };
+    }
+  }
+
   // QUARTERLY: 포트폴리오 스냅샷 검증
   if (type === "QUARTERLY") {
     const validItems = portfolioItems.filter((item) => {
@@ -246,6 +254,7 @@ export interface CreateReportPayload {
   earningsReview?: string;
   portfolioItems: {
     ticker: string;
+    displayName?: string | null;
     sector?: string;
     logoUrl?: string | null;
     role?: AssetRole;
@@ -274,23 +283,27 @@ export async function createReport(payload: CreateReportPayload) {
 
   const profileValue = profile || "AlphA Holdings Portfolio";
 
+  const createData = {
+    ...reportData,
+    status: status as ReportStatus,
+    profile: profileValue,
+    earningsReview: earningsReview || null,
+    portfolioItems: {
+      create: portfolioItems,
+    },
+    newInvestments:
+      newInvestments.length > 0
+        ? {
+            create: newInvestments,
+          }
+        : undefined,
+  };
+
+  const include = { portfolioItems: true as const, newInvestments: true as const };
+
   const report = await prisma.report.create({
-    data: {
-      ...reportData,
-      status: status as ReportStatus,
-      profile: profileValue,
-      earningsReview: earningsReview || null,
-      portfolioItems: {
-        create: portfolioItems,
-      },
-      newInvestments: newInvestments.length > 0 ? {
-        create: newInvestments,
-      } : undefined,
-    },
-    include: { 
-      portfolioItems: true,
-      newInvestments: true,
-    },
+    data: createData,
+    include,
   });
 
   revalidatePath("/");
@@ -335,6 +348,7 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
 
   const report = await prisma.$transaction(async (tx) => {
     await tx.portfolioItem.deleteMany({ where: { reportId: id } });
+    await tx.newInvestment.deleteMany({ where: { reportId: id } });
 
     const updatedReport = await tx.report.update({
       where: { id },
@@ -346,10 +360,12 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
         portfolioItems: {
           create: portfolioItems,
         },
-        newInvestments: newInvestments.length > 0 ? {
-          deleteMany: {},
-          create: newInvestments,
-        } : undefined,
+        newInvestments:
+          newInvestments.length > 0
+            ? {
+                create: newInvestments,
+              }
+            : undefined,
       },
       include: {
         portfolioItems: true,

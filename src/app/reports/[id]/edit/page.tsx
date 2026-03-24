@@ -96,6 +96,7 @@ interface PortfolioRow {
     id: string;
     accountType: AccountType;
     ticker: string;
+    displayName?: string | null;
     sector: string;
     role: AssetRole;
     amount: string;
@@ -128,6 +129,7 @@ function newRow(): PortfolioRow {
         id: crypto.randomUUID(),
         accountType: "US_DIRECT",
         ticker: "",
+        displayName: null,
         sector: "",
         role: "CORE",
         amount: "",
@@ -358,14 +360,25 @@ export default function EditReportPage() {
                     id: crypto.randomUUID(),
                     accountType,
                     ticker: item.ticker,
-                    sector: (item as any).sector || "",
-                    role: ((item as any).role as AssetRole) || "CORE",
+                    displayName: (item as { displayName?: string | null }).displayName ?? null,
+                    sector: (item as { sector?: string | null }).sector || "",
+                    role: ((item as { role?: AssetRole }).role as AssetRole) || "CORE",
                     amount: String(item.originalAmount),
                     cashCurrency,
-                    logoUrl: (item as any).logoUrl ?? null,
+                    logoUrl: (item as { logoUrl?: string | null }).logoUrl ?? null,
                 };
             });
             setRows(initialRows.length > 0 ? initialRows : [newRow()]);
+            const qInv: NewInvestmentRow[] = (report.newInvestments || []).map((inv) => {
+                const accountType = inv.accountType as AccountType;
+                return {
+                    id: crypto.randomUUID(),
+                    accountType: accountType === "CASH" ? "US_DIRECT" : accountType,
+                    amount: String(inv.originalAmount),
+                    cashCurrency: inv.accountType === "CASH" ? (inv.originalCurrency as CashCurrency) : undefined,
+                };
+            });
+            setNewInvestmentRows(qInv);
         }
     }, [report, isMonthly]);
 
@@ -462,6 +475,12 @@ export default function EditReportPage() {
                         })),
                 });
             } else {
+                const incompleteNewInv = newInvestmentRows.filter((r) => parseNumber(r.amount) <= 0);
+                if (incompleteNewInv.length > 0) {
+                    toast.error("신규 투입금이 비어 있는 행이 있습니다. 금액을 입력하거나 해당 행을 삭제해 주세요.");
+                    setIsSubmitting(false);
+                    return;
+                }
                 // 분기별 리포트: 미완성 행 검증 (종목만/금액만 있는 행)
                 const incompletePortfolio = rows.filter((r) => {
                     const hasTicker = r.ticker.trim().length > 0;
@@ -498,6 +517,7 @@ export default function EditReportPage() {
                     portfolioItems: validRows.map((r) => {
                         const item = {
                             ticker: r.accountType === "CASH" ? ACCOUNT_LABELS[r.accountType] : (r.ticker || ACCOUNT_LABELS[r.accountType]),
+                            displayName: r.accountType === "CASH" ? null : (r.displayName?.trim() || null),
                             sector: r.accountType === "CASH" ? undefined : (r.sector || undefined),
                             role: r.accountType === "CASH" ? undefined : (r.role ?? "CORE"),
                             accountType: r.accountType,
@@ -508,7 +528,14 @@ export default function EditReportPage() {
                         };
                         return item;
                     }),
-                    newInvestments: [],
+                    newInvestments: newInvestmentRows
+                        .filter((r) => parseNumber(r.amount) > 0)
+                        .map((r) => ({
+                            accountType: r.accountType,
+                            originalCurrency: "KRW" as const,
+                            originalAmount: parseNumber(r.amount),
+                            krwAmount: parseNumber(r.amount),
+                        })),
                 });
             }
             toast.success(asDraft ? "임시 저장되었습니다." : "리포트가 성공적으로 수정되었습니다.");
@@ -753,6 +780,32 @@ export default function EditReportPage() {
                                 className={inputCls}
                             />
                             <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                        </div>
+                    </FormRow>
+                    <FormRow
+                        label="신규 투입금"
+                        sublabel="이 분기 리포트에만 저장되는 신규 납입액(원화)입니다."
+                    >
+                        <div className="space-y-2">
+                            {newInvestmentRows.map((row) => (
+                                <NewInvestmentRowItem
+                                    key={row.id}
+                                    row={row}
+                                    krwValue={toKRWForInvestment(row, usdRate, jpyRate, true)}
+                                    usdRate={usdRate}
+                                    jpyRate={jpyRate}
+                                    isMonthly
+                                    onChange={(patch) => updateNewInvestmentRow(row.id, patch)}
+                                    onDelete={() => removeNewInvestmentRow(row.id)}
+                                />
+                            ))}
+                            <button
+                                type="button"
+                                onClick={addNewInvestmentRow}
+                                className="w-full rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-2 text-sm text-neutral-500 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                            >
+                                + 신규 투입금 추가
+                            </button>
                         </div>
                     </FormRow>
                     {(totalValuation > 0 || principal > 0) && (

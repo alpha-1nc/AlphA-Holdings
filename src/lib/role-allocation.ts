@@ -1,6 +1,7 @@
 import type { PortfolioItem } from "@/generated/prisma";
 import type { PortfolioStrategy } from "@/generated/prisma";
 import type { AssetRole } from "@/generated/prisma";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 
 export type RoleKey = AssetRole | "UNASSIGNED";
 
@@ -10,12 +11,14 @@ export interface RoleAllocationItem {
   actualWeight: number;   // % of total non-cash portfolio
   targetWeight: number;   // Feature A: 항상 0 (Strategy 미참조). 하위 호환용 유지.
   krwAmount: number;
-  tickers: string[];
+  /** 역할군 툴팁에 표시할 종목 라벨(티커가 아닌 표시명) */
+  holdingLabels: string[];
 }
 
 /** 종목별 목표 대비 괴리율 (기능 B) */
 export interface TickerDeviationItem {
   ticker: string;
+  displayLabel: string;
   targetWeight: number;
   actualWeight: number;
   diff: number;  // actualWeight - targetWeight
@@ -68,16 +71,20 @@ export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationIte
 
   const actualByRole = new Map<
     RoleKey,
-    { krwAmount: number; tickers: string[] }
+    { krwAmount: number; holdingLabels: string[] }
   >();
 
   for (const item of nonCashItems) {
     const itemRole = (item as { role?: AssetRole | null }).role;
     const role: RoleKey = (itemRole != null ? (itemRole as RoleKey) : "UNASSIGNED");
-    const existing = actualByRole.get(role) ?? { krwAmount: 0, tickers: [] };
+    const existing = actualByRole.get(role) ?? { krwAmount: 0, holdingLabels: [] };
+    const label = getPortfolioItemDisplayLabel({
+      ticker: item.ticker,
+      displayName: (item as { displayName?: string | null }).displayName,
+    });
     actualByRole.set(role, {
       krwAmount: existing.krwAmount + item.krwAmount,
-      tickers: [...existing.tickers, item.ticker],
+      holdingLabels: [...existing.holdingLabels, label],
     });
   }
 
@@ -96,7 +103,7 @@ export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationIte
       return data != null && data.krwAmount > 0;
     })
     .map((role) => {
-      const data = actualByRole.get(role) ?? { krwAmount: 0, tickers: [] };
+      const data = actualByRole.get(role) ?? { krwAmount: 0, holdingLabels: [] };
       const actualWeight =
         totalKrw > 0 ? (data.krwAmount / totalKrw) * 100 : 0;
       return {
@@ -105,7 +112,7 @@ export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationIte
         actualWeight,
         targetWeight: 0,  // 기능 A: Strategy 미참조
         krwAmount: data.krwAmount,
-        tickers: data.tickers,
+        holdingLabels: data.holdingLabels,
       };
     });
 }
@@ -142,6 +149,10 @@ export function computeTickerDeviation(
     const diff = actualWeight - targetWeight;
     return {
       ticker: s.ticker,
+      displayLabel: getPortfolioItemDisplayLabel({
+        ticker: s.ticker,
+        displayName: (s as { displayName?: string | null }).displayName,
+      }),
       targetWeight,
       actualWeight,
       diff,

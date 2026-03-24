@@ -11,7 +11,8 @@ import {
     getProfileLabel,
     type WorkspaceProfile,
 } from "@/lib/profile";
-import { TickerSearchInput } from "@/components/dashboard/ticker-search-input";
+import { TickerSearchInput, type TickerSearchChangeMeta } from "@/components/dashboard/ticker-search-input";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
 import { ASSET_ROLE_LABELS } from "@/types/portfolio-strategy";
 import type { AssetRole } from "@/generated/prisma";
@@ -33,6 +34,31 @@ const ACCOUNT_DEFAULT_CURRENCY: Record<AccountType, string> = {
     JP_DIRECT: "JPY",
     CASH: "KRW",
 };
+
+const MONTHLY_ACCOUNT_LABELS: Record<Exclude<AccountType, "CASH">, string> = {
+    US_DIRECT: "🇺🇸 미국 직투",
+    ISA: "🇰🇷 ISA",
+    JP_DIRECT: "🇯🇵 일본 직투",
+};
+
+interface NewInvestmentRow {
+    id: string;
+    accountType: Exclude<AccountType, "CASH">;
+    amount: string;
+}
+
+function newInvestmentRow(): NewInvestmentRow {
+    return {
+        id: crypto.randomUUID(),
+        accountType: "US_DIRECT",
+        amount: "",
+    };
+}
+
+function toKRWForQuarterlyNewInv(row: NewInvestmentRow): number {
+    const amount = parseNumber(row.amount);
+    return amount > 0 ? amount : 0;
+}
 
 /* ── Sector definitions ──────────────────────────────────────────────────*/
 export const SECTORS = [
@@ -87,6 +113,7 @@ interface PortfolioRow {
     id: string;
     accountType: AccountType;
     ticker: string;
+    displayName?: string | null;
     sector: string;
     role: AssetRole;
     amount: string;
@@ -112,6 +139,7 @@ function newRow(): PortfolioRow {
         id: crypto.randomUUID(),
         accountType: "US_DIRECT",
         ticker: "",
+        displayName: null,
         sector: "",
         role: "CORE",
         amount: "",
@@ -221,9 +249,22 @@ function PortfolioRowItem({
     const effectiveCurrency = getEffectiveCurrency(row);
     const isCash = row.accountType === "CASH";
 
-    const handleTickerChange = (ticker: string) => {
+    const handleTickerChange = (ticker: string, meta?: TickerSearchChangeMeta) => {
         const detectedSector = autoDetectSector(ticker);
-        onChange({ ticker, sector: detectedSector || row.sector });
+        if (meta?.source === "select") {
+            onChange({
+                ticker,
+                sector: detectedSector || row.sector,
+                displayName: meta.displayName?.trim() || null,
+            });
+        } else {
+            const same = ticker.trim().toUpperCase() === row.ticker.trim().toUpperCase();
+            onChange({
+                ticker,
+                sector: detectedSector || row.sector,
+                displayName: same ? row.displayName : null,
+            });
+        }
     };
 
     return (
@@ -241,6 +282,7 @@ function PortfolioRowItem({
                                 ticker: newType === "CASH" ? "" : row.ticker, 
                                 sector: newType === "CASH" ? "" : row.sector,
                                 role: newType === "CASH" ? "CORE" : row.role,
+                                displayName: newType === "CASH" ? null : row.displayName,
                                 cashCurrency: "KRW" 
                             });
                         }}
@@ -331,6 +373,7 @@ function PortfolioRowItem({
                         {row.ticker && (
                             <TickerAvatar
                                 ticker={row.ticker}
+                                displayName={row.displayName}
                                 logoUrl={row.logoUrl}
                                 size={24}
                                 editable
@@ -409,6 +452,7 @@ export default function NewQuarterlyReportPage() {
     const [strategy, setStrategy] = useState("");
     const [summary, setSummary] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [newInvestmentRows, setNewInvestmentRows] = useState<NewInvestmentRow[]>([]);
 
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
     const removeRow = useCallback((id: string) => setRows((prev) => prev.filter((r) => r.id !== id)), []);
@@ -427,9 +471,26 @@ export default function NewQuarterlyReportPage() {
     const rowKRWs = useMemo(() => rows.map((r) => toKRW(r, usdRate, jpyRate)), [rows, usdRate, jpyRate]);
     const totalValuation = useMemo(() => rowKRWs.reduce((acc, v) => acc + v, 0), [rowKRWs]);
 
-    const profit = principal > 0 && totalValuation > 0 ? totalValuation - principal : null;
-    const profitRate = profit !== null && principal > 0 ? (profit / principal) * 100 : null;
+    const newInvestmentKRWs = useMemo(
+        () => newInvestmentRows.map((r) => toKRWForQuarterlyNewInv(r)),
+        [newInvestmentRows],
+    );
+    const totalNewInvestment = useMemo(
+        () => newInvestmentKRWs.reduce((a, v) => a + v, 0),
+        [newInvestmentKRWs],
+    );
+    const adjustedPrincipal = principal - totalNewInvestment;
+    const profit = adjustedPrincipal > 0 && totalValuation > 0 ? totalValuation - adjustedPrincipal : null;
+    const profitRate = profit !== null && adjustedPrincipal > 0 ? (profit / adjustedPrincipal) * 100 : null;
     const isPositive = profit !== null ? profit >= 0 : true;
+
+    const addNewInvestmentRow = useCallback(() => setNewInvestmentRows((prev) => [...prev, newInvestmentRow()]), []);
+    const removeNewInvestmentRow = useCallback((id: string) => setNewInvestmentRows((prev) => prev.filter((r) => r.id !== id)), []);
+    const updateNewInvestmentRow = useCallback(
+        (id: string, patch: Partial<Omit<NewInvestmentRow, "id">>) =>
+            setNewInvestmentRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r))),
+        [],
+    );
 
     const handleSubmit = async (asDraft: boolean) => {
         if (!year.trim() || !quarter.trim()) {
@@ -466,6 +527,11 @@ export default function NewQuarterlyReportPage() {
             toast.error("포트폴리오 스냅샷에 최소 1개 이상의 항목을 입력해주세요.");
             return;
         }
+        const incompleteNewInv = newInvestmentRows.filter((r) => parseNumber(r.amount) <= 0);
+        if (incompleteNewInv.length > 0) {
+            toast.error("신규 투입금이 비어 있는 행이 있습니다. 금액을 입력하거나 해당 행을 삭제해 주세요.");
+            return;
+        }
         setIsSubmitting(true);
         try {
             await createReport({
@@ -484,6 +550,7 @@ export default function NewQuarterlyReportPage() {
                 portfolioItems: validRows.map((r) => {
                     const item = {
                         ticker: r.accountType === "CASH" ? ACCOUNT_LABELS[r.accountType] : (r.ticker || ACCOUNT_LABELS[r.accountType]),
+                        displayName: r.accountType === "CASH" ? null : (r.displayName?.trim() || null),
                         sector: r.accountType === "CASH" ? undefined : (r.sector || undefined),
                         role: r.accountType === "CASH" ? undefined : (r.role ?? "CORE"),
                         accountType: r.accountType,
@@ -495,7 +562,14 @@ export default function NewQuarterlyReportPage() {
                     console.log(`[portfolioItems] ticker: ${item.ticker}, logoUrl:`, item.logoUrl?.substring(0, 50));
                     return item;
                 }),
-                newInvestments: [],
+                newInvestments: newInvestmentRows
+                    .filter((r) => parseNumber(r.amount) > 0)
+                    .map((r) => ({
+                        accountType: r.accountType,
+                        originalCurrency: "KRW" as const,
+                        originalAmount: parseNumber(r.amount),
+                        krwAmount: parseNumber(r.amount),
+                    })),
             });
             toast.success(asDraft ? "임시 저장되었습니다." : "분기별 리포트가 저장되었습니다.");
             router.push(asDraft ? "/quarterly" : "/");
@@ -671,7 +745,10 @@ export default function NewQuarterlyReportPage() {
                                         key={r.id}
                                         className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] text-neutral-300 dark:bg-black/10 dark:text-neutral-600"
                                     >
-                                        {r.ticker || ACCOUNT_LABELS[r.accountType]}
+                                        {getPortfolioItemDisplayLabel({
+                                            ticker: r.ticker || ACCOUNT_LABELS[r.accountType],
+                                            displayName: r.accountType === "CASH" ? null : r.displayName,
+                                        })}
                                         {r.sector && <span className="opacity-60">· {r.sector}</span>}
                                         <span className="opacity-50">·</span>
                                         {formatKRW(v)}
@@ -696,6 +773,28 @@ export default function NewQuarterlyReportPage() {
                             className={inputCls}
                         />
                         <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                    </div>
+                </FormRow>
+                <FormRow
+                    label="신규 투입금"
+                    sublabel="해당 분기에 기록해 두고 싶은 신규 납입액(원화). 이 분기 리포트에만 저장됩니다."
+                >
+                    <div className="space-y-2">
+                        {newInvestmentRows.map((row) => (
+                            <QuarterlyNewInvestmentRowItem
+                                key={row.id}
+                                row={row}
+                                onChange={(patch) => updateNewInvestmentRow(row.id, patch)}
+                                onDelete={() => removeNewInvestmentRow(row.id)}
+                            />
+                        ))}
+                        <button
+                            type="button"
+                            onClick={addNewInvestmentRow}
+                            className="w-full rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-2 text-sm text-neutral-500 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                        >
+                            + 신규 투입금 추가
+                        </button>
                     </div>
                 </FormRow>
                 {(totalValuation > 0 || principal > 0) && (
@@ -810,6 +909,92 @@ export default function NewQuarterlyReportPage() {
                             작성 완료
                         </>
                     )}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+function QuarterlyNewInvestmentRowItem({
+    row,
+    onChange,
+    onDelete,
+}: {
+    row: NewInvestmentRow;
+    onChange: (patch: Partial<Omit<NewInvestmentRow, "id">>) => void;
+    onDelete: () => void;
+}) {
+    return (
+        <div className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-blue-200/80 transition hover:ring-blue-300 dark:bg-neutral-900 dark:ring-blue-800 dark:hover:ring-blue-700">
+            <div className="grid grid-cols-[150px_1fr_36px] items-center gap-3 px-4 py-3">
+                <div className="flex flex-col gap-1">
+                    <select
+                        value={row.accountType}
+                        onChange={(e) => {
+                            const newType = e.target.value as Exclude<AccountType, "CASH">;
+                            onChange({ accountType: newType });
+                        }}
+                        className="w-full rounded-xl bg-blue-50 px-3 py-2 text-xs font-medium text-neutral-700 ring-1 ring-blue-200/80 outline-none transition focus:ring-2 focus:ring-blue-400 dark:bg-blue-900/30 dark:text-neutral-200 dark:ring-blue-700"
+                    >
+                        {(Object.keys(MONTHLY_ACCOUNT_LABELS) as Exclude<AccountType, "CASH">[]).map((k) => (
+                            <option key={k} value={k}>
+                                {MONTHLY_ACCOUNT_LABELS[k]}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="relative flex items-center">
+                    <input
+                        type="number"
+                        min={0}
+                        value={row.amount}
+                        onChange={(e) => onChange({ amount: e.target.value })}
+                        placeholder="신규 투자금액 입력"
+                        className="no-spinner w-full rounded-xl bg-blue-50 px-3 py-2 pr-16 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-blue-200/80 outline-none transition focus:ring-2 focus:ring-blue-400 dark:bg-blue-900/30 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-blue-700"
+                    />
+                    <span className="pointer-events-none absolute right-9 text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
+                        KRW
+                    </span>
+                    <div className="absolute right-0 flex h-full flex-col overflow-hidden rounded-r-xl border-l border-blue-200 dark:border-blue-700">
+                        <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() => {
+                                const v = parseFloat(row.amount) || 0;
+                                onChange({ amount: String(v + 1) });
+                            }}
+                            className="flex flex-1 items-center justify-center px-1.5 text-neutral-600 transition hover:bg-blue-100 dark:text-neutral-300 dark:hover:bg-blue-800"
+                        >
+                            <svg width="8" height="5" viewBox="0 0 10 6" fill="none">
+                                <path d="M1 5L5 1L9 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                        <div className="h-px bg-blue-200 dark:bg-blue-700" />
+                        <button
+                            type="button"
+                            tabIndex={-1}
+                            onClick={() => {
+                                const v = parseFloat(row.amount) || 0;
+                                if (v > 0) onChange({ amount: String(v - 1) });
+                            }}
+                            className="flex flex-1 items-center justify-center px-1.5 text-neutral-600 transition hover:bg-blue-100 dark:text-neutral-300 dark:hover:bg-blue-800"
+                        >
+                            <svg width="8" height="5" viewBox="0 0 10 6" fill="none">
+                                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={onDelete}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                    </svg>
                 </button>
             </div>
         </div>

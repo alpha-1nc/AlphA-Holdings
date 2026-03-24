@@ -8,11 +8,11 @@ import {
     ComposedChart, Line, Area,
     LineChart,
 } from "recharts";
-import { Globe, Wallet, BarChart3 } from "lucide-react";
+import { Globe, Wallet, BarChart3, ChevronDown } from "lucide-react";
 import { getReportsByProfilePublished } from "@/app/actions/reports";
 import { getPortfolioStrategies } from "@/app/actions/strategy";
 import { getTickerColor, FALLBACK_COLORS } from "@/constants/brandColors";
-import { getTickerDisplayName } from "@/lib/ticker-metadata";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { WorkspaceProfile } from "@/lib/profile";
 import { computeRoleAllocation, computeTickerDeviation } from "@/lib/role-allocation";
@@ -104,6 +104,83 @@ function CustomBarTooltip({ active, payload, label }: { active?: boolean; payloa
     );
 }
 
+type NewInvBarRow = { period: string; "신규 투자금(합계)": number };
+
+function NewInvestmentAccordion({
+    latestPeriodLabel,
+    latestAmount,
+    ytdAmount,
+    yearLabel,
+    chartData,
+}: {
+    latestPeriodLabel: string;
+    latestAmount: number;
+    ytdAmount: number;
+    yearLabel: number;
+    chartData: NewInvBarRow[];
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <button
+                type="button"
+                aria-expanded={open}
+                onClick={() => setOpen((v) => !v)}
+                className="flex w-full items-start gap-3 rounded-2xl p-4 text-left transition-colors hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 md:p-6"
+            >
+                <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                        신규 납입
+                    </p>
+                    <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
+                        <div>
+                            <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">최근 달 ({latestPeriodLabel})</p>
+                            <p className="mt-1 text-xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-neutral-50 md:text-2xl">
+                                {krwFmt(latestAmount)}
+                            </p>
+                        </div>
+                        <div>
+                            <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{yearLabel}년 누적</p>
+                            <p className="mt-1 text-xl font-bold tabular-nums tracking-tight text-neutral-900 dark:text-neutral-50 md:text-2xl">
+                                {krwFmt(ytdAmount)}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{open ? "접기" : "추이 보기"}</span>
+                    <ChevronDown
+                        className={[
+                            "h-5 w-5 text-neutral-400 transition-transform duration-200 dark:text-neutral-500",
+                            open ? "rotate-180" : "",
+                        ].join(" ")}
+                        aria-hidden
+                    />
+                </div>
+            </button>
+            {open && (
+                <div className="border-t border-neutral-100 px-4 pb-4 pt-3 dark:border-neutral-800 md:px-6 md:pb-6">
+                    <p className="mb-3 text-[11px] text-neutral-400 dark:text-neutral-500">
+                        각 월별 리포트에 기록된 신규 납입액 합계입니다.
+                    </p>
+                    <div className="h-52 min-w-0 md:h-56">
+                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
+                                <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                                <Bar name="신규 납입" dataKey="신규 투자금(합계)" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={44} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* ── Donut Tooltip ───────────────────────────────────────────────────────*/
 function DonutTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { color: string } }> }) {
     if (!active || !payload?.length) return null;
@@ -119,10 +196,10 @@ function DonutTooltip({ active, payload }: { active?: boolean; payload?: Array<{
     );
 }
 
-/* ── Sector Tooltip (shows tickers in sector) ────────────────────────────*/
+/* ── Sector Tooltip (shows holding labels in sector) ─────────────────────*/
 function SectorTooltip({ active, payload }: {
     active?: boolean;
-    payload?: Array<{ name: string; value: number; payload: { color: string; tickers: string[] } }>;
+    payload?: Array<{ name: string; value: number; payload: { color: string; holdingLabels: string[] } }>;
 }) {
     if (!active || !payload?.length) return null;
     const item = payload[0];
@@ -133,11 +210,11 @@ function SectorTooltip({ active, payload }: {
                 <span className="font-semibold text-neutral-800 dark:text-neutral-100">{item.name}</span>
             </div>
             <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{krwFmt(item.value)}</p>
-            {item.payload.tickers.length > 0 && (
+            {item.payload.holdingLabels.length > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
-                    {item.payload.tickers.map((t) => (
-                        <span key={t} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-                            {getTickerDisplayName(t)}
+                    {item.payload.holdingLabels.map((t, i) => (
+                        <span key={`${t}-${i}`} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                            {t}
                         </span>
                     ))}
                 </div>
@@ -180,7 +257,10 @@ function TickerDonut({ items, totalKrw, includeCash }: { items: PortfolioItem[];
     const displayTotal = includeCash ? totalKrw : totalExCash;
 
     const nonCashData = nonCashItems.map((item, idx) => ({
-        name: getTickerDisplayName(item.ticker),
+        name: getPortfolioItemDisplayLabel({
+            ticker: item.ticker,
+            displayName: item.displayName,
+        }),
         value: item.krwAmount,
         color: getTickerColor(item.ticker, idx),
     }));
@@ -197,9 +277,9 @@ function TickerDonut({ items, totalKrw, includeCash }: { items: PortfolioItem[];
     }
 
     return (
-        <div className="flex flex-col items-center gap-4">
-            <div className="relative h-52 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+        <div className="flex w-full min-w-0 flex-col items-center gap-4">
+            <div className="relative h-52 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" debounce={50}>
                     <PieChart>
                         <Pie
                             data={data}
@@ -261,23 +341,27 @@ const SECTOR_COLORS: Record<string, string> = {
 
 /** 현금 제외하여 섹터별 비중 계산 (CASH는 섹터 분류 없음) */
 function SectorDonut({ items, totalKrw }: { items: PortfolioItem[]; totalKrw: number }) {
-    const sectorMap = new Map<string, { value: number; tickers: string[] }>();
+    const sectorMap = new Map<string, { value: number; holdingLabels: string[] }>();
     const nonCashItems = items.filter((i) => i.accountType !== "CASH" && i.krwAmount > 0);
     const totalExCash = nonCashItems.reduce((s, i) => s + i.krwAmount, 0);
 
     nonCashItems.forEach((item) => {
             const sector = (item.sector as string | null) || "기타";
-            const existing = sectorMap.get(sector) ?? { value: 0, tickers: [] };
+            const existing = sectorMap.get(sector) ?? { value: 0, holdingLabels: [] };
+            const label = getPortfolioItemDisplayLabel({
+                ticker: item.ticker,
+                displayName: item.displayName,
+            });
             sectorMap.set(sector, {
                 value: existing.value + item.krwAmount,
-                tickers: [...existing.tickers, item.ticker],
+                holdingLabels: [...existing.holdingLabels, label],
             });
         });
 
-    const data = Array.from(sectorMap.entries()).map(([name, { value, tickers }], idx) => ({
+    const data = Array.from(sectorMap.entries()).map(([name, { value, holdingLabels }], idx) => ({
         name,
         value,
-        tickers,
+        holdingLabels,
         color: SECTOR_COLORS[name] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length],
     }));
 
@@ -291,9 +375,9 @@ function SectorDonut({ items, totalKrw }: { items: PortfolioItem[]; totalKrw: nu
     }
 
     return (
-        <div className="flex flex-col items-center gap-4">
-            <div className="relative h-52 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+        <div className="flex w-full min-w-0 flex-col items-center gap-4">
+            <div className="relative h-52 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" debounce={50}>
                     <PieChart>
                         <Pie
                             data={data}
@@ -443,28 +527,25 @@ export default function DashboardPage() {
             "총 투자금": r.totalInvestedKrw,
             "총 평가금": r.totalCurrentKrw,
             "수익금": g,
-            "신규 투자금": newInv,
         };
     });
 
-    // 신규 투자금 차트 데이터 (월별/계좌별)
-    const newInvestmentData = chartReports.map((r) => {
-        const newInv = (r.newInvestments || []).reduce((sum, inv) => sum + inv.krwAmount, 0);
-        // 월별 리포트의 경우 CASH 계좌 제외
-        const filteredInvestments = activeTab === "monthly" 
-            ? (r.newInvestments || []).filter((inv) => inv.accountType !== "CASH")
-            : (r.newInvestments || []);
-        const byAccount = filteredInvestments.reduce((acc, inv) => {
-            const key = inv.accountType;
-            acc[key] = (acc[key] || 0) + inv.krwAmount;
-            return acc;
-        }, {} as Record<string, number>);
-        return {
-            period: r.periodLabel,
-            "신규 투자금": newInv,
-            ...byAccount,
-        };
-    });
+    const monthlyAscForNewInv = [...reports]
+        .filter((r) => r.type === "MONTHLY")
+        .sort((a, b) => a.periodLabel.localeCompare(b.periodLabel));
+    const calendarYear = new Date().getFullYear();
+    const ytdNewInvestmentKrw = monthlyAscForNewInv
+        .filter((r) => r.periodLabel.startsWith(`${calendarYear}-`))
+        .reduce(
+            (sum, r) => sum + (r.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0),
+            0,
+        );
+    const latestMonthlyForNewInv =
+        monthlyAscForNewInv.length > 0 ? monthlyAscForNewInv[monthlyAscForNewInv.length - 1] : null;
+    const monthlyNewInvBarData: NewInvBarRow[] = monthlyAscForNewInv.map((r) => ({
+        period: r.periodLabel,
+        "신규 투자금(합계)": (r.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0),
+    }));
 
     const returnData = chartReports.map((r) => {
         const newInv = (r.newInvestments || []).reduce((sum, inv) => sum + inv.krwAmount, 0);
@@ -524,136 +605,6 @@ export default function DashboardPage() {
             {/* AI 브리핑 배너 */}
             <AiBriefingBanner profileId={profileId as WorkspaceProfile} />
 
-            {/* Chart Section */}
-            {chartReports.length > 0 && (
-                <div className="space-y-4 md:space-y-6">
-                    {/* Tab */}
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
-                    </div>
-
-                    {/* ComposedChart: 총 투자금(Bar) · 총 평가금(Line) */}
-                    <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                            총 투자금 · 총 평가금
-                        </p>
-                        <div className="h-52 md:h-64">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                    <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                    <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                    <Legend wrapperStyle={{ fontSize: 11, color: "#9CA3AF" }} />
-                                    <Bar dataKey="총 투자금" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                    <Line type="monotone" dataKey="총 평가금" stroke="#10B981" strokeWidth={3} dot={{ fill: "#10B981", strokeWidth: 0 }} />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* 계좌별 신규 투자금 스택 차트 */}
-                    {newInvestmentData.some((d) => d["신규 투자금"] > 0) && (
-                        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                계좌별 신규 투자금
-                            </p>
-                            <div className="h-52 md:h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart
-                                        data={newInvestmentData.map((d) => {
-                                            const rec = d as Record<string, number | string>;
-                                            const result: Record<string, number | string> = {
-                                                period: d.period,
-                                                "미국 직투": (rec["US_DIRECT"] as number) || 0,
-                                                "ISA": (rec["ISA"] as number) || 0,
-                                                "일본 직투": (rec["JP_DIRECT"] as number) || 0,
-                                            };
-                                            // 분기별 리포트의 경우에만 현금 표시
-                                            if (activeTab === "quarterly") {
-                                                result["현금"] = (rec["CASH"] as number) || 0;
-                                            }
-                                            return result;
-                                        })}
-                                        margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
-                                        barGap={4}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                        <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                        <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                        <Legend wrapperStyle={{ fontSize: 11, color: "#9CA3AF" }} />
-                                        <Bar dataKey="미국 직투" stackId="a" fill="#3B82F6" radius={[0, 0, 0, 0]} maxBarSize={40} />
-                                        <Bar dataKey="ISA" stackId="a" fill="#10B981" radius={[0, 0, 0, 0]} maxBarSize={40} />
-                                        <Bar dataKey="일본 직투" stackId="a" fill="#F59E0B" radius={activeTab === "monthly" ? [4, 4, 0, 0] : [0, 0, 0, 0]} maxBarSize={40} />
-                                        {activeTab === "quarterly" && (
-                                            <Bar dataKey="현금" stackId="a" fill="#6B7280" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                        )}
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Two charts side by side: 누적 수익금 + 수익률 (LineChart with gradient fill) */}
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        {/* 누적 수익금 */}
-                        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                누적 수익금
-                            </p>
-                            <div className="h-48 md:h-52">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.4} />
-                                                <stop offset="100%" stopColor="#F59E0B" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                        <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                        <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                        <Area type="monotone" dataKey="수익금" fill="url(#profitGradient)" stroke="none" hide />
-                                        <Line type="monotone" dataKey="수익금" stroke="#F59E0B" strokeWidth={2} dot={{ fill: "#F59E0B", strokeWidth: 0 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        {/* 수익률 */}
-                        <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                수익률 (%)
-                            </p>
-                            <div className="h-48 md:h-52">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="returnGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                                                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={40} unit="%" />
-                                        <Tooltip
-                                            formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "수익률"]}
-                                            contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
-                                            cursor={{ fill: "rgba(0,0,0,0.04)" }}
-                                        />
-                                        <Area type="monotone" dataKey="수익률(%)" fill="url(#returnGradient)" stroke="none" hide />
-                                        <Line type="monotone" dataKey="수익률(%)" stroke="#8B5CF6" strokeWidth={2} dot={{ fill: "#8B5CF6", strokeWidth: 0 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {/* Portfolio Composition — based on latest quarterly report */}
             <div className="space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -680,7 +631,7 @@ export default function DashboardPage() {
                 {/* 2x2 그리드: [1,1]종목별 [1,2]목표대비괴리율 [2,1]역할별 [2,2]섹터별 */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
                     {/* [1행 1열 - 좌상단] 종목별 비중 (Ticker Allocation) */}
-                    <div className="flex min-h-[380px] flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                         <div className="mb-4 flex shrink-0 items-start justify-between">
                             <div>
                                 <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
@@ -703,7 +654,7 @@ export default function DashboardPage() {
                                 ) : null;
                             })()}
                         </div>
-                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center">
                             {latestQuarterly ? (
                                 <TickerDonut
                                     items={latestQuarterly.portfolioItems}
@@ -740,7 +691,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* [2행 1열 - 좌하단] 역할별 비중 (Role Allocation) */}
-                    <div className="flex min-h-[380px] flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                         <div className="mb-4 shrink-0">
                             <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 역할별 비중
@@ -749,13 +700,13 @@ export default function DashboardPage() {
                                 Role Allocation · 설정에서 역할 지정 가능
                             </p>
                         </div>
-                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center">
                             <RoleAllocationChart data={roleAllocationData} />
                         </div>
                     </div>
 
                     {/* [2행 2열 - 우하단] 섹터별 비중 (Sector Allocation) */}
-                    <div className="flex min-h-[380px] flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                         <div className="mb-4 shrink-0">
                             <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                                 섹터별 비중
@@ -764,7 +715,7 @@ export default function DashboardPage() {
                                 Sector Allocation · 호버 시 보유 종목 표시
                             </p>
                         </div>
-                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+                        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center">
                             {latestQuarterly ? (
                                 <SectorDonut
                                     items={latestQuarterly.portfolioItems}
@@ -785,6 +736,128 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            {latestMonthlyForNewInv && (
+                <NewInvestmentAccordion
+                    latestPeriodLabel={latestMonthlyForNewInv.periodLabel}
+                    latestAmount={(latestMonthlyForNewInv.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0)}
+                    ytdAmount={ytdNewInvestmentKrw}
+                    yearLabel={calendarYear}
+                    chartData={monthlyNewInvBarData}
+                />
+            )}
+
+            {/* Chart Section */}
+            {chartReports.length > 0 && (
+                <div className="space-y-4 md:space-y-6">
+                    {/* Tab */}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
+                        <div className="inline-flex shrink-0 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("monthly")}
+                                className={[
+                                    "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                                    activeTab === "monthly"
+                                        ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
+                                        : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
+                                ].join(" ")}
+                            >
+                                월별
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActiveTab("quarterly")}
+                                className={[
+                                    "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                                    activeTab === "quarterly"
+                                        ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
+                                        : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
+                                ].join(" ")}
+                            >
+                                분기별
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                            총 투자금 · 총 평가금
+                        </p>
+                        <div className="h-52 min-w-0 md:h-64">
+                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                <ComposedChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                    <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                    <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
+                                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                                    <Legend wrapperStyle={{ fontSize: 11, color: "#9CA3AF" }} />
+                                    <Bar dataKey="총 투자금" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                    <Line type="monotone" dataKey="총 평가금" stroke="#10B981" strokeWidth={3} dot={{ fill: "#10B981", strokeWidth: 0 }} />
+                                </ComposedChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Two charts side by side: 누적 수익금 + 수익률 (LineChart with gradient fill) */}
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {/* 누적 수익금 */}
+                        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                누적 수익금
+                            </p>
+                            <div className="h-48 min-w-0 md:h-52">
+                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                    <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.4} />
+                                                <stop offset="100%" stopColor="#F59E0B" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                        <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
+                                        <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                                        <Area type="monotone" dataKey="수익금" fill="url(#profitGradient)" stroke="none" hide />
+                                        <Line type="monotone" dataKey="수익금" stroke="#F59E0B" strokeWidth={2} dot={{ fill: "#F59E0B", strokeWidth: 0 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* 수익률 */}
+                        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                수익률 (%)
+                            </p>
+                            <div className="h-48 min-w-0 md:h-52">
+                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                    <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="returnGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
+                                                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={40} unit="%" />
+                                        <Tooltip
+                                            formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "수익률"]}
+                                            contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
+                                            cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                                        />
+                                        <Area type="monotone" dataKey="수익률(%)" fill="url(#returnGradient)" stroke="none" hide />
+                                        <Line type="monotone" dataKey="수익률(%)" stroke="#8B5CF6" strokeWidth={2} dot={{ fill: "#8B5CF6", strokeWidth: 0 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

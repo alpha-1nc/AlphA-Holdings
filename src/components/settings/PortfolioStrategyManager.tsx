@@ -18,7 +18,8 @@ import type { AssetRole } from "@/generated/prisma";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TickerSearchInput } from "@/components/dashboard/ticker-search-input";
+import { TickerSearchInput, type TickerSearchChangeMeta } from "@/components/dashboard/ticker-search-input";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import {
     Select,
     SelectContent,
@@ -49,6 +50,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
     // Form state
     const [ticker, setTicker] = useState("");
+    const [strategyDisplayName, setStrategyDisplayName] = useState<string | null>(null);
     const [role, setRole] = useState<AssetRole>("CORE");
     const [targetWeight, setTargetWeight] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -71,6 +73,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
     function handleEdit(strategy: PortfolioStrategy) {
         setEditingId(strategy.id);
         setTicker(strategy.ticker);
+        setStrategyDisplayName(strategy.displayName ?? null);
         setRole(strategy.role);
         setTargetWeight(String(strategy.targetWeight));
     }
@@ -78,6 +81,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
     function handleCancelEdit() {
         setEditingId(null);
         setTicker("");
+        setStrategyDisplayName(null);
         setRole("CORE");
         setTargetWeight("");
     }
@@ -102,6 +106,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                 await upsertPortfolioStrategy({
                     workspaceProfile,
                     ticker: trimmedTicker,
+                    displayName: strategyDisplayName?.trim() || null,
                     role,
                     targetWeight: weight,
                 });
@@ -167,7 +172,15 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             ) : (
                                 <TickerSearchInput
                                     value={ticker}
-                                    onChange={setTicker}
+                                    onChange={(t, meta?: TickerSearchChangeMeta) => {
+                                        setTicker(t);
+                                        if (meta?.source === "select") {
+                                            setStrategyDisplayName(meta.displayName?.trim() || null);
+                                        } else {
+                                            const same = t.trim().toUpperCase() === ticker.trim().toUpperCase();
+                                            if (!same) setStrategyDisplayName(null);
+                                        }
+                                    }}
                                     placeholder="AAPL, 005930, 7203..."
                                 />
                             )}
@@ -273,13 +286,23 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                 <span className="w-14" />
                             </div>
 
-                            {strategies.map((s) => (
+                            {strategies.map((s) => {
+                                const rowLabel = getPortfolioItemDisplayLabel({
+                                    ticker: s.ticker,
+                                    displayName: s.displayName,
+                                });
+                                return (
                                 <div
                                     key={s.id}
                                     className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 rounded-lg px-1 py-2 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                                 >
-                                    <span className="font-mono text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                                        {s.ticker}
+                                    <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                                        {rowLabel}
+                                        {rowLabel.trim().toUpperCase() !== s.ticker.trim().toUpperCase() && (
+                                            <span className="ml-1 font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                                                ({s.ticker})
+                                            </span>
+                                        )}
                                     </span>
                                     <span
                                         className={`inline-flex w-16 items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_BADGE_STYLES[s.role]}`}
@@ -308,7 +331,8 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            );
+                            })}
                         </div>
                     )}
                 </div>

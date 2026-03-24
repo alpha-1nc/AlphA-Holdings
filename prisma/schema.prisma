@@ -68,6 +68,7 @@ model PortfolioStrategy {
   profile          Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   ticker           String             // 종목 심볼
+  displayName      String?            // 표시명 (검색·메타데이터 캐시, 예: ETF 한글명)
   role             AssetRole          @default(CORE)  // 역할군
   targetWeight     Float              // 목표 비중 (%)
 
@@ -138,6 +139,7 @@ model PortfolioItem {
   report           Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   ticker           String                            // 종목 코드 (ex. AAPL, 삼성전자)
+  displayName      String?                           // 표시명 (검색·메타 캐시)
   logoUrl          String?                           // 사용자 지정 종목 대표 이미지 URL (붙여넣기)
   sector           String?                           // 섹터 분류 (Technology, Financials, Consumer Discretionary 등)
   role             AssetRole   @default(CORE)         // 역할군 (CORE, GROWTH, BOOSTER, DEFENSIVE, INDEX, UNASSIGNED)

@@ -74,6 +74,13 @@ export function TickerLogo({
     );
 }
 
+export type TickerSearchChangeMeta = {
+    /** input: 직접 입력, select: 검색 결과 선택 */
+    source?: "input" | "select";
+    /** 검색에서 고른 종목의 표시명 (한·일 숫자코드용 저장에 사용) */
+    displayName?: string | null;
+};
+
 /* ══════════════════════════════════════════════════════════════════════════
    TickerSearchInput
    - Portal 없음: 부모가 overflow:visible 이어야 함
@@ -82,7 +89,7 @@ export function TickerLogo({
 ══════════════════════════════════════════════════════════════════════════ */
 interface TickerSearchInputProps {
     value: string;
-    onChange: (ticker: string) => void;
+    onChange: (ticker: string, meta?: TickerSearchChangeMeta) => void;
     accountType?: string;
     placeholder?: string;
 }
@@ -137,7 +144,7 @@ export function TickerSearchInput({
             setIsLoading(false);
             setSelectedMeta(null);
             setActiveIdx(-1);
-            onChangeRef.current("");
+            onChangeRef.current("", { source: "input" });
             if (abortRef.current) abortRef.current.abort();
             clearTimeout(debounceRef.current);
         }
@@ -193,7 +200,7 @@ export function TickerSearchInput({
     const handleChange = (v: string) => {
         setInputVal(v);
         setActiveIdx(-1);
-        onChange(v); // 직접 입력 시에도 부모에 반영
+        onChange(v, { source: "input" });
 
         clearTimeout(debounceRef.current);
 
@@ -214,7 +221,7 @@ export function TickerSearchInput({
 
     /* ── Select ──────────────────────────────────────────────────────────*/
     const handleSelect = (t: TickerSearchResult) => {
-        onChange(t.symbol);
+        onChange(t.symbol, { source: "select", displayName: t.name });
         setInputVal(t.symbol);
         setSelectedMeta({ symbol: t.symbol, region: t.region });
         setIsOpen(false);

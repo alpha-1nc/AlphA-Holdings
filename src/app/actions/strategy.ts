@@ -30,21 +30,28 @@ export async function getPortfolioStrategies(workspaceProfile: WorkspaceProfile)
 export async function upsertPortfolioStrategy(data: {
     workspaceProfile: WorkspaceProfile;
     ticker: string;
+    displayName?: string | null;
     role: AssetRole;
     targetWeight: number;
 }) {
     const profileId = await resolveProfileId(data.workspaceProfile);
     const ticker = data.ticker.trim().toUpperCase();
+    const displayName =
+        data.displayName != null && String(data.displayName).trim() !== ""
+            ? String(data.displayName).trim()
+            : null;
 
     await prisma.portfolioStrategy.upsert({
         where: { profileId_ticker: { profileId, ticker } },
         create: {
             profileId,
             ticker,
+            displayName,
             role: data.role,
             targetWeight: data.targetWeight,
         },
         update: {
+            displayName,
             role: data.role,
             targetWeight: data.targetWeight,
         },

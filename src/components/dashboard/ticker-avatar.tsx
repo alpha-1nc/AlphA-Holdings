@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { getTickerDisplayName } from "@/lib/ticker-metadata";
+import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import {
     Dialog,
     DialogContent,
@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/input";
 
 interface TickerAvatarProps {
     ticker: string;
+    /** DB에 저장된 검색 표시명 (숫자 티커용, 이니셜·접근성에 반영) */
+    displayName?: string | null;
     logoUrl?: string | null;
     size?: number;
     /** 둥근 사각형 (기업 분석 리포트 스타일) — 기본은 원형 */
@@ -25,6 +27,7 @@ interface TickerAvatarProps {
 
 export function TickerAvatar({
     ticker,
+    displayName: displayNameProp,
     logoUrl,
     size = 28,
     roundedSquare = false,
@@ -37,8 +40,12 @@ export function TickerAvatar({
     const inputRef = useRef<HTMLInputElement>(null);
     const prevLogoUrl = useRef(logoUrl);
 
-    const displayName = getTickerDisplayName(ticker);
-    const initial = displayName ? displayName[0] : ticker?.trim().slice(0, 1)?.toUpperCase() || "?";
+    const labelForInitial = getPortfolioItemDisplayLabel({
+        ticker,
+        displayName: displayNameProp,
+    });
+    const initialSource = (labelForInitial.trim() || ticker.trim() || "?");
+    const initial = initialSource[0] ?? "?";
 
     const hasValidLogo = logoUrl?.trim() && !imgError;
     const sizeClass =

@@ -2,7 +2,6 @@
 
 import type { TickerDeviationItem } from "@/lib/role-allocation";
 import { getTickerColor } from "@/constants/brandColors";
-import { getTickerMetadata } from "@/lib/ticker-metadata";
 
 interface TargetVsActualBarProps {
   data: TickerDeviationItem[];
@@ -60,12 +59,13 @@ function TickerRow({ item, index }: TickerRowProps) {
             className="h-2 w-2 shrink-0 rounded-full"
             style={{ background: tickerColor }}
           />
-          <span className="font-mono text-xs font-semibold text-neutral-700 dark:text-neutral-200">
-            {(() => {
-              const meta = getTickerMetadata(item.ticker);
-              const sym = item.ticker?.trim() || "";
-              return meta?.name ? `${sym} · ${meta.name}` : sym;
-            })()}
+          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">
+            {item.displayLabel}
+            {item.displayLabel.trim().toUpperCase() !== item.ticker.trim().toUpperCase() && (
+              <span className="ml-1 font-mono text-[10px] font-normal text-neutral-500 dark:text-neutral-400">
+                ({item.ticker})
+              </span>
+            )}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -146,7 +146,7 @@ export function TargetVsActualBar({ data }: TargetVsActualBarProps) {
   return (
     <div className="flex flex-col gap-4">
       {data.map((item, idx) => (
-        <TickerRow key={item.ticker} item={item} index={idx} />
+        <TickerRow key={`${item.ticker}-${idx}`} item={item} index={idx} />
       ))}
 
       {/* Total target weight hint */}
