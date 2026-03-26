@@ -28,46 +28,6 @@ function parsePeriodLabel(periodLabel: string): Date {
   return new Date();
 }
 
-// ── 리포트 목록 (전체 / 타입별 필터) ────────────────────────
-export async function listReports(type?: ReportTypeInput, profile?: string) {
-  const reports = await prisma.report.findMany({
-    where: {
-      ...(type ? { type } : {}),
-      ...(profile ? { profile } : {}),
-    },
-    include: {
-      portfolioItems: true,
-      newInvestments: true,
-    },
-  });
-  
-  // periodLabel 기준으로 정렬 (최신순)
-  return reports.sort((a, b) => {
-    const dateA = parsePeriodLabel(a.periodLabel);
-    const dateB = parsePeriodLabel(b.periodLabel);
-    return dateB.getTime() - dateA.getTime(); // 내림차순
-  });
-}
-
-// ── 프로필별 리포트 목록 (최근 순) ───────────────────────────
-export async function getReportsByProfile(profile: string) {
-  const reports = await prisma.report.findMany({
-    where: { profile },
-    include: {
-      portfolioItems: true,
-      newInvestments: true,
-    },
-  });
-  
-  
-  // periodLabel 기준으로 정렬 (최신순)
-  return reports.sort((a, b) => {
-    const dateA = parsePeriodLabel(a.periodLabel);
-    const dateB = parsePeriodLabel(b.periodLabel);
-    return dateB.getTime() - dateA.getTime(); // 내림차순
-  });
-}
-
 // ── 프로필별 리포트 목록 (타입 필터 포함) ──────────────────────
 export async function getReportsByProfileAndType(profile: string, type?: ReportTypeInput) {
   const reports = await prisma.report.findMany({
@@ -82,26 +42,6 @@ export async function getReportsByProfileAndType(profile: string, type?: ReportT
   });
   
   // periodLabel 기준으로 정렬 (과거→최신 순서, 오름차순)
-  return reports.sort((a, b) => {
-    const dateA = parsePeriodLabel(a.periodLabel);
-    const dateB = parsePeriodLabel(b.periodLabel);
-    return dateA.getTime() - dateB.getTime(); // 오름차순 (과거→최신)
-  });
-}
-
-// ── 프로필·타입별 PUBLISHED 리포트 (차트용, 오름차순) ───────────────
-export async function getReportsByProfileAndTypePublished(profile: string, type?: ReportTypeInput) {
-  const reports = await prisma.report.findMany({
-    where: {
-      profile,
-      status: "PUBLISHED",
-      ...(type ? { type } : {}),
-    },
-    include: {
-      portfolioItems: true,
-      newInvestments: true,
-    },
-  });
   return reports.sort((a, b) => {
     const dateA = parsePeriodLabel(a.periodLabel);
     const dateB = parsePeriodLabel(b.periodLabel);
@@ -312,30 +252,6 @@ export async function createReport(payload: CreateReportPayload) {
   return report;
 }
 
-// ── 리포트 수정 (기본 필드만) ────────────────────────────────────────────
-export async function updateReport(
-  id: number,
-  data: Partial<{
-    type: ReportType;
-    periodLabel: string;
-    usdRate: number;
-    jpyRate: number;
-    totalInvestedKrw: number;
-    totalCurrentKrw: number;
-    summary: string;
-    journal: string;
-    strategy: string;
-    earningsReview: string;
-  }>
-) {
-  const report = await prisma.report.update({ where: { id }, data });
-  revalidatePath("/");
-  revalidatePath("/monthly");
-  revalidatePath("/quarterly");
-  revalidatePath(`/reports/${id}`);
-  return report;
-}
-
 // ── 리포트 전체 수정 (포트폴리오 아이템 포함) ──────────────────────────────
 export async function updateReportFull(id: number, payload: CreateReportPayload) {
   const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
@@ -387,13 +303,6 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
 // ── 리포트 삭제 ────────────────────────────────────────────
 export async function deleteReport(id: number) {
   await prisma.report.delete({ where: { id } });
-  revalidatePath("/");
-  revalidatePath("/monthly");
-  revalidatePath("/quarterly");
-}
-
-// ── 캐시 재검증 헬퍼 ──────────────────────────────────────
-export async function revalidateReportPaths() {
   revalidatePath("/");
   revalidatePath("/monthly");
   revalidatePath("/quarterly");

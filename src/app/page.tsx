@@ -605,6 +605,137 @@ export default function DashboardPage() {
             {/* AI 브리핑 배너 */}
             <AiBriefingBanner profileId={profileId as WorkspaceProfile} />
 
+            {/* 기간별 투자 추이 (AI 브리핑 바로 아래) — 탭은 항상 표시, 데이터 없을 때는 안내 문구 */}
+            <div className="space-y-4 md:space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
+                    <div className="inline-flex shrink-0 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("monthly")}
+                            className={[
+                                "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                                activeTab === "monthly"
+                                    ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
+                                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
+                            ].join(" ")}
+                        >
+                            월별
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("quarterly")}
+                            className={[
+                                "rounded-md px-3 py-1.5 text-xs font-medium transition",
+                                activeTab === "quarterly"
+                                    ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
+                                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
+                            ].join(" ")}
+                        >
+                            분기별
+                        </button>
+                    </div>
+                </div>
+
+                {chartReports.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/80 px-6 py-14 text-center dark:border-neutral-700 dark:bg-neutral-900/40">
+                        <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
+                            {activeTab === "monthly"
+                                ? "표시할 월별 리포트 데이터가 없습니다."
+                                : "표시할 분기별 리포트 데이터가 없습니다."}
+                        </p>
+                        <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+                            해당 유형의 리포트를 작성하면 추이 그래프가 나타납니다.
+                        </p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                총 투자금 · 총 평가금
+                            </p>
+                            <div className="h-52 min-w-0 md:h-64">
+                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                    <ComposedChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                        <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
+                                        <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                                        <Legend wrapperStyle={{ fontSize: 11, color: "#9CA3AF" }} />
+                                        <Bar dataKey="총 투자금" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                                        <Line type="monotone" dataKey="총 평가금" stroke="#10B981" strokeWidth={3} dot={{ fill: "#10B981", strokeWidth: 0 }} />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                            <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                    누적 수익금
+                                </p>
+                                <div className="h-48 min-w-0 md:h-52">
+                                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                        <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.4} />
+                                                    <stop offset="100%" stopColor="#F59E0B" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                            <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                            <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
+                                            <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                                            <Area type="monotone" dataKey="수익금" fill="url(#profitGradient)" stroke="none" hide />
+                                            <Line type="monotone" dataKey="수익금" stroke="#F59E0B" strokeWidth={2} dot={{ fill: "#F59E0B", strokeWidth: 0 }} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
+                                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                                    수익률 (%)
+                                </p>
+                                <div className="h-48 min-w-0 md:h-52">
+                                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                                        <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                                            <defs>
+                                                <linearGradient id="returnGradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
+                                                    <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
+                                            <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={40} unit="%" />
+                                            <Tooltip
+                                                formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "수익률"]}
+                                                contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
+                                                cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                                            />
+                                            <Area type="monotone" dataKey="수익률(%)" fill="url(#returnGradient)" stroke="none" hide />
+                                            <Line type="monotone" dataKey="수익률(%)" stroke="#8B5CF6" strokeWidth={2} dot={{ fill: "#8B5CF6", strokeWidth: 0 }} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            {latestMonthlyForNewInv && (
+                <NewInvestmentAccordion
+                    latestPeriodLabel={latestMonthlyForNewInv.periodLabel}
+                    latestAmount={(latestMonthlyForNewInv.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0)}
+                    ytdAmount={ytdNewInvestmentKrw}
+                    yearLabel={calendarYear}
+                    chartData={monthlyNewInvBarData}
+                />
+            )}
+
             {/* Portfolio Composition — based on latest quarterly report */}
             <div className="space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -736,128 +867,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
-
-            {latestMonthlyForNewInv && (
-                <NewInvestmentAccordion
-                    latestPeriodLabel={latestMonthlyForNewInv.periodLabel}
-                    latestAmount={(latestMonthlyForNewInv.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0)}
-                    ytdAmount={ytdNewInvestmentKrw}
-                    yearLabel={calendarYear}
-                    chartData={monthlyNewInvBarData}
-                />
-            )}
-
-            {/* Chart Section */}
-            {chartReports.length > 0 && (
-                <div className="space-y-4 md:space-y-6">
-                    {/* Tab */}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
-                        <div className="inline-flex shrink-0 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("monthly")}
-                                className={[
-                                    "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                                    activeTab === "monthly"
-                                        ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
-                                ].join(" ")}
-                            >
-                                월별
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("quarterly")}
-                                className={[
-                                    "rounded-md px-3 py-1.5 text-xs font-medium transition",
-                                    activeTab === "quarterly"
-                                        ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
-                                ].join(" ")}
-                            >
-                                분기별
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                            총 투자금 · 총 평가금
-                        </p>
-                        <div className="h-52 min-w-0 md:h-64">
-                            <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                <ComposedChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                    <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                    <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                    <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                    <Legend wrapperStyle={{ fontSize: 11, color: "#9CA3AF" }} />
-                                    <Bar dataKey="총 투자금" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                    <Line type="monotone" dataKey="총 평가금" stroke="#10B981" strokeWidth={3} dot={{ fill: "#10B981", strokeWidth: 0 }} />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* Two charts side by side: 누적 수익금 + 수익률 (LineChart with gradient fill) */}
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        {/* 누적 수익금 */}
-                        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                누적 수익금
-                            </p>
-                            <div className="h-48 min-w-0 md:h-52">
-                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                    <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.4} />
-                                                <stop offset="100%" stopColor="#F59E0B" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                        <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                        <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                        <Area type="monotone" dataKey="수익금" fill="url(#profitGradient)" stroke="none" hide />
-                                        <Line type="monotone" dataKey="수익금" stroke="#F59E0B" strokeWidth={2} dot={{ fill: "#F59E0B", strokeWidth: 0 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        {/* 수익률 */}
-                        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                수익률 (%)
-                            </p>
-                            <div className="h-48 min-w-0 md:h-52">
-                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                    <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="returnGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                                                <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                        <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={40} unit="%" />
-                                        <Tooltip
-                                            formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "수익률"]}
-                                            contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
-                                            cursor={{ fill: "rgba(0,0,0,0.04)" }}
-                                        />
-                                        <Area type="monotone" dataKey="수익률(%)" fill="url(#returnGradient)" stroke="none" hide />
-                                        <Line type="monotone" dataKey="수익률(%)" stroke="#8B5CF6" strokeWidth={2} dot={{ fill: "#8B5CF6", strokeWidth: 0 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

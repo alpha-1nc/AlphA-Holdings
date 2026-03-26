@@ -32,27 +32,3 @@ export const ANALYSIS_REPORTS: AnalysisReportMeta[] = [
         verdict: "BUY",
     },
 ];
-
-/** 연·월 period 목록 (최신순) */
-export function getAnalysisReportPeriods(): string[] {
-    const set = new Set<string>();
-    for (const r of ANALYSIS_REPORTS) {
-        set.add(`${r.year}-${String(r.month).padStart(2, "0")}`);
-    }
-    return [...set].sort((a, b) => b.localeCompare(a));
-}
-
-/** 특정 연·월의 보고서 목록 */
-export function getReportsByPeriod(year: number, month: number): AnalysisReportMeta[] {
-    return ANALYSIS_REPORTS.filter((r) => r.year === year && r.month === month);
-}
-
-/** slug(companyCode)로 보고서 조회 (year, month 일치 시) */
-export function getReportBySlug(yearStr: string, monthStr: string, slug: string): AnalysisReportMeta | undefined {
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10);
-    if (Number.isNaN(year) || Number.isNaN(month)) return undefined;
-    return ANALYSIS_REPORTS.find(
-        (r) => r.year === year && r.month === month && r.companyCode.toUpperCase() === slug.toUpperCase()
-    );
-}

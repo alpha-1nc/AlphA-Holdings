@@ -9,6 +9,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import logo from "@assets/logo.png";
 import logoDark from "@assets/logo-dark.png";
+import { useLogoHomeCinematic } from "@/components/layout/logo-home-cinematic";
 
 const navItems = [
     { href: "/", icon: Home, label: "홈" },
@@ -68,37 +69,47 @@ export function TopNavbar() {
     const pathname = usePathname();
     const { theme, toggleTheme } = useTheme();
     const [themeHovered, setThemeHovered] = useState(false);
+    const { start: startLogoHome, portal: logoHomePortal } = useLogoHomeCinematic();
 
     return (
         <header className="sticky top-0 z-50 w-full border-b border-neutral-200/60 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-950/85">
+            {logoHomePortal}
             <div className="mx-auto flex h-[68px] max-w-screen-2xl items-center justify-between px-4 md:px-8">
-                {/* Logo + Brand */}
-                <Link href="/" className="flex items-center gap-2.5 select-none group">
+                {/* Logo + Brand — 클릭 시 시네마틱 홈 전환 */}
+                <button
+                    type="button"
+                    aria-label="홈으로 이동"
+                    onClick={startLogoHome}
+                    className="flex items-center gap-2.5 select-none text-left group rounded-lg outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-neutral-400 dark:focus-visible:ring-neutral-500 dark:ring-offset-neutral-950"
+                >
                     <div className="relative flex h-9 w-9 shrink-0 items-center justify-center transition-transform duration-200 group-hover:scale-105">
                         <Image
                             src={logo}
-                            alt="AlphA Holdings logo"
+                            alt=""
                             width={36}
                             height={36}
                             className="h-9 w-9 object-contain dark:hidden"
                             priority
+                            aria-hidden
                         />
                         <Image
                             src={logoDark}
-                            alt="AlphA Holdings logo"
+                            alt=""
                             width={36}
                             height={36}
                             className="hidden h-9 w-9 object-contain dark:block"
                             priority
+                            aria-hidden
                         />
                     </div>
                     <span
                         className="hidden text-[17px] font-bold tracking-tight text-neutral-900 dark:text-neutral-50 transition-opacity duration-200 group-hover:opacity-80 sm:block"
                         style={{ fontFamily: "var(--font-inter), sans-serif", letterSpacing: "-0.025em" }}
+                        aria-hidden
                     >
                         AlphA Holdings
                     </span>
-                </Link>
+                </button>
 
                 {/* Icon Navigation */}
                 <nav className="flex items-center gap-0.5 md:gap-1.5">

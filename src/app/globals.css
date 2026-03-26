@@ -149,3 +149,19 @@ body {
   max-width: 100vw;
   overflow-x: hidden;
 }
+
+/* Logo → home cinematic: emerge */
+@keyframes logo-emerge {
+  from {
+    transform: scale(0.25);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-logo-emerge {
+  animation: logo-emerge 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
