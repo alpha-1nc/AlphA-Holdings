@@ -151,6 +151,24 @@ model PortfolioItem {
   createdAt        DateTime     @default(now())
 }
 
+// ── 투자 분석 HTML (붙여넣기 등록 — 서버리스에서 public/ 쓰기 불가하므로 DB 저장) ──
+model AnalysisReportUpload {
+  id           String   @id @default(cuid())
+  year         Int
+  month        Int
+  companyCode  String   @map("company_code")
+  companyName  String   @map("company_name")
+  title        String
+  fileName     String   @map("file_name")
+  verdict      String?
+  html         String
+  addedAt      DateTime @default(now()) @map("added_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([year, month, companyCode])
+  @@map("analysis_report_upload")
+}
+
 // ── 신규 투자금 (리포트별, 계좌별) ───────────────────────────────
 model NewInvestment {
   id               Int          @id @default(autoincrement())
@@ -164,4 +182,19 @@ model NewInvestment {
   krwAmount        Float                             // 원화 환산 신규 투자금
 
   createdAt        DateTime     @default(now())
+}
+
+model AnalysisReport {
+  id           String   @id @default(cuid())
+  ticker       String
+  companyName  String
+  slug         String   @unique
+  reportDate   DateTime @default(now())
+  periodLabel  String
+  reportData   Json
+  rating       String
+  totalScore   Float
+  appliedModel String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

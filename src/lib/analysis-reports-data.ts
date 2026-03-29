@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { ANALYSIS_REPORTS, type AnalysisReportMeta } from "@/constants/analysis-reports";
+import { prisma } from "@/lib/prisma";
 
 const REGISTRY_PATH = path.join(process.cwd(), "public", "analysis-reports", "registry.json");
 
@@ -23,14 +24,39 @@ export async function readRegistry(): Promise<UserRegistryEntry[]> {
     }
 }
 
-/** 코드에 정의된 보고서 + 붙여넣기로 등록한 보고서(레지스트리)를 합칩니다. 동일 연·월·티커는 레지스트리가 우선합니다. */
+async function readRegistryFromDb(): Promise<UserRegistryEntry[]> {
+    const rows = await prisma.analysisReportUpload.findMany({
+        orderBy: { addedAt: "asc" },
+    });
+    return rows.map((row) => ({
+        year: row.year,
+        month: row.month,
+        companyCode: row.companyCode,
+        companyName: row.companyName,
+        title: row.title,
+        fileName: row.fileName,
+        verdict: row.verdict as AnalysisReportMeta["verdict"] | undefined,
+        htmlSource: "database" as const,
+        addedAt: row.addedAt.toISOString(),
+    }));
+}
+
+function withStaticSource(r: AnalysisReportMeta): AnalysisReportMeta {
+    return { ...r, htmlSource: "static" };
+}
+
+/** 코드 정의 + 파일 레지스트리 + DB(붙여넣기)를 합칩니다. 동일 연·월·티커는 나중 항목이 우선(DB가 파일보다 우선). */
 export async function getMergedAnalysisReports(): Promise<AnalysisReportMeta[]> {
-    const dynamic = await readRegistry();
+    const fromFile = await readRegistry();
+    const fromDb = await readRegistryFromDb();
     const map = new Map<string, AnalysisReportMeta>();
     for (const r of ANALYSIS_REPORTS) {
-        map.set(reportKey(r), r);
+        map.set(reportKey(r), withStaticSource(r));
     }
-    for (const r of dynamic) {
+    for (const r of fromFile) {
+        map.set(reportKey(r), { ...r, htmlSource: "static" });
+    }
+    for (const r of fromDb) {
         map.set(reportKey(r), r);
     }
     return [...map.values()].sort((a, b) => {
@@ -57,36 +83,33 @@ export async function getReportBySlugMerged(
     );
 }
 
+/** 붙여넣기 등록: 배포 환경(Vercel 등)에서 public/ 쓰기가 불가하므로 DB에만 저장합니다. */
 export async function upsertUserReport(html: string, meta: AnalysisReportMeta): Promise<void> {
-    const monthDir = String(meta.month).padStart(2, "0");
-    const dir = path.join(process.cwd(), "public", "analysis-reports", String(meta.year), monthDir);
-    await fs.mkdir(dir, { recursive: true });
-    const fullPath = path.join(dir, meta.fileName);
-
-    const list = await readRegistry();
-    const idx = list.findIndex((e) => reportKey(e) === reportKey(meta));
-
-    if (idx >= 0) {
-        const old = list[idx];
-        if (old.fileName !== meta.fileName) {
-            const oldPath = path.join(dir, old.fileName);
-            try {
-                await fs.unlink(oldPath);
-            } catch {
-                /* ignore */
-            }
-        }
-    }
-
-    await fs.writeFile(fullPath, html, "utf-8");
-
-    const now = new Date().toISOString();
-    const entry: UserRegistryEntry = {
-        ...meta,
-        addedAt: idx >= 0 ? list[idx].addedAt : now,
-    };
-    if (idx >= 0) list[idx] = entry;
-    else list.push(entry);
-
-    await fs.writeFile(REGISTRY_PATH, JSON.stringify(list, null, 2), "utf-8");
+    const code = meta.companyCode.toUpperCase();
+    await prisma.analysisReportUpload.upsert({
+        where: {
+            year_month_companyCode: {
+                year: meta.year,
+                month: meta.month,
+                companyCode: code,
+            },
+        },
+        create: {
+            year: meta.year,
+            month: meta.month,
+            companyCode: code,
+            companyName: meta.companyName,
+            title: meta.title,
+            fileName: meta.fileName,
+            verdict: meta.verdict ?? null,
+            html,
+        },
+        update: {
+            companyName: meta.companyName,
+            title: meta.title,
+            fileName: meta.fileName,
+            verdict: meta.verdict ?? null,
+            html,
+        },
+    });
 }

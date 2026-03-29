@@ -9,6 +9,8 @@ export type AnalysisReportMeta = {
     title: string;
     fileName: string;
     verdict?: "BUY" | "HOLD" | "SELL";
+    /** static: public/analysis-reports 파일, database: Prisma에 저장된 HTML(API 제공) */
+    htmlSource?: "static" | "database";
 };
 
 /** 연도/월별 기업 분석 보고서 목록 (당시 데이터 기준) */
