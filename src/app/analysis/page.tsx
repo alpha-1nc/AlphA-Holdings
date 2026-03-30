@@ -1,23 +1,23 @@
-import { Separator } from "@/components/ui/separator";
 import AnalysisReportList from "./AnalysisReportList";
+import { AnalysisPageShell } from "./analysis-page-shell";
 import AnalysisTickerForm from "./analysis-ticker-form";
 
 export const dynamic = "force-dynamic";
 
-export default function AnalysisPage() {
+export default async function AnalysisPage() {
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6">
-      <header>
+    <AnalysisPageShell>
+      <div role="banner">
         <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           주식 분석 리포트
         </h1>
-      </header>
+      </div>
 
       <AnalysisTickerForm />
 
-      <Separator className="my-2" />
+      <hr className="my-2 h-px w-full shrink-0 border-0 bg-border" />
 
       <AnalysisReportList />
-    </div>
+    </AnalysisPageShell>
   );
 }

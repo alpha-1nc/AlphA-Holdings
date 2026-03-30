@@ -122,6 +122,10 @@ export interface FinancialData {
   /** FMP 연간 매출 시계열 기준 3년 매출 CAGR */
   fmpRevenueCAGR3Y: number | null;
   fmpHistoricalEps: Array<{ year: number; eps: number }> | null;
+  /** FMP cash-flow-statement 기반 TTM FCF (OCF − |CapEx| 분기 합) */
+  fmpFreeCashflow: number | null;
+  /** FMP cash-flow-statement 최신 분기 |CapEx| */
+  fmpCapex: number | null;
 
   stockBasedCompensation: number | null;
   netDilutionRate: number | null;
@@ -129,8 +133,70 @@ export interface FinancialData {
   peersMedian: {
     grossMargin: number | null;
     evToFcf: number | null;
+    evToGrossProfit: number | null;
     peersUsed: string[];
   } | null;
+
+  /** Model B — Rule of 40: 매출성장률(%) + FCF마진(%) */
+  ruleOf40: number | null;
+  /** Model B — 주식기반보상 / 매출 */
+  sbcToRevenue: number | null;
+  /** Model B — 연 현금 런웨이 (FCF<0일 때만; FCF>0이면 null) */
+  cashRunwayYears: number | null;
+  /** Model B — FCF>0이면 현금 소진 없음으로 간주 */
+  isCashRunwayInfinite: boolean;
+  /** Model B — EV / 매출총이익 (기업 자체) */
+  evToGrossProfit: number | null;
+  /** Model B — EV/Sales ÷ (성장률×100), 성장률은 소수(예: 0.05) */
+  evToSalesGrowthRatio: number | null;
+  /** Model B — 분기 YoY 매출성장률 표준편차(%p) */
+  revenueGrowthStdDev: number | null;
+  /** Model B — FMP 애널리스트 차기 연도 대비 매출 성장률(소수) */
+  fmpForwardRevenueGrowth: number | null;
+  /** Model B — 분기별 YoY 매출성장률(소수) */
+  quarterlyRevenueGrowthRates: number[] | null;
+
+  /** Model C — 음수 분기 OCF 평균 절대값(FMP 분기 현금흐름표) */
+  quarterlyBurnRate: number | null;
+  /** Model C — 총현금 ÷ 분기 소진율 */
+  cashRunwayQuarters: number | null;
+  /** Model C — 희석주식수 YoY(연간 시계열 최근 2년) */
+  sharesOutstandingYoY: number | null;
+  /** Model C — 프리매출 추정 */
+  isPreRevenue: boolean;
+  /** Model C — EV ÷ EV/Revenue 역산 매출 */
+  revenueAbsolute: number | null;
+  /** Model C — P/B와 동일(priceToBook) */
+  marketCapToBookRatio: number | null;
+
+  /** Model D — 재고회전율 YoY (연간 시계열, 최신 대비 전년) */
+  inventoryTurnoverYoY: number | null;
+  /** Model D — FCF ÷ 총 배당지급액 (dividendRate·무배당 시 null) */
+  dividendCoverageRatio: number | null;
+
+  /** Model E — 베타 (Yahoo defaultKeyStatistics) */
+  beta: number | null;
+  /** Model E — 정당 P/B (ROE ÷ CoE), collectAllData에서 산출 */
+  justifiedPB: number | null;
+  /** Model E — 자기자본비용 CoE */
+  costOfEquity: number | null;
+  /** Model E — NIM 근사 (gross/operating margin 기반, 참고용) */
+  netInterestMarginProxy: number | null;
+
+  /** Model F — FFO/주 (FMP 분기 OCF TTM 우선, 없으면 순이익+D&A) */
+  ffoPerShare: number | null;
+  /** Model F — FFO 산출 방식 (추적용) */
+  ffoCalculationMethod: "operatingCF" | "netIncomePlusDA" | null;
+  /** Model F — 배당률 ÷ FFO/주 */
+  ffoPayoutRatio: number | null;
+  /** Model F — 연간 FFO YoY (최근 2년 시계열) */
+  ffoGrowthRate: number | null;
+  /** Model F — 장기부채 ÷ 총부채 */
+  longTermDebtRatio: number | null;
+  /** Model F — 배당수익률 − 10년 국채(소수, 예: 0.02 = 200bps) */
+  dividendToTreasurySpread: number | null;
+  /** Model F — 주가 ÷ FFO/주 */
+  priceToFfo: number | null;
 }
 
 export interface FredSeries {
@@ -348,6 +414,106 @@ function median(arr: number[]): number | null {
     : sorted[mid]!;
 }
 
+/** Peer EV/FCF용: OCF − |CapEx| (둘 다 있을 때), 아니면 Yahoo freeCashflow */
+function peerFcfForEvToFcf(
+  fd: { operatingCashflow?: number; freeCashflow?: number } | null | undefined
+): number | null {
+  if (!fd) return null;
+  const ocf = toNumber(fd.operatingCashflow);
+  const capex = toNumber((fd as Record<string, unknown>).capitalExpenditures);
+  if (ocf !== null && capex !== null) {
+    return ocf - Math.abs(capex);
+  }
+  return toNumber(fd.freeCashflow);
+}
+
+type YahooFinanceClient = InstanceType<typeof yahooFinance>;
+
+/**
+ * Yahoo recommendations peers 기반 grossMargin / EV/FCF / EV/GrossProfit 중앙값.
+ * EV/GP·매출총이익률 중앙값은 전통 기업이 섞여 왜곡될 수 있어 하한 미만이면 null (비교군 부적절).
+ */
+async function fetchPeersMedian(
+  yf: YahooFinanceClient,
+  upperTicker: string
+): Promise<FinancialData["peersMedian"]> {
+  try {
+    const recResponse = await yf.recommendationsBySymbol(upperTicker);
+    const peerCandidates = (recResponse.recommendedSymbols ?? [])
+      .map((x) => x.symbol)
+      .filter((s): s is string => typeof s === "string" && s.length > 0 && !s.includes("."))
+      .slice(0, 6);
+    if (peerCandidates.length < 3) return null;
+
+    const settled = await Promise.all(
+      peerCandidates.map(async (peer) => {
+        try {
+          const qs = await yf.quoteSummary(peer, {
+            modules: ["financialData", "defaultKeyStatistics"],
+          });
+          return { peer, qs };
+        } catch {
+          return null;
+        }
+      })
+    );
+    const ok = settled.filter((r): r is NonNullable<typeof r> => r !== null);
+    if (ok.length === 0) return null;
+
+    const grossMarginValues: number[] = [];
+    const evToFcfValues: number[] = [];
+    const evToGrossProfitValues: number[] = [];
+    for (const { qs } of ok) {
+      const gm = qs.financialData?.grossMargins;
+      if (typeof gm === "number" && Number.isFinite(gm)) {
+        grossMarginValues.push(gm);
+      }
+      const peerFcf = peerFcfForEvToFcf(qs.financialData);
+      const ev = qs.defaultKeyStatistics?.enterpriseValue;
+      if (
+        peerFcf !== null &&
+        peerFcf > 0 &&
+        typeof ev === "number" &&
+        Number.isFinite(ev)
+      ) {
+        evToFcfValues.push(ev / peerFcf);
+      }
+      const evToRev = qs.defaultKeyStatistics?.enterpriseToRevenue;
+      if (
+        typeof gm === "number" &&
+        Number.isFinite(gm) &&
+        typeof evToRev === "number" &&
+        Number.isFinite(evToRev) &&
+        evToRev !== 0 &&
+        typeof ev === "number" &&
+        Number.isFinite(ev)
+      ) {
+        const grossProfit = gm * (ev / evToRev);
+        if (Number.isFinite(grossProfit) && grossProfit > 0) {
+          evToGrossProfitValues.push(ev / grossProfit);
+        }
+      }
+    }
+
+    const grossMarginMed = median(grossMarginValues);
+    const evToFcfMed = median(evToFcfValues);
+    const evToGrossProfitMed = median(evToGrossProfitValues);
+
+    return {
+      grossMargin:
+        grossMarginMed != null && grossMarginMed < 0.3 ? null : grossMarginMed,
+      evToFcf: evToFcfMed,
+      evToGrossProfit:
+        evToGrossProfitMed != null && evToGrossProfitMed < 8
+          ? null
+          : evToGrossProfitMed,
+      peersUsed: ok.map((r) => r.peer),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function formatUsdDilutionLabel(n: number): string {
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
@@ -380,6 +546,32 @@ function annualTotalRevenueFromRow(row: Record<string, unknown>): number | null 
 }
 
 /** 연도 오름차순 연간 매출로 최근 3년 CAGR: (latest/oldest)^(1/3)-1, 최소 4개 연도 */
+/** 연간 fundamentals에서 희석주식수 YoY: (최신 − 전년) ÷ 전년 */
+function computeSharesOutstandingYoYFromAnnualRows(
+  rows: FundamentalsAnnualRow[]
+): number | null {
+  try {
+    const sorted = [...rows].sort((a, b) => a.date.getTime() - b.date.getTime());
+    const points: { shares: number }[] = [];
+    for (const row of sorted) {
+      const r = row as Record<string, unknown>;
+      const sh =
+        toNumber(r.annualDilutedAverageShares) ?? toNumber(r.dilutedAverageShares) ?? null;
+      if (sh !== null && sh > 0) {
+        points.push({ shares: sh });
+      }
+    }
+    if (points.length < 2) return null;
+    const latest = points[points.length - 1]!.shares;
+    const prev = points[points.length - 2]!.shares;
+    if (prev === 0) return null;
+    const yoy = (latest - prev) / prev;
+    return Number.isFinite(yoy) ? yoy : null;
+  } catch {
+    return null;
+  }
+}
+
 function computeRevenueCagr3YFromAnnualRows(
   rows: FundamentalsAnnualRow[]
 ): number | null {
@@ -398,6 +590,57 @@ function computeRevenueCagr3YFromAnnualRows(
     if (oldest <= 0) return null;
     const cagr = Math.pow(latest / oldest, 1 / 3) - 1;
     return Number.isFinite(cagr) ? cagr : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Model D — 재고회전율 YoY: (최신연도 회전율 − 전년 회전율) ÷ 전년, annualCostOfRevenue 우선 */
+function computeInventoryTurnoverYoYFromAnnualRows(
+  rows: FundamentalsAnnualRow[]
+): number | null {
+  try {
+    const sorted = [...rows].sort((a, b) => a.date.getTime() - b.date.getTime());
+    if (sorted.length < 3) return null;
+
+    const r0 = sorted[sorted.length - 3]! as Record<string, unknown>;
+    const r1 = sorted[sorted.length - 2]! as Record<string, unknown>;
+    const r2 = sorted[sorted.length - 1]! as Record<string, unknown>;
+
+    const inv0 =
+      toNumber(r0.annualInventory) ?? toNumber(r0.inventory);
+    const inv1 =
+      toNumber(r1.annualInventory) ?? toNumber(r1.inventory);
+    const inv2 =
+      toNumber(r2.annualInventory) ?? toNumber(r2.inventory);
+    if (inv0 === null || inv1 === null || inv2 === null) return null;
+    if (inv0 < 0 || inv1 < 0 || inv2 < 0) return null;
+
+    const cost1 =
+      toNumber(r1.annualCostOfRevenue) ??
+      toNumber(r1.costOfRevenue) ??
+      toNumber(r1.annualCostOfGoodsAndServicesSold) ??
+      toNumber(r1.costOfGoodsAndServicesSold) ??
+      null;
+    const cost2 =
+      toNumber(r2.annualCostOfRevenue) ??
+      toNumber(r2.costOfRevenue) ??
+      toNumber(r2.annualCostOfGoodsAndServicesSold) ??
+      toNumber(r2.costOfGoodsAndServicesSold) ??
+      null;
+    if (cost1 === null || cost2 === null || cost1 <= 0 || cost2 <= 0) return null;
+
+    const avgInv1 = (inv1 + inv0) / 2;
+    const avgInv2 = (inv2 + inv1) / 2;
+    if (avgInv1 <= 0 || avgInv2 <= 0) return null;
+
+    const turnover1 = cost1 / avgInv1;
+    const turnover2 = cost2 / avgInv2;
+    if (!Number.isFinite(turnover1) || !Number.isFinite(turnover2) || turnover1 === 0) {
+      return null;
+    }
+    const yoy = (turnover2 - turnover1) / turnover1;
+    return Number.isFinite(yoy) ? yoy : null;
   } catch {
     return null;
   }
@@ -466,11 +709,98 @@ function computeRevenueCagr3YFromEarningsTrend(trend: EarningsTrendRow[]): numbe
 // 1b. FMP 보완 (선택)
 // ─────────────────────────────────────────────
 
+function parseFmpForwardRevenueGrowthFromEstimates(
+  estimatesRaw: unknown,
+  currentYear: number
+): number | null {
+  try {
+    if (!Array.isArray(estimatesRaw)) return null;
+    type EstRevRow = {
+      date: string;
+      estimatedRevenueAvg?: number;
+      revenueAvg?: number;
+    };
+    const byYear = new Map<number, number>();
+    for (const r of estimatesRaw as EstRevRow[]) {
+      if (!r || typeof r.date !== "string") continue;
+      const raw = r.estimatedRevenueAvg ?? r.revenueAvg;
+      const rev = typeof raw === "number" ? raw : raw != null ? Number(raw) : NaN;
+      if (!Number.isFinite(rev) || rev <= 0) continue;
+      const y = new Date(r.date).getFullYear();
+      byYear.set(y, rev);
+    }
+    const currentRev = byYear.get(currentYear);
+    const futureYears = [...byYear.keys()]
+      .filter((y) => y > currentYear)
+      .sort((a, b) => a - b);
+    if (currentRev === undefined || futureYears.length === 0) return null;
+    const nextRev = byYear.get(futureYears[0]!);
+    if (nextRev === undefined || currentRev <= 0) return null;
+    const g = (nextRev - currentRev) / currentRev;
+    return Number.isFinite(g) ? g : null;
+  } catch {
+    return null;
+  }
+}
+
+function computeQuarterlyRevenueYoYStats(incomeRaw: unknown): {
+  revenueGrowthStdDev: number | null;
+  quarterlyRevenueGrowthRates: number[] | null;
+} {
+  try {
+    if (!Array.isArray(incomeRaw)) {
+      return { revenueGrowthStdDev: null, quarterlyRevenueGrowthRates: null };
+    }
+    type QRow = { date: string; revenue: number };
+    const sorted = (incomeRaw as QRow[])
+      .filter((r) => r && typeof r.date === "string")
+      .map((r) => ({
+        date: r.date,
+        revenue: typeof r.revenue === "number" ? r.revenue : Number(r.revenue),
+      }))
+      .filter((r) => Number.isFinite(r.revenue))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const n = sorted.length;
+    if (n < 5) {
+      return { revenueGrowthStdDev: null, quarterlyRevenueGrowthRates: null };
+    }
+    const maxI = n >= 12 ? 11 : n - 1;
+    const yoyRates: number[] = [];
+    for (let i = 4; i <= maxI; i++) {
+      const cur = sorted[i]!.revenue;
+      const prev = sorted[i - 4]!.revenue;
+      if (!Number.isFinite(cur) || !Number.isFinite(prev) || prev === 0) continue;
+      yoyRates.push((cur - prev) / prev);
+    }
+    if (yoyRates.length < 4) {
+      return { revenueGrowthStdDev: null, quarterlyRevenueGrowthRates: null };
+    }
+    const mean = yoyRates.reduce((a, b) => a + b, 0) / yoyRates.length;
+    const variance = yoyRates.reduce((s, x) => s + (x - mean) ** 2, 0) / yoyRates.length;
+    const sd = Math.sqrt(variance);
+    const revenueGrowthStdDev = Number.isFinite(sd) ? sd * 100 : null;
+    return {
+      revenueGrowthStdDev,
+      quarterlyRevenueGrowthRates: yoyRates,
+    };
+  } catch {
+    return { revenueGrowthStdDev: null, quarterlyRevenueGrowthRates: null };
+  }
+}
+
 export interface FmpDataResult {
   fmpForwardEpsCAGR3Y: number | null;
   fmpEpsCagrYears: number | null;
   fmpRevenueCAGR3Y: number | null;
   fmpHistoricalEps: Array<{ year: number; eps: number }> | null;
+  fmpForwardRevenueGrowth: number | null;
+  revenueGrowthStdDev: number | null;
+  quarterlyRevenueGrowthRates: number[] | null;
+  fmpFreeCashflow: number | null;
+  fmpCapex: number | null;
+  /** 분기 현금흐름표 최근 4분기 operatingCashFlow 합 (TTM) */
+  fmpOperatingCashflowTtm: number | null;
+  quarterlyBurnRate: number | null;
 }
 
 /**
@@ -489,21 +819,23 @@ export async function fetchFmpData(
     /** FMP는 2025년 하반기부터 v3 레거시 URL을 신규 키에서 403 처리 — stable API 사용 */
     const base = "https://financialmodelingprep.com/stable";
     const keyQ = `apikey=${encodeURIComponent(apiKey)}`;
-    const [estRes, incRes] = await Promise.all([
+    const [estRes, incRes, cfsRes] = await Promise.all([
       fetch(`${base}/analyst-estimates?symbol=${sym}&period=annual&limit=10&${keyQ}`, {
         next: { revalidate: 3600 },
       }),
       fetch(`${base}/income-statement?symbol=${sym}&period=annual&limit=4&${keyQ}`, {
         next: { revalidate: 3600 },
       }),
+      fetch(`${base}/cash-flow-statement?symbol=${sym}&period=quarter&limit=4&${keyQ}`, {
+        next: { revalidate: 3600 },
+      }),
     ]);
 
-    if (!estRes.ok || !incRes.ok) return null;
-
-    const estimatesRaw = (await estRes.json()) as unknown;
-    const incomeRaw = (await incRes.json()) as unknown;
-
-    if (!Array.isArray(estimatesRaw) || !Array.isArray(incomeRaw)) return null;
+    /** 추정·연간 손익 실패 시에도 cash-flow-statement(FFO·FCF 등)는 파싱 */
+    const estimatesJson = estRes.ok ? ((await estRes.json()) as unknown) : [];
+    const incomeJson = incRes.ok ? ((await incRes.json()) as unknown) : [];
+    const estimatesRaw = Array.isArray(estimatesJson) ? estimatesJson : [];
+    const incomeRaw = Array.isArray(incomeJson) ? incomeJson : [];
 
     const currentYear = new Date().getFullYear();
 
@@ -605,11 +937,119 @@ export async function fetchFmpData(
       }))
       .filter((x) => Number.isFinite(x.year) && Number.isFinite(x.eps));
 
+    let fmpForwardRevenueGrowth: number | null = null;
+    try {
+      fmpForwardRevenueGrowth = parseFmpForwardRevenueGrowthFromEstimates(
+        estimatesRaw,
+        currentYear
+      );
+    } catch {
+      fmpForwardRevenueGrowth = null;
+    }
+
+    let fmpFreeCashflow: number | null = null;
+    let fmpCapex: number | null = null;
+    let fmpOperatingCashflowTtm: number | null = null;
+    let quarterlyBurnRate: number | null = null;
+    if (cfsRes.ok) {
+      try {
+        const cfsRaw = (await cfsRes.json()) as unknown;
+        if (Array.isArray(cfsRaw) && cfsRaw.length > 0) {
+          type CfsRow = {
+            date: string;
+            capitalExpenditure?: number;
+            freeCashFlow?: number;
+            operatingCashFlow?: number;
+          };
+          const rows = (cfsRaw as CfsRow[])
+            .filter((r) => r && typeof r.date === "string")
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          const latest = rows[0];
+          if (latest) {
+            const capexRaw = toNumber(latest.capitalExpenditure);
+            fmpCapex = capexRaw != null ? Math.abs(capexRaw) : null;
+          }
+          const ttmRows = rows.slice(0, 4);
+          let ttmOcfSum = 0;
+          let ocfQuarterCount = 0;
+          for (const row of ttmRows) {
+            const ocf = toNumber(row.operatingCashFlow);
+            if (ocf != null) {
+              ttmOcfSum += ocf;
+              ocfQuarterCount++;
+            }
+          }
+          if (ocfQuarterCount === 4) {
+            fmpOperatingCashflowTtm = Number.isFinite(ttmOcfSum) ? ttmOcfSum : null;
+          }
+          let ttmFcf = 0;
+          let n = 0;
+          for (const row of ttmRows) {
+            const ocf = toNumber(row.operatingCashFlow);
+            const capexRaw = toNumber(row.capitalExpenditure);
+            if (ocf != null && capexRaw != null) {
+              ttmFcf += ocf - Math.abs(capexRaw);
+              n++;
+            } else {
+              const fcf = toNumber(row.freeCashFlow);
+              if (fcf != null) {
+                ttmFcf += fcf;
+                n++;
+              }
+            }
+          }
+          if (n > 0) fmpFreeCashflow = ttmFcf;
+
+          const ocfSeries = rows
+            .map((r) => toNumber(r.operatingCashFlow))
+            .filter((ocf): ocf is number => ocf !== null);
+          const negative = ocfSeries.filter((ocf) => ocf < 0);
+          if (negative.length > 0) {
+            const sum = negative.reduce((a, ocf) => a + ocf, 0);
+            const avg = sum / negative.length;
+            const absBurn = Math.abs(avg);
+            quarterlyBurnRate =
+              Number.isFinite(absBurn) && absBurn > 0 ? absBurn : null;
+          }
+        }
+      } catch {
+        fmpFreeCashflow = null;
+        fmpCapex = null;
+        fmpOperatingCashflowTtm = null;
+        quarterlyBurnRate = null;
+      }
+    }
+
+    let revenueGrowthStdDev: number | null = null;
+    let quarterlyRevenueGrowthRates: number[] | null = null;
+    try {
+      const qRes = await fetch(
+        `${base}/income-statement?symbol=${sym}&period=quarterly&limit=12&${keyQ}`,
+        { next: { revalidate: 3600 } }
+      );
+      if (qRes.ok) {
+        const qRaw = (await qRes.json()) as unknown;
+        const qStats = computeQuarterlyRevenueYoYStats(qRaw);
+        revenueGrowthStdDev = qStats.revenueGrowthStdDev;
+        quarterlyRevenueGrowthRates = qStats.quarterlyRevenueGrowthRates;
+      }
+    } catch {
+      revenueGrowthStdDev = null;
+      quarterlyRevenueGrowthRates = null;
+    }
+
     return {
       fmpForwardEpsCAGR3Y,
       fmpEpsCagrYears,
       fmpRevenueCAGR3Y,
       fmpHistoricalEps: fmpHistoricalEps.length > 0 ? fmpHistoricalEps : null,
+      fmpForwardRevenueGrowth,
+      revenueGrowthStdDev,
+      quarterlyRevenueGrowthRates,
+      fmpFreeCashflow,
+      fmpCapex,
+      fmpOperatingCashflowTtm,
+      quarterlyBurnRate,
     };
   } catch {
     return null;
@@ -848,6 +1288,13 @@ export async function fetchFinancialData(ticker: string): Promise<FinancialData>
       ? earningsEstimateAvgOrCurrent(trendPlus2y)
       : null;
 
+    let forwardRevenueGrowth: number | null = null;
+    try {
+      forwardRevenueGrowth = trendPlus1y?.revenueEstimate?.growth ?? null;
+    } catch {
+      forwardRevenueGrowth = null;
+    }
+
     let forwardEpsCAGR: number | null = null;
     let forwardEpsCagrIsOneYear = false;
     try {
@@ -926,58 +1373,57 @@ export async function fetchFinancialData(ticker: string): Promise<FinancialData>
       netDilutionDetail = null;
     }
 
-    let peersMedian: FinancialData["peersMedian"] = null;
+    const peersMedian = await fetchPeersMedian(yf, upperTicker);
+
+    let revenueAbsoluteModelC: number | null = null;
     try {
-      const recResponse = await yf.recommendationsBySymbol(upperTicker);
-      const peerCandidates = (recResponse.recommendedSymbols ?? [])
-        .map((x) => x.symbol)
-        .filter((s): s is string => typeof s === "string" && s.length > 0 && !s.includes("."))
-        .slice(0, 6);
-      if (peerCandidates.length >= 3) {
-        const settled = await Promise.all(
-          peerCandidates.map(async (peer) => {
-            try {
-              const qs = await yf.quoteSummary(peer, {
-                modules: ["financialData", "defaultKeyStatistics"],
-              });
-              return { peer, qs };
-            } catch {
-              return null;
-            }
-          })
-        );
-        const ok = settled.filter((r): r is NonNullable<typeof r> => r !== null);
-        if (ok.length > 0) {
-          const grossMarginValues: number[] = [];
-          const evToFcfValues: number[] = [];
-          for (const { qs } of ok) {
-            const gm = qs.financialData?.grossMargins;
-            if (typeof gm === "number" && Number.isFinite(gm)) {
-              grossMarginValues.push(gm);
-            }
-            const fcf = qs.financialData?.freeCashflow;
-            const ev = qs.defaultKeyStatistics?.enterpriseValue;
-            if (
-              typeof fcf === "number" &&
-              fcf > 0 &&
-              typeof ev === "number" &&
-              Number.isFinite(fcf) &&
-              Number.isFinite(ev)
-            ) {
-              evToFcfValues.push(ev / fcf);
-            }
-          }
-          peersMedian = {
-            grossMargin: median(grossMarginValues),
-            evToFcf: median(evToFcfValues),
-            peersUsed: ok.map((r) => r.peer),
-          };
-        } else {
-          peersMedian = null;
-        }
+      const ev = keyStats?.enterpriseValue ?? null;
+      const evr = keyStats?.enterpriseToRevenue ?? null;
+      const en = toNumber(ev);
+      const evrn = toNumber(evr);
+      if (en !== null && evrn !== null && evrn !== 0) {
+        revenueAbsoluteModelC = en / evrn;
       }
     } catch {
-      peersMedian = null;
+      revenueAbsoluteModelC = null;
+    }
+
+    let sharesOutstandingYoY: number | null = null;
+    try {
+      sharesOutstandingYoY = computeSharesOutstandingYoYFromAnnualRows(fundamentalsAnnual);
+    } catch {
+      sharesOutstandingYoY = null;
+    }
+
+    let isPreRevenueModelC = false;
+    try {
+      const rg = revenueGrowthTtm;
+      const evr = keyStats?.enterpriseToRevenue ?? null;
+      const evrN = toNumber(evr);
+      if (rg === null && evrN === null) {
+        isPreRevenueModelC = true;
+      } else if (revenueAbsoluteModelC !== null && revenueAbsoluteModelC < 100_000_000) {
+        isPreRevenueModelC = true;
+      } else {
+        isPreRevenueModelC = false;
+      }
+    } catch {
+      isPreRevenueModelC = false;
+    }
+
+    let marketCapToBookRatioModelC: number | null = null;
+    try {
+      marketCapToBookRatioModelC = keyStats?.priceToBook ?? null;
+    } catch {
+      marketCapToBookRatioModelC = null;
+    }
+
+    let inventoryTurnoverYoYModelD: number | null = null;
+    try {
+      inventoryTurnoverYoYModelD =
+        computeInventoryTurnoverYoYFromAnnualRows(fundamentalsAnnual);
+    } catch {
+      inventoryTurnoverYoYModelD = null;
     }
 
     const financial: FinancialData = {
@@ -1065,11 +1511,46 @@ export async function fetchFinancialData(ticker: string): Promise<FinancialData>
       fmpEpsCagrYears: null,
       fmpRevenueCAGR3Y: null,
       fmpHistoricalEps: null,
+      fmpFreeCashflow: null,
+      fmpCapex: null,
 
       stockBasedCompensation,
       netDilutionRate,
       netDilutionDetail,
       peersMedian,
+
+      ruleOf40: null,
+      sbcToRevenue: null,
+      cashRunwayYears: null,
+      isCashRunwayInfinite: false,
+      evToGrossProfit: null,
+      evToSalesGrowthRatio: null,
+      revenueGrowthStdDev: null,
+      fmpForwardRevenueGrowth: null,
+      quarterlyRevenueGrowthRates: null,
+
+      quarterlyBurnRate: null,
+      cashRunwayQuarters: null,
+      sharesOutstandingYoY,
+      isPreRevenue: isPreRevenueModelC,
+      revenueAbsolute: revenueAbsoluteModelC,
+      marketCapToBookRatio: marketCapToBookRatioModelC,
+
+      inventoryTurnoverYoY: inventoryTurnoverYoYModelD,
+      dividendCoverageRatio: null,
+
+      beta: keyStats?.beta ?? null,
+      justifiedPB: null,
+      costOfEquity: null,
+      netInterestMarginProxy: null,
+
+      ffoPerShare: null,
+      ffoCalculationMethod: null,
+      ffoPayoutRatio: null,
+      ffoGrowthRate: null,
+      longTermDebtRatio: null,
+      dividendToTreasurySpread: null,
+      priceToFfo: null,
     };
 
     const fmpData = await fetchFmpData(upperTicker, trailingEps).catch(() => null);
@@ -1085,6 +1566,286 @@ export async function fetchFinancialData(ticker: string): Promise<FinancialData>
       financial.fmpEpsCagrYears = fmpData.fmpEpsCagrYears;
       financial.fmpRevenueCAGR3Y = fmpData.fmpRevenueCAGR3Y;
       financial.fmpHistoricalEps = fmpData.fmpHistoricalEps;
+      financial.fmpForwardRevenueGrowth = fmpData.fmpForwardRevenueGrowth;
+      financial.revenueGrowthStdDev = fmpData.revenueGrowthStdDev;
+      financial.quarterlyRevenueGrowthRates = fmpData.quarterlyRevenueGrowthRates;
+      if (fmpData.fmpFreeCashflow != null) {
+        financial.freeCashflow = fmpData.fmpFreeCashflow;
+        financial.fmpFreeCashflow = fmpData.fmpFreeCashflow;
+      }
+      if (fmpData.fmpCapex != null) {
+        financial.fmpCapex = fmpData.fmpCapex;
+      }
+      financial.quarterlyBurnRate = fmpData.quarterlyBurnRate;
+      try {
+        if (
+          financial.quarterlyBurnRate != null &&
+          financial.quarterlyBurnRate > 0 &&
+          financial.totalCash != null &&
+          financial.totalCash > 0
+        ) {
+          financial.cashRunwayQuarters = financial.totalCash / financial.quarterlyBurnRate;
+        }
+      } catch {
+        /* Model C cashRunwayQuarters */
+      }
+    }
+
+    try {
+      const gm = financial.grossMargins;
+      const om = financial.operatingMargins;
+      if (gm != null && om != null && om !== 1) {
+        const nim = (gm - om) / (1 - om);
+        financial.netInterestMarginProxy = Number.isFinite(nim) ? nim : null;
+      }
+    } catch {
+      /* Model E netInterestMarginProxy */
+    }
+
+    try {
+      const rg = financial.revenueGrowth;
+      const ev = financial.enterpriseValue;
+      const evr = financial.evToRevenue;
+      const fcf = financial.freeCashflow;
+      if (
+        rg != null &&
+        ev != null &&
+        evr != null &&
+        fcf != null &&
+        evr !== 0
+      ) {
+        const revenue = ev / evr;
+        if (revenue > 0) {
+          const fcfMargin = fcf / revenue;
+          financial.ruleOf40 = rg * 100 + fcfMargin * 100;
+        }
+      }
+    } catch {
+      /* Model B ruleOf40 */
+    }
+
+    try {
+      const ev = financial.enterpriseValue;
+      const evr = financial.evToRevenue;
+      const sbc = financial.stockBasedCompensation;
+      if (ev != null && evr != null && sbc != null && evr !== 0) {
+        const revenue = ev / evr;
+        if (revenue > 0) {
+          financial.sbcToRevenue = sbc / revenue;
+        }
+      }
+    } catch {
+      /* Model B sbcToRevenue */
+    }
+
+    try {
+      const fcf = financial.freeCashflow;
+      const cash = financial.totalCash;
+      if (fcf === null) {
+        financial.cashRunwayYears = null;
+        financial.isCashRunwayInfinite = false;
+      } else if (fcf > 0) {
+        financial.isCashRunwayInfinite = true;
+        financial.cashRunwayYears = null;
+      } else if (fcf < 0) {
+        financial.isCashRunwayInfinite = false;
+        if (cash != null && cash > 0) {
+          financial.cashRunwayYears = cash / Math.abs(fcf);
+        } else {
+          financial.cashRunwayYears = null;
+        }
+      } else {
+        financial.isCashRunwayInfinite = true;
+        financial.cashRunwayYears = null;
+      }
+    } catch {
+      /* Model B cash runway */
+    }
+
+    try {
+      const ev = financial.enterpriseValue;
+      const evr = financial.evToRevenue;
+      const gm = financial.grossMargins;
+      if (ev != null && evr != null && gm != null && evr !== 0) {
+        const revenue = ev / evr;
+        const grossProfit = revenue * gm;
+        if (grossProfit > 0) {
+          financial.evToGrossProfit = ev / grossProfit;
+        }
+      }
+    } catch {
+      /* Model B evToGrossProfit */
+    }
+
+    try {
+      const evr = financial.evToRevenue;
+      const g =
+        financial.fmpForwardRevenueGrowth ??
+        forwardRevenueGrowth ??
+        financial.revenueGrowth;
+      if (evr != null && g != null && g > 0) {
+        financial.evToSalesGrowthRatio = evr / (g * 100);
+      }
+    } catch {
+      /* Model B evToSalesGrowthRatio */
+    }
+
+    try {
+      const dr = toNumber(summary?.dividendRate ?? null);
+      const fcf = financial.freeCashflow;
+      const cap = toNumber(financial.marketCap);
+      const cp = toNumber(financial.currentPrice);
+      if (
+        dr === null ||
+        dr === 0 ||
+        fcf === null ||
+        cap === null ||
+        cp === null ||
+        cp <= 0
+      ) {
+        financial.dividendCoverageRatio = null;
+      } else {
+        const sharesOutstanding = cap / cp;
+        const totalDividendPaid = dr * sharesOutstanding;
+        if (totalDividendPaid <= 0) {
+          financial.dividendCoverageRatio = null;
+        } else {
+          const ratio = fcf / totalDividendPaid;
+          financial.dividendCoverageRatio = Number.isFinite(ratio) ? ratio : null;
+        }
+      }
+    } catch {
+      financial.dividendCoverageRatio = null;
+    }
+
+    try {
+      const cap = toNumber(financial.marketCap);
+      const cp = toNumber(financial.currentPrice);
+      if (cap === null || cp === null || cp <= 0) {
+        financial.ffoPerShare = null;
+        financial.ffoCalculationMethod = null;
+      } else {
+        const shares = cap / cp;
+        if (shares <= 0) {
+          financial.ffoPerShare = null;
+          financial.ffoCalculationMethod = null;
+        } else {
+          const ocfTtm = fmpData?.fmpOperatingCashflowTtm ?? null;
+          const useOcf =
+            ocfTtm != null &&
+            Number.isFinite(ocfTtm) &&
+            ocfTtm > 0;
+          if (useOcf) {
+            const ffoPs = ocfTtm / shares;
+            if (Number.isFinite(ffoPs) && ffoPs > 0) {
+              financial.ffoPerShare = ffoPs;
+              financial.ffoCalculationMethod = "operatingCF";
+            } else {
+              financial.ffoPerShare = null;
+              financial.ffoCalculationMethod = null;
+            }
+          }
+          if (financial.ffoPerShare == null) {
+            const lf = latestF as Record<string, unknown> | undefined;
+            const pm = financial.profitMargins;
+            if (lf && pm != null && cap > 0 && cp > 0) {
+              const revenue = annualTotalRevenueFromRow(lf);
+              const netIncome = revenue != null ? pm * revenue : null;
+              const daRaw =
+                toNumber(lf.annualDepreciationAndAmortization) ??
+                toNumber(lf.annualDepreciation);
+              const da = daRaw ?? 0;
+              if (netIncome !== null) {
+                const ffo = netIncome + da;
+                const ffoPs = ffo / shares;
+                financial.ffoPerShare = Number.isFinite(ffoPs) ? ffoPs : null;
+                financial.ffoCalculationMethod =
+                  financial.ffoPerShare != null ? "netIncomePlusDA" : null;
+              } else {
+                financial.ffoCalculationMethod = null;
+              }
+            } else {
+              financial.ffoCalculationMethod = null;
+            }
+          }
+        }
+      }
+    } catch {
+      financial.ffoPerShare = null;
+      financial.ffoCalculationMethod = null;
+    }
+
+    try {
+      const dr = toNumber(financial.dividendRate);
+      const ffoPs = financial.ffoPerShare;
+      if (dr === null || ffoPs === null || ffoPs <= 0) {
+        financial.ffoPayoutRatio = null;
+      } else {
+        const r = dr / ffoPs;
+        financial.ffoPayoutRatio = Number.isFinite(r) ? r : null;
+      }
+    } catch {
+      financial.ffoPayoutRatio = null;
+    }
+
+    try {
+      if (fundamentalsAnnual.length >= 2) {
+        const r0 = fundamentalsAnnual[0] as Record<string, unknown>;
+        const r1 = fundamentalsAnnual[1] as Record<string, unknown>;
+        const ni0 =
+          toNumber(r0.annualNetIncome) ?? toNumber(r0.netIncome);
+        const ni1 =
+          toNumber(r1.annualNetIncome) ?? toNumber(r1.netIncome);
+        const da0 =
+          toNumber(r0.annualDepreciationAndAmortization) ??
+          toNumber(r0.annualDepreciation) ??
+          0;
+        const da1 =
+          toNumber(r1.annualDepreciationAndAmortization) ??
+          toNumber(r1.annualDepreciation) ??
+          0;
+        if (ni0 !== null && ni1 !== null) {
+          const ffo0 = ni0 + da0;
+          const ffo1 = ni1 + da1;
+          if (ffo1 !== 0 && Number.isFinite(ffo0) && Number.isFinite(ffo1)) {
+            financial.ffoGrowthRate = (ffo0 - ffo1) / ffo1;
+          }
+        }
+      }
+    } catch {
+      financial.ffoGrowthRate = null;
+    }
+
+    try {
+      const td = financial.totalDebt;
+      if (td == null || td <= 0) {
+        financial.longTermDebtRatio = null;
+      } else {
+        const lf = latestF as Record<string, unknown> | undefined;
+        if (!lf) {
+          financial.longTermDebtRatio = null;
+        } else {
+          const ltd =
+            toNumber(lf.annualLongTermDebt) ?? toNumber(lf.longTermDebt);
+          financial.longTermDebtRatio =
+            ltd !== null && Number.isFinite(ltd / td) ? ltd / td : null;
+        }
+      }
+    } catch {
+      financial.longTermDebtRatio = null;
+    }
+
+    try {
+      const ffoPs = financial.ffoPerShare;
+      const cp = toNumber(financial.currentPrice);
+      if (ffoPs === null || ffoPs <= 0 || cp === null) {
+        financial.priceToFfo = null;
+      } else {
+        const v = cp / ffoPs;
+        financial.priceToFfo = Number.isFinite(v) ? v : null;
+      }
+    } catch {
+      financial.priceToFfo = null;
     }
 
     return financial;
@@ -1222,7 +1983,7 @@ async function fetchNewsArticles(query: string, pageSize = 10): Promise<NewsItem
     url.searchParams.set("language", "en");
     url.searchParams.set("sortBy",   "publishedAt");
     url.searchParams.set("pageSize", String(pageSize));
-    url.searchParams.set("from",     getDateNDaysAgo(7).toISOString().split("T")[0]);
+    url.searchParams.set("from",     getDateNDaysAgo(30).toISOString().split("T")[0]);
     url.searchParams.set("apiKey",   apiKey);
 
     const res = await fetch(url.toString(), { next: { revalidate: 1800 } });
@@ -1255,8 +2016,8 @@ async function fetchNewsArticles(query: string, pageSize = 10): Promise<NewsItem
 
 export async function fetchNewsData(ticker: string, companyName: string): Promise<NewsData> {
   const [companyNews, marketNews] = await Promise.all([
-    fetchNewsArticles(`"${companyName}" OR "${ticker}" stock`, 8),
-    fetchNewsArticles("stock market economy Fed interest rates",  5),
+    fetchNewsArticles(`"${companyName}" OR "${ticker}" stock earnings partnership investment`, 15),
+    fetchNewsArticles("stock market economy Fed interest rates", 8),
   ]);
 
   return {
@@ -1281,6 +2042,32 @@ export async function collectAllData(ticker: string): Promise<CollectedData> {
     fetchMacroData(),
     fetchNewsData(ticker, financial.companyName),
   ]);
+
+  try {
+    const riskFreeRate = macro.tenYearTreasury?.latestValue != null
+      ? macro.tenYearTreasury.latestValue / 100
+      : 0.045;
+    const beta = financial.beta ?? 1.0;
+    const roe = financial.returnOnEquity;
+    if (roe != null) {
+      const coe = riskFreeRate + beta * 0.055;
+      financial.costOfEquity = coe;
+      const jpb = roe / coe;
+      financial.justifiedPB = (jpb > 0 && jpb < 20) ? jpb : null;
+    }
+  } catch { }
+
+  try {
+    const dy = financial.dividendYield;
+    const t10 = macro.tenYearTreasury?.latestValue ?? null;
+    if (dy === null || t10 === null) {
+      financial.dividendToTreasurySpread = null;
+    } else {
+      financial.dividendToTreasurySpread = dy - t10 / 100;
+    }
+  } catch {
+    financial.dividendToTreasurySpread = null;
+  }
 
   console.log(`[DataFetcher] Done: ${financial.companyName}`);
   return { financial, macro, news, collectedAt: new Date().toISOString() };
