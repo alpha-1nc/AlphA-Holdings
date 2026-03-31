@@ -183,10 +183,14 @@ export interface FinancialData {
   /** Model E — NIM 근사 (gross/operating margin 기반, 참고용) */
   netInterestMarginProxy: number | null;
 
-  /** Model F — FFO/주 (FMP 분기 OCF TTM 우선, 없으면 순이익+D&A) */
+  /** Model F — FFO/주 (FMP OCF TTM → Yahoo 영업현금흐름 → 순이익+D&A) */
   ffoPerShare: number | null;
   /** Model F — FFO 산출 방식 (추적용) */
-  ffoCalculationMethod: "operatingCF" | "netIncomePlusDA" | null;
+  ffoCalculationMethod:
+    | "fmpOperatingCashflowTtm"
+    | "operatingCF"
+    | "netIncomePlusDA"
+    | null;
   /** Model F — 배당률 ÷ FFO/주 */
   ffoPayoutRatio: number | null;
   /** Model F — 연간 FFO YoY (최근 2년 시계열) */
@@ -1730,19 +1734,30 @@ export async function fetchFinancialData(ticker: string): Promise<FinancialData>
           financial.ffoPerShare = null;
           financial.ffoCalculationMethod = null;
         } else {
-          const ocfTtm = fmpData?.fmpOperatingCashflowTtm ?? null;
-          const useOcf =
-            ocfTtm != null &&
-            Number.isFinite(ocfTtm) &&
-            ocfTtm > 0;
-          if (useOcf) {
-            const ffoPs = ocfTtm / shares;
+          const fmpOcf = fmpData?.fmpOperatingCashflowTtm ?? null;
+          if (
+            fmpOcf != null &&
+            Number.isFinite(fmpOcf) &&
+            fmpOcf > 0
+          ) {
+            const ffoPs = fmpOcf / shares;
             if (Number.isFinite(ffoPs) && ffoPs > 0) {
               financial.ffoPerShare = ffoPs;
-              financial.ffoCalculationMethod = "operatingCF";
-            } else {
-              financial.ffoPerShare = null;
-              financial.ffoCalculationMethod = null;
+              financial.ffoCalculationMethod = "fmpOperatingCashflowTtm";
+            }
+          }
+          if (financial.ffoPerShare == null) {
+            const yahooOcf = toNumber(financial.operatingCashflow);
+            if (
+              yahooOcf != null &&
+              Number.isFinite(yahooOcf) &&
+              yahooOcf > 0
+            ) {
+              const ffoPs = yahooOcf / shares;
+              if (Number.isFinite(ffoPs) && ffoPs > 0) {
+                financial.ffoPerShare = ffoPs;
+                financial.ffoCalculationMethod = "operatingCF";
+              }
             }
           }
           if (financial.ffoPerShare == null) {

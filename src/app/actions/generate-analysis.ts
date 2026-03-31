@@ -595,6 +595,8 @@ Model F 선택 시 추가 지침:
   FFO는 순이익+D&A 근사값이므로 실제 AFFO보다 높게 나올 수 있음.
   근사값 기준으로 채점하되 "(FFO 근사)" 명시.
 - D1-2 배당 성장 이력: 제공된 dividendGrowthYears 반드시 사용.
+  dividendGrowthYears 데이터가 12년 한계로 과소 추정될 수 있음. 사업 개요나 뉴스에 더 긴 연속 증배 이력이
+  명시된 경우 그 값을 우선 사용할 것.
 - D1-3 AFFO 성장률: 제공된 ffoGrowthRate 사용.
   N/A면 뉴스에서 FFO 성장 가이던스 찾아 채점.
 - D2-1 가동률: 뉴스·어닝콜에서 "occupancy rate", "가동률" 수치 탐색.
