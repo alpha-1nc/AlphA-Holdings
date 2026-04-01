@@ -9,7 +9,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardPaste, ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { ClipboardPaste, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { updateAnalysisCardImage } from "@/app/actions/update-analysis-card-image";
+import {
+  extractImgSrcFromHtml,
+  normalizeHttpUrl,
+  resizeImageToDataUrl,
+} from "@/lib/image-paste";
 import { AnalysisReportDeleteButton } from "./analysis-report-delete-button";
 
 function ratingBadgeClass(rating: string): string {
@@ -44,74 +49,6 @@ function ratingBadgeClass(rating: string): string {
     default:
       return "border-border bg-muted text-muted-foreground";
   }
-}
-
-function normalizeHttpUrl(src: string): string | null {
-  try {
-    const u = new URL(src, typeof window !== "undefined" ? window.location.href : undefined);
-    if (u.protocol === "http:" || u.protocol === "https:") return u.href;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function extractImgSrcFromHtml(html: string): string | null {
-  if (!html?.trim()) return null;
-  try {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const img = doc.querySelector("img[src]");
-    const raw = img?.getAttribute("src");
-    if (raw) return normalizeHttpUrl(raw);
-  } catch {
-    /* fall through */
-  }
-  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  if (m?.[1]) return normalizeHttpUrl(m[1]);
-  return null;
-}
-
-async function resizeImageToDataUrl(
-  blob: Blob,
-  maxDim = 220,
-  quality = 0.88
-): Promise<string> {
-  const file =
-    blob instanceof File
-      ? blob
-      : new File([blob], "image", { type: blob.type || "image/png" });
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxDim || height > maxDim) {
-        if (width > height) {
-          height = (height / width) * maxDim;
-          width = maxDim;
-        } else {
-          width = (width / height) * maxDim;
-          height = maxDim;
-        }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(width);
-      canvas.height = Math.round(height);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("canvas"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("load"));
-    };
-    img.src = url;
-  });
 }
 
 export interface AnalysisReportCardProps {
@@ -142,6 +79,7 @@ export function AnalysisReportCard({
     initialCardImageDataUrl
   );
   const [isPending, startTransition] = useTransition();
+  const tickerInitial = ticker.trim()[0]?.toUpperCase() ?? "?";
 
   useEffect(() => {
     setImageUrl(initialCardImageDataUrl);
@@ -282,19 +220,13 @@ export function AnalysisReportCard({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center gap-0.5 px-1 text-center">
+                <div className="flex h-full w-full items-center justify-center px-1 text-center">
                   {isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   ) : (
-                    <>
-                      <ImagePlus
-                        className="h-4 w-4 text-muted-foreground"
-                        strokeWidth={1.75}
-                      />
-                      <span className="hidden min-[380px]:block text-[7px] leading-none text-muted-foreground">
-                        설정
-                      </span>
-                    </>
+                    <span className="text-lg font-bold tabular-nums text-muted-foreground sm:text-xl">
+                      {tickerInitial}
+                    </span>
                   )}
                 </div>
               )}

@@ -5,7 +5,7 @@ import { getReportById } from "@/app/actions/reports";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
-import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
+import { PortfolioItemLogoAvatar } from "@/components/reports/portfolio-item-logo-avatar";
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
 import { AiCommentSection } from "@/components/reports/AiCommentSection";
 import { getProfileFromLabel } from "@/lib/profile";
@@ -244,12 +244,12 @@ export default async function ReportDetailPage(props: {
                                                     className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] items-center gap-2 px-3 py-2.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
                                                 >
                                                     <div className="flex items-center gap-2">
-                                                        <TickerAvatar
+                                                        <PortfolioItemLogoAvatar
+                                                            portfolioItemId={item.id}
+                                                            reportId={id}
                                                             ticker={item.ticker}
                                                             displayName={item.displayName}
-                                                            logoUrl={(item as { logoUrl?: string | null }).logoUrl}
-                                                            size={40}
-                                                            roundedSquare
+                                                            logoUrl={item.logoUrl}
                                                         />
                                                         <div>
                                                             <p className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
