@@ -3,6 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import type { AssetRole, ReportType, ReportStatus } from "@/generated/prisma";
+import {
+  getPreviousMonthPeriodLabel,
+  monthPeriodLabelsInQuarter,
+  quarterEndMonthPeriodLabel,
+} from "@/lib/report-period";
 
 export type ReportTypeInput = "MONTHLY" | "QUARTERLY";
 export type ReportStatusInput = "DRAFT" | "PUBLISHED";
@@ -91,9 +96,9 @@ function validateReportPayload(
     return { ok: false, error: "총 평가금을 입력해주세요." };
   }
 
-  // MONTHLY: 신규 투입금 행 검증
+  // MONTHLY: 신규 투입금 행 검증 (입금·출금(음수) 허용, 0만 불가)
   if (type === "MONTHLY") {
-    const incompleteNewInv = newInvestments.filter((inv) => (inv.originalAmount || 0) <= 0);
+    const incompleteNewInv = newInvestments.filter((inv) => (inv.originalAmount ?? 0) === 0);
     if (incompleteNewInv.length > 0) {
       return { ok: false, error: "신규 투입금이 비어 있는 행이 있습니다. 금액을 입력하거나 해당 행을 삭제해 주세요." };
     }
@@ -252,6 +257,207 @@ export async function createReport(payload: CreateReportPayload) {
   return report;
 }
 
+/** 분기 말월(3·6·9·12월) 월별 리포트의 총 평가금 — 분기 작성 시 동기화 비교용 */
+export async function getQuarterEndMonthMonthlyValuationForSync(
+  profile: string,
+  year: number,
+  quarter: number,
+): Promise<{
+  reportId: number;
+  totalCurrentKrw: number;
+  periodLabel: string;
+  monthNumber: number;
+} | null> {
+  const label = quarterEndMonthPeriodLabel(year, quarter);
+  const r = await prisma.report.findFirst({
+    where: { profile, type: "MONTHLY", periodLabel: label },
+    select: { id: true, totalCurrentKrw: true, periodLabel: true },
+  });
+  if (!r) return null;
+  return {
+    reportId: r.id,
+    totalCurrentKrw: r.totalCurrentKrw,
+    periodLabel: r.periodLabel,
+    monthNumber: quarter * 3,
+  };
+}
+
+/**
+ * 분기 리포트(PUBLISHED) 저장 + 선택 시 같은 트랜잭션에서 분기 말월 월별 리포트의 totalCurrentKrw 갱신
+ */
+export async function createQuarterlyPublishedWithMonthValuationSync(
+  payload: CreateReportPayload,
+  syncMonthEndReportId?: number,
+) {
+  const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
+
+  const status: ReportStatusInput = statusInput ?? "DRAFT";
+  if (payload.type !== "QUARTERLY" || status !== "PUBLISHED") {
+    throw new Error("분기 리포트 작성 완료(PUBLISHED) 저장에만 사용할 수 있습니다.");
+  }
+
+  const validation = validateReportPayload({ ...payload, status }, status);
+  if (!validation.ok) {
+    throw new Error(validation.error);
+  }
+
+  const profileValue = profile || "AlphA Holdings Portfolio";
+  const periodMatch = /^(\d{4})-Q([1-4])$/.exec(payload.periodLabel.trim());
+  if (!periodMatch) {
+    throw new Error("분기 형식이 올바르지 않습니다.");
+  }
+  const y = Number(periodMatch[1]);
+  const q = Number(periodMatch[2]);
+  const expectedMonthLabel = quarterEndMonthPeriodLabel(y, q);
+
+  const createData = {
+    ...reportData,
+    status: status as ReportStatus,
+    profile: profileValue,
+    earningsReview: earningsReview || null,
+    portfolioItems: {
+      create: portfolioItems,
+    },
+    newInvestments:
+      newInvestments.length > 0
+        ? {
+            create: newInvestments,
+          }
+        : undefined,
+  };
+
+  const include = { portfolioItems: true as const, newInvestments: true as const };
+
+  const report = await prisma.$transaction(async (tx) => {
+    const created = await tx.report.create({
+      data: createData,
+      include,
+    });
+
+    if (syncMonthEndReportId != null) {
+      const monthly = await tx.report.findFirst({
+        where: {
+          id: syncMonthEndReportId,
+          profile: profileValue,
+          type: "MONTHLY",
+        },
+      });
+      if (!monthly) {
+        throw new Error("연동할 월별 리포트를 찾을 수 없습니다.");
+      }
+      if (monthly.periodLabel !== expectedMonthLabel) {
+        throw new Error("선택한 월별 리포트가 이 분기의 말월 리포트와 일치하지 않습니다.");
+      }
+      await tx.report.update({
+        where: { id: syncMonthEndReportId },
+        data: { totalCurrentKrw: payload.totalCurrentKrw },
+      });
+    }
+
+    return created;
+  });
+
+  revalidatePath("/");
+  revalidatePath("/monthly");
+  revalidatePath("/quarterly");
+  if (syncMonthEndReportId != null) {
+    revalidatePath(`/reports/${syncMonthEndReportId}`);
+    revalidatePath(`/reports/${syncMonthEndReportId}/edit`);
+  }
+  return report;
+}
+
+/**
+ * 분기 리포트(PUBLISHED) 수정 + 선택 시 같은 트랜잭션에서 분기 말월 월별 리포트의 totalCurrentKrw 갱신
+ */
+export async function updateQuarterlyPublishedWithMonthValuationSync(
+  quarterlyReportId: number,
+  payload: CreateReportPayload,
+  syncMonthEndReportId?: number,
+) {
+  const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
+
+  const status: ReportStatusInput = statusInput ?? "DRAFT";
+  if (payload.type !== "QUARTERLY" || status !== "PUBLISHED") {
+    throw new Error("분기 리포트 작성 완료(PUBLISHED) 수정에만 사용할 수 있습니다.");
+  }
+
+  const validation = validateReportPayload({ ...payload, status }, status);
+  if (!validation.ok) {
+    throw new Error(validation.error);
+  }
+
+  const profileValue = profile || "AlphA Holdings Portfolio";
+  const periodMatch = /^(\d{4})-Q([1-4])$/.exec(payload.periodLabel.trim());
+  if (!periodMatch) {
+    throw new Error("분기 형식이 올바르지 않습니다.");
+  }
+  const y = Number(periodMatch[1]);
+  const q = Number(periodMatch[2]);
+  const expectedMonthLabel = quarterEndMonthPeriodLabel(y, q);
+
+  const report = await prisma.$transaction(async (tx) => {
+    await tx.portfolioItem.deleteMany({ where: { reportId: quarterlyReportId } });
+    await tx.newInvestment.deleteMany({ where: { reportId: quarterlyReportId } });
+
+    const updatedReport = await tx.report.update({
+      where: { id: quarterlyReportId },
+      data: {
+        ...reportData,
+        status: status as ReportStatus,
+        profile: profile || undefined,
+        earningsReview: earningsReview || null,
+        portfolioItems: {
+          create: portfolioItems,
+        },
+        newInvestments:
+          newInvestments.length > 0
+            ? {
+                create: newInvestments,
+              }
+            : undefined,
+      },
+      include: {
+        portfolioItems: true,
+        newInvestments: true,
+      },
+    });
+
+    if (syncMonthEndReportId != null) {
+      const monthly = await tx.report.findFirst({
+        where: {
+          id: syncMonthEndReportId,
+          profile: profileValue,
+          type: "MONTHLY",
+        },
+      });
+      if (!monthly) {
+        throw new Error("연동할 월별 리포트를 찾을 수 없습니다.");
+      }
+      if (monthly.periodLabel !== expectedMonthLabel) {
+        throw new Error("선택한 월별 리포트가 이 분기의 말월 리포트와 일치하지 않습니다.");
+      }
+      await tx.report.update({
+        where: { id: syncMonthEndReportId },
+        data: { totalCurrentKrw: payload.totalCurrentKrw },
+      });
+    }
+
+    return updatedReport;
+  });
+
+  revalidatePath("/");
+  revalidatePath("/monthly");
+  revalidatePath("/quarterly");
+  revalidatePath(`/reports/${quarterlyReportId}`);
+  revalidatePath(`/reports/${quarterlyReportId}/edit`);
+  if (syncMonthEndReportId != null) {
+    revalidatePath(`/reports/${syncMonthEndReportId}`);
+    revalidatePath(`/reports/${syncMonthEndReportId}/edit`);
+  }
+  return report;
+}
+
 // ── 리포트 전체 수정 (포트폴리오 아이템 포함) ──────────────────────────────
 export async function updateReportFull(id: number, payload: CreateReportPayload) {
   const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
@@ -306,4 +512,58 @@ export async function deleteReport(id: number) {
   revalidatePath("/");
   revalidatePath("/monthly");
   revalidatePath("/quarterly");
+}
+
+// ── 기간 헬퍼 (월별·분기 연동) — 순수 함수는 @/lib/report-period 참고 ──
+
+/** 직전 월별 리포트의 말일 누적 원금(없으면 null) */
+export async function getPreviousMonthEndPrincipalKrw(profile: string, currentMonthlyPeriodLabel: string) {
+  const prev = getPreviousMonthPeriodLabel(currentMonthlyPeriodLabel);
+  if (!prev) return null;
+  const r = await prisma.report.findFirst({
+    where: { profile, type: "MONTHLY", periodLabel: prev },
+    select: { totalInvestedKrw: true },
+  });
+  return r?.totalInvestedKrw ?? null;
+}
+
+/** 직전 월 리포트 존재 여부 + 말일 누적 원금 (최초 작성 vs 연속 구분용) */
+export async function getPreviousMonthMonthlyReportPrincipalState(
+  profile: string,
+  currentMonthlyPeriodLabel: string,
+): Promise<{ hasPreviousReport: boolean; totalInvestedKrw: number | null }> {
+  const prev = getPreviousMonthPeriodLabel(currentMonthlyPeriodLabel);
+  if (!prev) return { hasPreviousReport: false, totalInvestedKrw: null };
+  const r = await prisma.report.findFirst({
+    where: { profile, type: "MONTHLY", periodLabel: prev },
+    select: { totalInvestedKrw: true },
+  });
+  if (!r) return { hasPreviousReport: false, totalInvestedKrw: null };
+  return { hasPreviousReport: true, totalInvestedKrw: r.totalInvestedKrw };
+}
+
+/** 분기 말 월(3·6·9·12월) 월별 리포트의 누적 원금 — 분기 원금 기준으로 사용 */
+export async function getQuarterEndPrincipalFromMonthlyReports(profile: string, year: number, quarter: number) {
+  const label = quarterEndMonthPeriodLabel(year, quarter);
+  const r = await prisma.report.findFirst({
+    where: { profile, type: "MONTHLY", periodLabel: label },
+    select: { totalInvestedKrw: true },
+  });
+  return r?.totalInvestedKrw ?? null;
+}
+
+/** 해당 분기에 속한 월별 리포트들의 신규 투입 합계(원화) */
+export async function sumMonthlyNewInvestmentsInQuarterKrw(profile: string, year: number, quarter: number) {
+  const labels = monthPeriodLabelsInQuarter(year, quarter);
+  const reports = await prisma.report.findMany({
+    where: { profile, type: "MONTHLY", periodLabel: { in: labels } },
+    include: { newInvestments: true },
+  });
+  let sum = 0;
+  for (const r of reports) {
+    for (const inv of r.newInvestments) {
+      sum += inv.krwAmount;
+    }
+  }
+  return sum;
 }

@@ -1,11 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
-import { createReport } from "@/app/actions/reports";
+import {
+    createReport,
+    createQuarterlyPublishedWithMonthValuationSync,
+    getQuarterEndMonthMonthlyValuationForSync,
+    getQuarterEndPrincipalFromMonthlyReports,
+    sumMonthlyNewInvestmentsInQuarterKrw,
+    type CreateReportPayload,
+} from "@/app/actions/reports";
+import { Button } from "@/components/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { computeGainKrw, computeReturnRatePercent } from "@/lib/report-performance";
+import { sortPortfolioFormRowsByDisplay } from "@/lib/portfolio-display-order";
 import {
     getCurrentProfile,
     getProfileLabel,
@@ -19,21 +37,25 @@ import type { AssetRole } from "@/generated/prisma";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 type AccountType = "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
-type CashCurrency = "KRW" | "USD" | "JPY";
+/** 포트폴리오 행별 평가 통화 (사용자 선택) */
+type ValuationCurrency = "USD" | "JPY" | "KRW";
 
-const ACCOUNT_LABELS: Record<AccountType, string> = {
-    US_DIRECT: "🇺🇸 미국 직투",
-    ISA: "🇰🇷 ISA",
-    JP_DIRECT: "🇯🇵 일본 직투",
-    CASH: "💵 현금",
+const VALUATION_CURRENCY_LABELS: Record<ValuationCurrency, string> = {
+    USD: "USD",
+    JPY: "JPY",
+    KRW: "KRW",
 };
 
-const ACCOUNT_DEFAULT_CURRENCY: Record<AccountType, string> = {
-    US_DIRECT: "USD",
-    ISA: "KRW",
-    JP_DIRECT: "JPY",
-    CASH: "KRW",
-};
+function accountTypeFromValuationCurrency(c: ValuationCurrency): Exclude<AccountType, "CASH"> {
+    switch (c) {
+        case "USD":
+            return "US_DIRECT";
+        case "JPY":
+            return "JP_DIRECT";
+        default:
+            return "ISA";
+    }
+}
 
 /* ── Sector definitions ──────────────────────────────────────────────────*/
 export const SECTORS = [
@@ -87,13 +109,16 @@ function autoDetectSector(ticker: string): Sector | "" {
 /* ── Types ──────────────────────────────────────────────────────────────── */
 interface PortfolioRow {
     id: string;
-    accountType: AccountType;
+    /** 종목 행 vs 통화별 현금 행 (DB: accountType CASH) */
+    kind: "stock" | "cash";
     ticker: string;
     displayName?: string | null;
     sector: string;
     role: AssetRole;
+    /** 현지 통화 평가액에 적용할 통화 */
+    valuationCurrency: ValuationCurrency;
+    /** 현지 통화 기준 평가액 */
     amount: string;
-    cashCurrency?: CashCurrency;
     logoUrl?: string | null;
 }
 
@@ -113,31 +138,51 @@ function parseNumber(raw: string): number {
 function newRow(): PortfolioRow {
     return {
         id: crypto.randomUUID(),
-        accountType: "US_DIRECT",
+        kind: "stock",
         ticker: "",
         displayName: null,
         sector: "",
         role: "CORE",
+        valuationCurrency: "USD",
         amount: "",
-        cashCurrency: "KRW",
         logoUrl: null,
     };
 }
 
-function getEffectiveCurrency(row: PortfolioRow): string {
-    if (row.accountType === "CASH") return row.cashCurrency ?? "KRW";
-    return ACCOUNT_DEFAULT_CURRENCY[row.accountType];
+function newCashRow(): PortfolioRow {
+    return {
+        id: crypto.randomUUID(),
+        kind: "cash",
+        ticker: "USD",
+        displayName: "현금",
+        sector: "",
+        role: "UNASSIGNED",
+        valuationCurrency: "USD",
+        amount: "",
+        logoUrl: null,
+    };
 }
 
-function toKRW(row: PortfolioRow, usdRate: number, jpyRate: number): number {
-    const amount = parseNumber(row.amount);
-    if (amount <= 0) return 0;
-    const currency = getEffectiveCurrency(row);
+/** 현지 통화 평가액 → 원화 (JPY는 100엔당 KRW 환율 jpyRate 사용) */
+function localAmountToKrw(
+    localAmount: number,
+    currency: ValuationCurrency,
+    usdRate: number,
+    jpyRate: number,
+): number {
+    if (localAmount <= 0) return 0;
     switch (currency) {
-        case "USD": return amount * usdRate;
-        case "JPY": return amount * (jpyRate / 100);
-        default: return amount;
+        case "USD":
+            return localAmount * usdRate;
+        case "JPY":
+            return localAmount * (jpyRate / 100);
+        default:
+            return localAmount;
     }
+}
+
+function rowToKrw(row: PortfolioRow, usdRate: number, jpyRate: number): number {
+    return localAmountToKrw(parseNumber(row.amount), row.valuationCurrency, usdRate, jpyRate);
 }
 
 
@@ -213,17 +258,83 @@ function JournalField({
 
 /* ── Portfolio Row Item ───────────────────────────────────────────────────*/
 function PortfolioRowItem({
-    row, krwValue, usdRate, jpyRate, onChange, onDelete,
+    row, krwValue, onChange, onDelete,
 }: {
     row: PortfolioRow;
     krwValue: number;
-    usdRate: number;
-    jpyRate: number;
     onChange: (patch: Partial<Omit<PortfolioRow, "id">>) => void;
     onDelete?: () => void;
 }) {
-    const effectiveCurrency = getEffectiveCurrency(row);
-    const isCash = row.accountType === "CASH";
+    if (row.kind === "cash") {
+        return (
+            <div className="group relative rounded-2xl bg-white ring-1 ring-neutral-200/80 transition hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700">
+                <div className="space-y-2 px-3 py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                        <div className="w-full shrink-0 sm:w-[100px]">
+                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">통화</label>
+                            <select
+                                value={row.valuationCurrency}
+                                onChange={(e) => {
+                                    const v = e.target.value as ValuationCurrency;
+                                    onChange({ valuationCurrency: v, ticker: v });
+                                }}
+                                className="w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
+                            >
+                                {(Object.keys(VALUATION_CURRENCY_LABELS) as ValuationCurrency[]).map((k) => (
+                                    <option key={k} value={k}>{VALUATION_CURRENCY_LABELS[k]}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">유형</label>
+                            <div className="rounded-xl bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+                                현금 보유
+                                <span className="ml-2 text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                                    (해당 통화 기준)
+                                </span>
+                            </div>
+                            {parseNumber(row.amount) > 0 && krwValue > 0 && (
+                                <p className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                    약 {formatKRW(krwValue)}
+                                </p>
+                            )}
+                        </div>
+                        <div className="w-full shrink-0 sm:w-[160px]">
+                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
+                            <div className="flex items-center gap-1.5">
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={row.amount}
+                                    onChange={(e) => onChange({ amount: e.target.value })}
+                                    placeholder="0"
+                                    className="no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700"
+                                />
+                                <span className="shrink-0 text-[10px] font-medium text-neutral-400">{row.valuationCurrency}</span>
+                            </div>
+                        </div>
+                        <div className="flex justify-end sm:justify-start sm:pt-5">
+                            <button
+                                type="button"
+                                onClick={onDelete}
+                                disabled={!onDelete}
+                                className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <p className="border-t border-neutral-100 px-3 py-2 text-[10px] text-neutral-400 dark:border-neutral-800 dark:text-neutral-500">
+                    현금 행은 섹터·역할 분류 없이 합산만 반영됩니다.
+                </p>
+            </div>
+        );
+    }
+
+    const searchAccountType = accountTypeFromValuationCurrency(row.valuationCurrency);
 
     const handleTickerChange = (ticker: string, meta?: TickerSearchChangeMeta) => {
         const detectedSector = autoDetectSector(ticker);
@@ -243,159 +354,117 @@ function PortfolioRowItem({
         }
     };
 
+    const tickerPlaceholder =
+        row.valuationCurrency === "USD"
+            ? "AAPL, NVDA, SPY..."
+            : row.valuationCurrency === "JPY"
+              ? "7203, 6758..."
+              : "삼성전자, KODEX 200...";
+
+    const displayLabel = row.ticker
+        ? getPortfolioItemDisplayLabel({ ticker: row.ticker, displayName: row.displayName })
+        : "";
+
     return (
         <div className="group relative rounded-2xl bg-white ring-1 ring-neutral-200/80 transition hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700">
-            {/* Row 1: 계좌 타입 + 티커 + 평가액 + 삭제 */}
-            <div className="grid grid-cols-[140px_1fr_140px_32px] items-start gap-2 px-3 py-3">
-                {/* ① 계좌 타입 */}
-                <div className="flex flex-col gap-1 pt-0.5">
-                    <select
-                        value={row.accountType}
-                        onChange={(e) => {
-                            const newType = e.target.value as AccountType;
-                            onChange({ 
-                                accountType: newType, 
-                                ticker: newType === "CASH" ? "" : row.ticker, 
-                                sector: newType === "CASH" ? "" : row.sector,
-                                role: newType === "CASH" ? "CORE" : row.role,
-                                displayName: newType === "CASH" ? null : row.displayName,
-                                cashCurrency: "KRW" 
-                            });
-                        }}
-                        className="w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
-                    >
-                        {(Object.keys(ACCOUNT_LABELS) as AccountType[]).map((k) => (
-                            <option key={k} value={k}>{ACCOUNT_LABELS[k]}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* ② 종목 검색 (현금이 아닐 때만 표시) */}
-                {!isCash ? (
-                    <div className="relative">
+            <div className="space-y-2 px-3 py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+                    <div className="w-full shrink-0 sm:w-[100px]">
+                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">통화</label>
+                        <select
+                            value={row.valuationCurrency}
+                            onChange={(e) => onChange({ valuationCurrency: e.target.value as ValuationCurrency })}
+                            className="w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
+                        >
+                            {(Object.keys(VALUATION_CURRENCY_LABELS) as ValuationCurrency[]).map((k) => (
+                                <option key={k} value={k}>{VALUATION_CURRENCY_LABELS[k]}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">종목</label>
                         <TickerSearchInput
                             value={row.ticker}
                             onChange={handleTickerChange}
-                            accountType={row.accountType}
-                            placeholder={
-                                row.accountType === "US_DIRECT" ? "AAPL, NVDA, SPY..." :
-                                row.accountType === "ISA" ? "삼성전자, KODEX 200..." :
-                                row.accountType === "JP_DIRECT" ? "7203, 6758..." :
-                                "종목 검색..."
-                            }
+                            accountType={searchAccountType}
+                            placeholder={tickerPlaceholder}
                         />
+                        {row.ticker.trim().length > 0 && (
+                            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                                <span>{displayLabel}</span>
+                                {krwValue > 0 && (
+                                    <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                                        (약 {formatKRW(krwValue)})
+                                    </span>
+                                )}
+                            </p>
+                        )}
                     </div>
-                ) : (
-                    <div className="relative">
-                        <select
-                            value={row.cashCurrency ?? "KRW"}
-                            onChange={(e) => onChange({ cashCurrency: e.target.value as CashCurrency })}
-                            className="w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
-                        >
-                            <option value="KRW">🇰🇷 원화 (KRW)</option>
-                            <option value="USD">🇺🇸 달러 (USD)</option>
-                            <option value="JPY">🇯🇵 엔화 (JPY)</option>
-                        </select>
+                    <div className="w-full shrink-0 sm:w-[160px]">
+                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
+                        <div className="flex items-center gap-1.5">
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                value={row.amount}
+                                onChange={(e) => onChange({ amount: e.target.value })}
+                                placeholder="0"
+                                className="no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700"
+                            />
+                            <span className="shrink-0 text-[10px] font-medium text-neutral-400">{row.valuationCurrency}</span>
+                        </div>
                     </div>
-                )}
-
-                {/* ③ 평가액 */}
-                <div className="relative flex items-center pt-0.5">
-                    <input
-                        type="number"
-                        min={0}
-                        value={row.amount}
-                        onChange={(e) => onChange({ amount: e.target.value })}
-                        placeholder="0"
-                        className="no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 pr-14 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700"
-                    />
-                    <span className="pointer-events-none absolute right-8 text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
-                        {effectiveCurrency}
-                    </span>
-                    <div className="absolute right-0 flex h-full flex-col overflow-hidden rounded-r-xl border-l border-neutral-200 dark:border-neutral-700">
-                        <button type="button" tabIndex={-1}
-                            onClick={() => onChange({ amount: String((parseFloat(row.amount) || 0) + 1) })}
-                            className="flex flex-1 items-center justify-center px-1.5 text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                    <div className="flex justify-end sm:justify-start sm:pt-5">
+                        <button
+                            type="button"
+                            onClick={onDelete}
+                            disabled={!onDelete}
+                            className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                         >
-                            <svg width="8" height="5" viewBox="0 0 10 6" fill="none"><path d="M1 5L5 1L9 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                        </button>
-                        <div className="h-px bg-neutral-200 dark:bg-neutral-700" />
-                        <button type="button" tabIndex={-1}
-                            onClick={() => { const v = parseFloat(row.amount) || 0; if (v > 0) onChange({ amount: String(v - 1) }); }}
-                            className="flex flex-1 items-center justify-center px-1.5 text-neutral-500 transition hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-                        >
-                            <svg width="8" height="5" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+                            </svg>
                         </button>
                     </div>
                 </div>
-
-                {/* ④ 삭제 */}
-                <button
-                    type="button"
-                    onClick={onDelete}
-                    disabled={!onDelete}
-                    className="mt-1 flex h-8 w-8 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-                    </svg>
-                </button>
             </div>
 
-            {/* Row 2: 섹터 선택 + KRW 환산 (현금이 아닐 때만 표시) */}
-            {!isCash && (
-                <div className="flex items-center justify-between border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
-                    <div className="flex items-center gap-2">
-                        {row.ticker && (
-                            <TickerAvatar
-                                ticker={row.ticker}
-                                displayName={row.displayName}
-                                logoUrl={row.logoUrl}
-                                size={24}
-                                editable
-                                onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
-                            />
-                        )}
-                        <select
-                            value={row.sector}
-                            onChange={(e) => onChange({ sector: e.target.value })}
-                            className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
-                        >
-                            <option value="">섹터 선택...</option>
-                            {SECTORS.map((s) => (
-                                <option key={s} value={s}>{s}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={row.role}
-                            onChange={(e) => onChange({ role: e.target.value as AssetRole })}
-                            className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
-                        >
-                            {(Object.keys(ASSET_ROLE_LABELS) as AssetRole[]).map((role) => (
-                                <option key={role} value={role}>{ASSET_ROLE_LABELS[role]}</option>
-                            ))}
-                        </select>
-                        {row.sector && (
-                            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
-                                {row.sector}
-                            </span>
-                        )}
-                    </div>
-                    {krwValue > 0 && effectiveCurrency !== "KRW" && (
-                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                            ≈ <span className="font-medium text-neutral-600 dark:text-neutral-400">{formatKRW(krwValue)}</span>
-                        </span>
-                    )}
-                </div>
-            )}
-            {/* 현금일 때 KRW 환산 표시 */}
-            {isCash && krwValue > 0 && effectiveCurrency !== "KRW" && (
-                <div className="border-t border-neutral-100 px-3 py-2 text-right dark:border-neutral-800">
-                    <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-                        ≈ <span className="font-medium text-neutral-600 dark:text-neutral-400">{formatKRW(krwValue)}</span>
+            <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+                {row.ticker && (
+                    <TickerAvatar
+                        ticker={row.ticker}
+                        displayName={row.displayName}
+                        logoUrl={row.logoUrl}
+                        size={24}
+                        editable
+                        onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
+                    />
+                )}
+                <select
+                    value={row.sector}
+                    onChange={(e) => onChange({ sector: e.target.value })}
+                    className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
+                >
+                    <option value="">섹터 선택...</option>
+                    {SECTORS.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                    ))}
+                </select>
+                <select
+                    value={row.role}
+                    onChange={(e) => onChange({ role: e.target.value as AssetRole })}
+                    className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
+                >
+                    {(Object.keys(ASSET_ROLE_LABELS) as AssetRole[]).map((role) => (
+                        <option key={role} value={role}>{ASSET_ROLE_LABELS[role]}</option>
+                    ))}
+                </select>
+                {row.sector && (
+                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                        {row.sector}
                     </span>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 }
@@ -422,33 +491,123 @@ export default function NewQuarterlyReportPage() {
     const [quarter, setQuarter] = useState("");
     const [usdKrw, setUsdKrw] = useState("");
     const [jpyKrw, setJpyKrw] = useState("");
-    const [principalRaw, setPrincipalRaw] = useState("");
+    /** 분기 말월 월별 리포트의 totalInvestedKrw (DB, 읽기 전용) */
+    const [principalKrw, setPrincipalKrw] = useState<number | null>(null);
+    const [principalLoading, setPrincipalLoading] = useState(false);
     const [rows, setRows] = useState<PortfolioRow[]>([newRow()]);
     const [earningsReview, setEarningsReview] = useState("");
     const [strategy, setStrategy] = useState("");
     const [summary, setSummary] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    /** 작성 완료 시 분기 총평가 vs 말월 월별 총평가 불일치 → 사용자 선택 */
+    const [syncModal, setSyncModal] = useState<null | {
+        payload: CreateReportPayload;
+        monthEndReportId: number;
+        monthlyTotal: number;
+        quarterlyTotal: number;
+        monthNumber: number;
+    }>(null);
+    /** 해당 분기 월별 리포트 신규 납입 합계 (표시용) */
+    const [quarterNewInvFromMonthly, setQuarterNewInvFromMonthly] = useState(0);
 
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
+    const addCashRow = useCallback(() => setRows((prev) => [...prev, newCashRow()]), []);
     const removeRow = useCallback((id: string) => setRows((prev) => prev.filter((r) => r.id !== id)), []);
-    const updateRow = useCallback(
-        (id: string, patch: Partial<Omit<PortfolioRow, "id">>) => {
-            console.log(`[updateRow] id: ${id}, patch:`, patch);
-            setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-        },
-        [],
-    );
+    const updateRow = useCallback((id: string, patch: Partial<Omit<PortfolioRow, "id">>) => {
+        setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    }, []);
 
     const usdRate = parseNumber(usdKrw);
     const jpyRate = parseNumber(jpyKrw);
-    const principal = parseNumber(principalRaw);
 
-    const rowKRWs = useMemo(() => rows.map((r) => toKRW(r, usdRate, jpyRate)), [rows, usdRate, jpyRate]);
+    const rowKRWs = useMemo(() => rows.map((r) => rowToKrw(r, usdRate, jpyRate)), [rows, usdRate, jpyRate]);
+    const displayRows = useMemo(
+        () => sortPortfolioFormRowsByDisplay(rows, (r) => rowToKrw(r, usdRate, jpyRate)),
+        [rows, usdRate, jpyRate],
+    );
     const totalValuation = useMemo(() => rowKRWs.reduce((acc, v) => acc + v, 0), [rowKRWs]);
 
-    const profit = principal > 0 && totalValuation > 0 ? totalValuation - principal : null;
-    const profitRate = profit !== null && principal > 0 ? (profit / principal) * 100 : null;
+    const principal = principalKrw ?? 0;
+
+    const profit =
+        principal > 0 && totalValuation >= 0 ? computeGainKrw(totalValuation, principal) : null;
+    const profitRate =
+        principal > 0 ? computeReturnRatePercent(totalValuation, principal) : null;
     const isPositive = profit !== null ? profit >= 0 : true;
+
+    useEffect(() => {
+        if (!year.trim() || !quarter.trim()) {
+            setPrincipalKrw(null);
+            setPrincipalLoading(false);
+            return;
+        }
+        const y = parseInt(year.trim(), 10);
+        const q = parseInt(quarter.trim(), 10);
+        if (isNaN(y) || isNaN(q) || q < 1 || q > 4) {
+            setPrincipalKrw(null);
+            setPrincipalLoading(false);
+            return;
+        }
+        let cancelled = false;
+        const label = getProfileLabel(profile);
+        setPrincipalLoading(true);
+        Promise.all([
+            getQuarterEndPrincipalFromMonthlyReports(label, y, q),
+            sumMonthlyNewInvestmentsInQuarterKrw(label, y, q),
+        ]).then(([p, s]) => {
+            if (cancelled) return;
+            setQuarterNewInvFromMonthly(s);
+            setPrincipalKrw(p != null ? Math.round(p) : null);
+            setPrincipalLoading(false);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [year, quarter, profile]);
+
+    const buildQuarterlyPayload = (asDraft: boolean, yearNum: number, quarterNum: number, validRows: PortfolioRow[]): CreateReportPayload => ({
+        type: "QUARTERLY",
+        profile: getProfileLabel(profile),
+        status: asDraft ? "DRAFT" : "PUBLISHED",
+        periodLabel: `${yearNum}-Q${quarterNum}`,
+        usdRate,
+        jpyRate,
+        totalInvestedKrw: principalKrw ?? 0,
+        totalCurrentKrw: totalValuation,
+        summary,
+        journal: "",
+        strategy,
+        earningsReview,
+        portfolioItems: validRows.map((r) => {
+            const krw = rowToKrw(r, usdRate, jpyRate);
+            if (r.kind === "cash") {
+                return {
+                    ticker: r.valuationCurrency,
+                    displayName: r.displayName?.trim() || "현금",
+                    sector: undefined,
+                    role: "UNASSIGNED",
+                    accountType: "CASH" as const,
+                    originalCurrency: r.valuationCurrency,
+                    originalAmount: parseNumber(r.amount),
+                    krwAmount: krw,
+                    logoUrl: null,
+                };
+            }
+            const at = accountTypeFromValuationCurrency(r.valuationCurrency);
+            return {
+                ticker: r.ticker.trim(),
+                displayName: r.displayName?.trim() || null,
+                sector: r.sector || undefined,
+                role: r.role ?? "CORE",
+                accountType: at,
+                originalCurrency: r.valuationCurrency,
+                originalAmount: parseNumber(r.amount),
+                krwAmount: krw,
+                logoUrl: r.logoUrl?.trim() || null,
+            };
+        }),
+        newInvestments: [],
+    });
 
     const handleSubmit = async (asDraft: boolean) => {
         if (!year.trim() || !quarter.trim()) {
@@ -465,11 +624,10 @@ export default function NewQuarterlyReportPage() {
             toast.error("올바른 분기를 선택해주세요.");
             return;
         }
-        const periodLabel = `${yearNum}-Q${quarterNum}`;
         const incompletePortfolio = rows.filter((r) => {
+            if (r.kind === "cash") return false;
             const hasTicker = r.ticker.trim().length > 0;
             const hasAmount = parseNumber(r.amount) > 0;
-            if (r.accountType === "CASH") return !hasAmount;
             return (hasTicker && !hasAmount) || (!hasTicker && hasAmount);
         });
         if (incompletePortfolio.length > 0) {
@@ -477,51 +635,86 @@ export default function NewQuarterlyReportPage() {
             return;
         }
         const validRows = rows.filter((r) => {
-            const hasAmount = parseNumber(r.amount) > 0;
-            if (r.accountType === "CASH") return hasAmount;
-            return r.ticker.trim() && hasAmount;
+            const amt = parseNumber(r.amount);
+            if (r.kind === "cash") return amt > 0;
+            return r.ticker.trim().length > 0 && amt > 0;
         });
         if (validRows.length === 0) {
             toast.error("포트폴리오 스냅샷에 최소 1개 이상의 항목을 입력해주세요.");
             return;
         }
+
+        const payload = buildQuarterlyPayload(asDraft, yearNum, quarterNum, validRows);
+
+        if (asDraft) {
+            setIsSubmitting(true);
+            try {
+                await createReport(payload);
+                toast.success("임시 저장되었습니다.");
+                router.push("/quarterly");
+            } catch (err) {
+                console.error("[분기별 리포트 저장 오류]", err);
+                toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
+            } finally {
+                setIsSubmitting(false);
+            }
+            return;
+        }
+
+        // 작성 완료(PUBLISHED): 말월 월별 총평가와 비교
         setIsSubmitting(true);
         try {
-            await createReport({
-                type: "QUARTERLY",
-                profile: getProfileLabel(profile),
-                status: asDraft ? "DRAFT" : "PUBLISHED",
-                periodLabel,
-                usdRate,
-                jpyRate,
-                totalInvestedKrw: principal,
-                totalCurrentKrw: totalValuation,
-                summary,
-                journal: "",
-                strategy,
-                earningsReview,
-                portfolioItems: validRows.map((r) => {
-                    const item = {
-                        ticker: r.accountType === "CASH" ? ACCOUNT_LABELS[r.accountType] : (r.ticker || ACCOUNT_LABELS[r.accountType]),
-                        displayName: r.accountType === "CASH" ? null : (r.displayName?.trim() || null),
-                        sector: r.accountType === "CASH" ? undefined : (r.sector || undefined),
-                        role: r.accountType === "CASH" ? undefined : (r.role ?? "CORE"),
-                        accountType: r.accountType,
-                        originalCurrency: getEffectiveCurrency(r) as "USD" | "KRW" | "JPY",
-                        originalAmount: parseNumber(r.amount),
-                        krwAmount: toKRW(r, usdRate, jpyRate),
-                        logoUrl: r.logoUrl?.trim() || null,
-                    };
-                    console.log(`[portfolioItems] ticker: ${item.ticker}, logoUrl:`, item.logoUrl?.substring(0, 50));
-                    return item;
-                }),
-                newInvestments: [],
-            });
-            toast.success(asDraft ? "임시 저장되었습니다." : "분기별 리포트가 저장되었습니다.");
-            router.push(asDraft ? "/quarterly" : "/");
+            const profileLabel = getProfileLabel(profile);
+            const monthSnap = await getQuarterEndMonthMonthlyValuationForSync(profileLabel, yearNum, quarterNum);
+            if (monthSnap && Math.round(totalValuation) !== Math.round(monthSnap.totalCurrentKrw)) {
+                setSyncModal({
+                    payload,
+                    monthEndReportId: monthSnap.reportId,
+                    monthlyTotal: monthSnap.totalCurrentKrw,
+                    quarterlyTotal: totalValuation,
+                    monthNumber: monthSnap.monthNumber,
+                });
+                setIsSubmitting(false);
+                return;
+            }
+            await createReport(payload);
+            toast.success("분기별 리포트가 저장되었습니다.");
+            router.push("/");
         } catch (err) {
             console.error("[분기별 리포트 저장 오류]", err);
             toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSyncModalKeepExisting = async () => {
+        if (!syncModal) return;
+        setIsSubmitting(true);
+        try {
+            await createReport(syncModal.payload);
+            toast.success("분기별 리포트가 저장되었습니다.");
+            setSyncModal(null);
+            router.push("/");
+        } catch (err) {
+            console.error("[분기별 리포트 저장 오류]", err);
+            toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSyncModalSaveWithSync = async () => {
+        if (!syncModal) return;
+        setIsSubmitting(true);
+        try {
+            await createQuarterlyPublishedWithMonthValuationSync(syncModal.payload, syncModal.monthEndReportId);
+            toast.success("분기 리포트가 저장되었고, 말월 월별 리포트 총평가가 동기화되었습니다.");
+            setSyncModal(null);
+            router.push("/");
+        } catch (err) {
+            console.error("[분기별 리포트 동기화 저장 오류]", err);
+            toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
+        } finally {
             setIsSubmitting(false);
         }
     };
@@ -565,7 +758,35 @@ export default function NewQuarterlyReportPage() {
                 </div>
             </div>
 
-            {/* Section 1: 기본 정보 */}
+            {/* 적용 환율 (최상단) */}
+            <FormSection label="적용 환율">
+                <FormRow label="1 USD =" sublabel="달러/원 환율">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="number"
+                            value={usdKrw}
+                            onChange={(e) => setUsdKrw(e.target.value)}
+                            placeholder="예: 1380"
+                            className={inputCls}
+                        />
+                        <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                    </div>
+                </FormRow>
+                <FormRow label="100 JPY =" sublabel="엔/원 환율 (100엔 기준)">
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="number"
+                            value={jpyKrw}
+                            onChange={(e) => setJpyKrw(e.target.value)}
+                            placeholder="예: 920"
+                            className={inputCls}
+                        />
+                        <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                    </div>
+                </FormRow>
+            </FormSection>
+
+            {/* 기본 정보 */}
             <FormSection label="기본 정보">
                 <FormRow label="연도 · 분기" sublabel="연도와 분기를 선택하세요">
                     <div className="flex items-center gap-3">
@@ -597,71 +818,43 @@ export default function NewQuarterlyReportPage() {
                 </FormRow>
             </FormSection>
 
-            {/* Section 2: 적용 환율 */}
-            <FormSection label="적용 환율">
-                <FormRow label="1 USD =" sublabel="달러/원 환율">
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="number"
-                            value={usdKrw}
-                            onChange={(e) => setUsdKrw(e.target.value)}
-                            placeholder="예: 1380"
-                            className={inputCls}
-                        />
-                        <span className="shrink-0 text-sm text-neutral-400">KRW</span>
-                    </div>
-                </FormRow>
-                <FormRow label="100 JPY =" sublabel="엔/원 환율 (100엔 기준)">
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="number"
-                            value={jpyKrw}
-                            onChange={(e) => setJpyKrw(e.target.value)}
-                            placeholder="예: 920"
-                            className={inputCls}
-                        />
-                        <span className="shrink-0 text-sm text-neutral-400">KRW</span>
-                    </div>
-                </FormRow>
-            </FormSection>
-
-            {/* Section 3: Portfolio Snapshot */}
+            {/* 포트폴리오 스냅샷 */}
             <section className="mb-8">
                 <div className="mb-4 flex items-center justify-between">
                     <div>
                         <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                            Portfolio Snapshot
+                            포트폴리오 스냅샷
                         </p>
                         <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                            이번 분기 말 기준 보유 종목과 평가금액을 입력하세요.
+                            종목 행은 티커·평가액을, 현금 행은 통화·금액만 입력하세요. 원화 환산은 상단 환율로 자동 계산됩니다.
                         </p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={addRow}
-                        className="inline-flex items-center gap-1 rounded-full bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-                    >
-                        <span className="text-base leading-none">+</span>
-                        종목 추가
-                    </button>
-                </div>
-
-                {/* Table header */}
-                <div className="mb-1.5 grid grid-cols-[140px_1fr_140px_32px] gap-2 px-4">
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">계좌 타입</span>
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">종목 / Ticker</span>
-                    <span className="text-right text-[10px] font-medium uppercase tracking-widest text-neutral-400">평가액</span>
-                    <span />
+                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        <button
+                            type="button"
+                            onClick={addRow}
+                            className="inline-flex items-center gap-1 rounded-full bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+                        >
+                            <span className="text-base leading-none">+</span>
+                            종목 추가
+                        </button>
+                        <button
+                            type="button"
+                            onClick={addCashRow}
+                            className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-neutral-800 shadow-sm transition hover:bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                        >
+                            <span className="text-base leading-none">+</span>
+                            현금 추가
+                        </button>
+                    </div>
                 </div>
 
                 <div className="space-y-2">
-                    {rows.map((row, idx) => (
+                    {displayRows.map((row) => (
                         <PortfolioRowItem
                             key={row.id}
                             row={row}
-                            krwValue={rowKRWs[idx]}
-                            usdRate={usdRate}
-                            jpyRate={jpyRate}
+                            krwValue={rowToKrw(row, usdRate, jpyRate)}
                             onChange={(patch) => updateRow(row.id, patch)}
                             onDelete={rows.length > 1 ? () => removeRow(row.id) : undefined}
                         />
@@ -683,18 +876,20 @@ export default function NewQuarterlyReportPage() {
                     </div>
                     {totalValuation > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
-                            {rows.map((r, i) => {
-                                const v = rowKRWs[i];
+                            {displayRows.map((r) => {
+                                const v = rowToKrw(r, usdRate, jpyRate);
                                 if (v <= 0) return null;
                                 return (
                                     <span
                                         key={r.id}
                                         className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] text-neutral-300 dark:bg-black/10 dark:text-neutral-600"
                                     >
-                                        {getPortfolioItemDisplayLabel({
-                                            ticker: r.ticker || ACCOUNT_LABELS[r.accountType],
-                                            displayName: r.accountType === "CASH" ? null : r.displayName,
-                                        })}
+                                        {r.kind === "cash"
+                                            ? `현금 (${r.valuationCurrency})`
+                                            : getPortfolioItemDisplayLabel({
+                                                ticker: r.ticker,
+                                                displayName: r.displayName,
+                                            })}
                                         {r.sector && <span className="opacity-60">· {r.sector}</span>}
                                         <span className="opacity-50">·</span>
                                         {formatKRW(v)}
@@ -708,17 +903,28 @@ export default function NewQuarterlyReportPage() {
 
             {/* Section 4: 투자금 및 수익 */}
             <FormSection label="투자금 및 수익">
-                <FormRow label="총 투자금 (원금)" sublabel="누적 투입 원금 총액">
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            inputMode="numeric"
-                            value={principalRaw}
-                            onChange={(e) => setPrincipalRaw(e.target.value)}
-                            placeholder="예: 50000000"
-                            className={inputCls}
-                        />
-                        <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                <FormRow
+                    label="이 분기 월별 신규 납입 합계"
+                    sublabel="월별 리포트에만 입력한 신규 납입을 같은 분기에 합산합니다 (참고)"
+                >
+                    <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
+                        {formatKRW(quarterNewInvFromMonthly)}
+                    </div>
+                </FormRow>
+                <FormRow
+                    label="총 투자금 (원금)"
+                    sublabel="해당 분기 말월(예: Q1 → 3월) 월별 리포트의 말일 누적 원금(totalInvestedKrw)입니다. DB에서만 불러옵니다."
+                >
+                    <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
+                        {!year.trim() || !quarter.trim() ? (
+                            <span className="text-neutral-400">연도·분기를 선택하세요.</span>
+                        ) : principalLoading ? (
+                            <span className="text-neutral-400">불러오는 중…</span>
+                        ) : principalKrw != null ? (
+                            formatKRW(principalKrw)
+                        ) : (
+                            <span className="text-neutral-400">해당 말월 월별 리포트가 없습니다.</span>
+                        )}
                     </div>
                 </FormRow>
                 {(totalValuation > 0 || principal > 0) && (
@@ -790,7 +996,7 @@ export default function NewQuarterlyReportPage() {
                 <button
                     type="button"
                     onClick={() => handleSubmit(true)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || syncModal !== null}
                     className={[
                         "relative inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5",
                         "text-sm font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
@@ -805,7 +1011,7 @@ export default function NewQuarterlyReportPage() {
                 <button
                     type="button"
                     onClick={() => handleSubmit(false)}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || syncModal !== null}
                     className={[
                         "relative inline-flex items-center gap-2.5 rounded-2xl px-8 py-3.5",
                         "text-sm font-semibold tracking-tight text-white shadow-lg",
@@ -835,6 +1041,48 @@ export default function NewQuarterlyReportPage() {
                     )}
                 </button>
             </div>
+
+            <Dialog
+                open={syncModal !== null}
+                onOpenChange={(open) => {
+                    if (!open && !isSubmitting) setSyncModal(null);
+                }}
+            >
+                <DialogContent showCloseButton={false} className="sm:max-w-md">
+                    {syncModal && (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle>평가금액 동기화 안내</DialogTitle>
+                                <DialogDescription className="text-left text-neutral-600 dark:text-neutral-400">
+                                    계산된 분기 총 평가금({formatKRW(syncModal.quarterlyTotal)})과 기존{" "}
+                                    {syncModal.monthNumber}월 리포트에 기록된 총 평가금(
+                                    {formatKRW(syncModal.monthlyTotal)}) 간에 차이가 있습니다. 더 정밀한 환율과
+                                    종목 데이터가 반영된 현재 금액으로 {syncModal.monthNumber}월 리포트의 자산
+                                    총액을 업데이트하시겠습니까?
+                                </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter className="gap-2 sm:justify-end">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={isSubmitting}
+                                    onClick={handleSyncModalKeepExisting}
+                                >
+                                    기존 데이터 유지
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="default"
+                                    disabled={isSubmitting}
+                                    onClick={handleSyncModalSaveWithSync}
+                                >
+                                    {isSubmitting ? "저장 중…" : "동기화 후 저장"}
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

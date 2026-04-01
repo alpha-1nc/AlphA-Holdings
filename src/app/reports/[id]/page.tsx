@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Globe, Wallet } from "lucide-react";
-import { getReportById } from "@/app/actions/reports";
+import { getReportById, getReportsByProfileAndType, sumMonthlyNewInvestmentsInQuarterKrw } from "@/app/actions/reports";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
@@ -9,6 +9,8 @@ import { PortfolioItemLogoAvatar } from "@/components/reports/portfolio-item-log
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
 import { AiCommentSection } from "@/components/reports/AiCommentSection";
 import { getProfileFromLabel } from "@/lib/profile";
+import { deriveMonthlyIntervalPerformance, deriveQuarterlyIntervalPerformance } from "@/lib/report-performance";
+import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
 
 const krw = (n: number) =>
     new Intl.NumberFormat("ko-KR", {
@@ -30,6 +32,12 @@ const ACCOUNT_ICONS: Record<string, React.ReactNode> = {
     JP_DIRECT: <Globe className="h-3.5 w-3.5" />,
     CASH: <Wallet className="h-3.5 w-3.5" />,
 };
+
+function parseQuarterlyPeriodLabel(periodLabel: string): { year: number; quarter: number } | null {
+    const m = /^(\d{4})-Q([1-4])$/.exec(periodLabel);
+    if (!m) return null;
+    return { year: Number(m[1]), quarter: Number(m[2]) };
+}
 
 export default async function ReportDetailPage(props: {
     params: Promise<{ id: string }>;
@@ -60,26 +68,89 @@ export default async function ReportDetailPage(props: {
 
         // 데이터 검증 및 안전장치
         const portfolioItems = Array.isArray(report.portfolioItems) ? report.portfolioItems : [];
+        const sortedPortfolioItems = sortPortfolioItemsForDisplay(portfolioItems);
         const newInvestments = Array.isArray(report.newInvestments) ? report.newInvestments : [];
         const totalInvestedKrw = report.totalInvestedKrw ?? 0;
         const totalCurrentKrw = report.totalCurrentKrw ?? 0;
 
-        // 신규 투입금을 제외한 투자금으로 수익 계산
-        const totalNewInvestment = newInvestments.reduce((sum, inv) => sum + inv.krwAmount, 0);
-        const adjustedInvested = totalInvestedKrw - totalNewInvestment;
-        const gain = totalCurrentKrw - adjustedInvested;
-        const returnRate =
-            adjustedInvested !== 0
-                ? (gain / adjustedInvested) * 100
+        const pq = report.type === "QUARTERLY" ? parseQuarterlyPeriodLabel(report.periodLabel) : null;
+        const quarterNewInvFromMonthly =
+            pq != null
+                ? await sumMonthlyNewInvestmentsInQuarterKrw(report.profile, pq.year, pq.quarter)
                 : 0;
-        const isPositive = gain >= 0;
+
+        const totalNewInvestment = newInvestments.reduce((sum, inv) => sum + inv.krwAmount, 0);
+
+        const posStyle = (gain: number) => {
+            const isPositive = gain >= 0;
+            return {
+                isPositive,
+                color: isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400",
+                barGain: isPositive ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500",
+                barRate: isPositive ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-gradient-to-r from-slate-400 to-gray-500",
+            } as const;
+        };
+
+        const baseCards = [
+            { label: "총 투자금", value: krw(totalInvestedKrw), color: "text-neutral-900 dark:text-neutral-50" as const, bar: "bg-gradient-to-r from-blue-400 to-indigo-500" },
+            { label: "총 평가금", value: krw(totalCurrentKrw), color: "text-neutral-900 dark:text-neutral-50" as const, bar: "bg-gradient-to-r from-violet-400 to-purple-500" },
+        ];
+
+        let summaryCards: Array<{ label: string; value: string; color: string; bar: string }>;
+        if (report.type === "MONTHLY") {
+            const monthlyAsc = await getReportsByProfileAndType(report.profile, "MONTHLY");
+            const mIdx = monthlyAsc.findIndex((r) => r.id === report.id);
+            const mPerf =
+                mIdx >= 0
+                    ? deriveMonthlyIntervalPerformance(monthlyAsc, mIdx)
+                    : { intervalGainKrw: 0, intervalReturnRatePercent: 0 };
+            const s = posStyle(mPerf.intervalGainKrw);
+            summaryCards = [
+                ...baseCards,
+                {
+                    label: "당월 수익금",
+                    value: `${s.isPositive ? "+" : ""}${krw(mPerf.intervalGainKrw)}`,
+                    color: s.color,
+                    bar: s.barGain,
+                },
+                {
+                    label: "당월 수익률",
+                    value: `${s.isPositive ? "+" : ""}${mPerf.intervalReturnRatePercent.toFixed(2)}%`,
+                    color: s.color,
+                    bar: s.barRate,
+                },
+            ];
+        } else {
+            const quarterlyAsc = await getReportsByProfileAndType(report.profile, "QUARTERLY");
+            const qIdx = quarterlyAsc.findIndex((r) => r.id === report.id);
+            const qPerf =
+                qIdx >= 0
+                    ? deriveQuarterlyIntervalPerformance(quarterlyAsc, qIdx)
+                    : { intervalGainKrw: 0, intervalReturnRatePercent: 0 };
+            const s = posStyle(qPerf.intervalGainKrw);
+            summaryCards = [
+                ...baseCards,
+                {
+                    label: "분기 수익금",
+                    value: `${s.isPositive ? "+" : ""}${krw(qPerf.intervalGainKrw)}`,
+                    color: s.color,
+                    bar: s.barGain,
+                },
+                {
+                    label: "분기 수익률",
+                    value: `${s.isPositive ? "+" : ""}${qPerf.intervalReturnRatePercent.toFixed(2)}%`,
+                    color: s.color,
+                    bar: s.barRate,
+                },
+            ];
+        }
 
     const label =
         report.type === "MONTHLY"
             ? `${report.periodLabel} · Monthly`
             : `${report.periodLabel} · Quarterly`;
 
-    const snapshotsForChart = portfolioItems.map((item) => ({
+    const snapshotsForChart = sortedPortfolioItems.map((item) => ({
         ticker: item.ticker,
         name: getPortfolioItemDisplayLabel({
             ticker: item.ticker,
@@ -144,14 +215,9 @@ export default async function ReportDetailPage(props: {
                 </div>
             </div>
 
-            {/* 수치 요약 카드 4개 */}
+            {/* 수치 요약: 총 투자금·총 평가금 + (월별: 당월만 / 분기: 분기만) */}
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {[
-                    { label: "총 투자금", value: krw(totalInvestedKrw), color: "text-neutral-900 dark:text-neutral-50", bar: "bg-gradient-to-r from-blue-400 to-indigo-500" },
-                    { label: "총 평가금", value: krw(totalCurrentKrw), color: "text-neutral-900 dark:text-neutral-50", bar: "bg-gradient-to-r from-violet-400 to-purple-500" },
-                    { label: "수익금", value: `${isPositive ? "+" : ""}${krw(gain)}`, color: isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400", bar: isPositive ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500" },
-                    { label: "수익률", value: `${isPositive ? "+" : ""}${returnRate.toFixed(2)}%`, color: isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400", bar: isPositive ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-gradient-to-r from-slate-400 to-gray-500" },
-                ].map((item) => (
+                {summaryCards.map((item) => (
                     <div key={item.label} className="relative overflow-hidden rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
                         <div className={`absolute inset-x-0 top-0 h-[3px] ${item.bar}`} />
                         <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400 dark:text-neutral-500">{item.label}</p>
@@ -160,51 +226,64 @@ export default async function ReportDetailPage(props: {
                 ))}
             </div>
 
-            {/* 신규 투자금 (월별은 항상, 분기는 입력된 경우만) */}
-            {(report.type === "MONTHLY" || newInvestments.length > 0) && (
+            {/* 신규 투자금: 월별은 계좌별 행, 분기는 해당 분기 월별 리포트 합산 */}
+            {(report.type === "MONTHLY" || report.type === "QUARTERLY") && (
                 <Card className="border border-neutral-100 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/70">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                            신규 투자금
+                            {report.type === "MONTHLY" ? "신규 투자금" : "이 분기 신규 납입 (월별 합산)"}
                         </CardTitle>
                         <p className="text-[11px] font-normal text-neutral-400 dark:text-neutral-500">
                             {report.type === "MONTHLY"
-                                ? "해당 월에 계좌별로 새로 납입한 금액입니다."
-                                : "이 분기 리포트에 입력한 신규 납입액입니다."}
+                                ? "해당 월에 계좌별로 새로 납입한 금액입니다. 말일 누적 원금에 반영됩니다."
+                                : "같은 분기 월별 리포트에 기록된 신규 납입액의 합계입니다."}
                         </p>
                     </CardHeader>
                     <CardContent>
-                        {newInvestments.length === 0 ? (
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400">이번 기간에 기록된 신규 투자금이 없습니다.</p>
+                        {report.type === "MONTHLY" ? (
+                            newInvestments.length === 0 ? (
+                                <p className="text-sm text-neutral-500 dark:text-neutral-400">이번 달 기록된 신규 투자금이 없습니다.</p>
+                            ) : (
+                                <div className="overflow-hidden rounded-xl border border-neutral-100 dark:border-neutral-800">
+                                    <div className="grid grid-cols-[1fr_1fr] border-b border-neutral-100 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400 sm:grid-cols-[1fr_1fr_1fr]">
+                                        <div>계좌</div>
+                                        <div className="hidden sm:block text-right">통화</div>
+                                        <div className="text-right">원화 환산</div>
+                                    </div>
+                                    <div className="divide-y divide-neutral-100 text-xs dark:divide-neutral-800">
+                                        {newInvestments.map((inv) => (
+                                            <div
+                                                key={inv.id}
+                                                className="grid grid-cols-[1fr_1fr] items-center gap-2 px-3 py-2.5 sm:grid-cols-[1fr_1fr_1fr]"
+                                            >
+                                                <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
+                                                    {ACCOUNT_ICONS[inv.accountType]}
+                                                    {ACCOUNT_LABELS[inv.accountType] ?? inv.accountType}
+                                                </div>
+                                                <div className="hidden text-right text-neutral-500 dark:text-neutral-400 sm:block">
+                                                    {inv.originalCurrency}
+                                                </div>
+                                                <div className="text-right font-medium text-neutral-800 dark:text-neutral-200">
+                                                    {krw(inv.krwAmount)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end border-t border-neutral-100 bg-neutral-50/80 px-3 py-2.5 text-xs font-semibold text-neutral-800 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-100">
+                                        합계 <span className="ml-2">{krw(totalNewInvestment)}</span>
+                                    </div>
+                                </div>
+                            )
                         ) : (
-                            <div className="overflow-hidden rounded-xl border border-neutral-100 dark:border-neutral-800">
-                                <div className="grid grid-cols-[1fr_1fr] border-b border-neutral-100 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400 sm:grid-cols-[1fr_1fr_1fr]">
-                                    <div>계좌</div>
-                                    <div className="hidden sm:block text-right">통화</div>
-                                    <div className="text-right">원화 환산</div>
-                                </div>
-                                <div className="divide-y divide-neutral-100 text-xs dark:divide-neutral-800">
-                                    {newInvestments.map((inv) => (
-                                        <div
-                                            key={inv.id}
-                                            className="grid grid-cols-[1fr_1fr] items-center gap-2 px-3 py-2.5 sm:grid-cols-[1fr_1fr_1fr]"
-                                        >
-                                            <div className="flex items-center gap-1.5 text-neutral-600 dark:text-neutral-300">
-                                                {ACCOUNT_ICONS[inv.accountType]}
-                                                {ACCOUNT_LABELS[inv.accountType] ?? inv.accountType}
-                                            </div>
-                                            <div className="hidden text-right text-neutral-500 dark:text-neutral-400 sm:block">
-                                                {inv.originalCurrency}
-                                            </div>
-                                            <div className="text-right font-medium text-neutral-800 dark:text-neutral-200">
-                                                {krw(inv.krwAmount)}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="flex justify-end border-t border-neutral-100 bg-neutral-50/80 px-3 py-2.5 text-xs font-semibold text-neutral-800 dark:border-neutral-800 dark:bg-neutral-900/50 dark:text-neutral-100">
-                                    합계 <span className="ml-2">{krw(totalNewInvestment)}</span>
-                                </div>
+                            <div className="space-y-2">
+                                <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
+                                    {krw(quarterNewInvFromMonthly)}
+                                </p>
+                                {totalNewInvestment > 0 && (
+                                    <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
+                                        참고: 이전에 분기 리포트에 별도 저장된 신규 항목 {krw(totalNewInvestment)}은(는) 수익 계산에는 사용하지 않습니다.
+                                    </p>
+                                )}
                             </div>
                         )}
                     </CardContent>
@@ -229,8 +308,8 @@ export default async function ReportDetailPage(props: {
                                     <div className="text-right">통화</div>
                                 </div>
                                 <div className="divide-y divide-neutral-100 text-xs dark:divide-neutral-800">
-                                    {portfolioItems.length > 0 ? (
-                                        portfolioItems.map((item) => {
+                                    {sortedPortfolioItems.length > 0 ? (
+                                        sortedPortfolioItems.map((item) => {
                                             const pct = totalCurrentKrw > 0
                                                 ? ((item.krwAmount / totalCurrentKrw) * 100).toFixed(1)
                                                 : "0";
@@ -328,7 +407,6 @@ export default async function ReportDetailPage(props: {
                               ]
                             : [
                                   { title: "증시 요약", content: report.summary },
-                                  { title: "느낀 점", content: report.journal },
                                   { title: "다음 전략", content: report.strategy },
                                   { title: "어닝/실적 리뷰", content: report.earningsReview },
                               ]

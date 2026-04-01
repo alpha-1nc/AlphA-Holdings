@@ -74,7 +74,7 @@ export function TopNavbar() {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-neutral-200/60 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-950/85">
             {logoHomePortal}
-            <div className="mx-auto flex h-[68px] max-w-screen-2xl items-center justify-between px-4 md:px-8">
+            <div className="mx-auto flex h-[68px] max-w-screen-2xl items-center justify-between px-5 md:px-10">
                 {/* Logo + Brand — 클릭 시 시네마틱 홈 전환 */}
                 <button
                     type="button"

@@ -7,6 +7,7 @@
  * 흐름: 티커 → 데이터 수집 → 모델 자동 선택(A~F) → 채점 → DB 저장 → slug 반환
  */
 
+import { revalidatePath } from "next/cache";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -184,6 +185,9 @@ export async function generateAnalysisAction(
         appliedModel: `gemini-2.5-flash | Model ${analysisOutput.selectedModel}: ${modelLabel}`,
       },
     });
+
+    revalidatePath("/analysis");
+    revalidatePath(`/analysis/${year}/${month}/${slug}`);
 
     console.log(`[Analysis] 완료: /analysis/${year}/${month}/${slug}`);
     return { success: true, slug, year, month };

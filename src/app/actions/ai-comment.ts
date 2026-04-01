@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/generated/prisma";
 import { buildAiAnalysisInput, type ReportWithItems } from "@/lib/ai-rule-engine";
 import { getReportsByProfileAndType } from "./reports";
+import { computeGainKrw, computeReturnRatePercent } from "@/lib/report-performance";
 
 const AI_OUTPUT_SCHEMA = z.object({
   monthlySummary: z.string().describe("현재 포트폴리오 상태 요약 (3문장 이내)"),
@@ -73,28 +74,20 @@ export async function generateReportAiComment(reportId: number, profileId: strin
     strategies
   );
 
-  // 수익률 계산 (신규 투입금 제외)
-  const totalNewInvestment = (currentReport.newInvestments ?? []).reduce(
-    (sum, inv) => sum + inv.krwAmount,
-    0
+  const gain = computeGainKrw(currentReport.totalCurrentKrw, currentReport.totalInvestedKrw);
+  const returnRatePct = computeReturnRatePercent(
+    currentReport.totalCurrentKrw,
+    currentReport.totalInvestedKrw
   );
-  const adjustedInvested = currentReport.totalInvestedKrw - totalNewInvestment;
-  const gain = currentReport.totalCurrentKrw - adjustedInvested;
-  const returnRatePct =
-    adjustedInvested !== 0 ? (gain / adjustedInvested) * 100 : 0;
 
-  // 이전 리포트 수익률 (지난달 대비 변화용)
   let prevReturnRate: number | null = null;
   let prevGainKrw: number | null = null;
   if (previousReport) {
-    const prevNewInv = (previousReport.newInvestments ?? []).reduce(
-      (s, inv) => s + inv.krwAmount,
-      0
-    );
-    const prevAdjusted = previousReport.totalInvestedKrw - prevNewInv;
-    prevGainKrw = previousReport.totalCurrentKrw - prevAdjusted;
+    prevGainKrw = computeGainKrw(previousReport.totalCurrentKrw, previousReport.totalInvestedKrw);
     prevReturnRate =
-      prevAdjusted !== 0 ? (prevGainKrw / prevAdjusted) * 100 : null;
+      previousReport.totalInvestedKrw > 0
+        ? computeReturnRatePercent(previousReport.totalCurrentKrw, previousReport.totalInvestedKrw)
+        : null;
   }
 
   const hasPortfolioData = flags.hasPortfolioData === true;

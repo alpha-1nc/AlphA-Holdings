@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, BarChart2 } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import { getTickerColor } from "@/constants/brandColors";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
+import { deriveMonthlyIntervalPerformance } from "@/lib/report-performance";
+import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
+import { PageMainTitle } from "@/components/layout/page-main-title";
 
 type ReportWithItems = Report & { 
     portfolioItems: PortfolioItem[];
@@ -21,15 +24,22 @@ const krw = (n: number) =>
         maximumFractionDigits: 0,
     }).format(n);
 
-function ReportCard({ report }: { report: ReportWithItems }) {
-    // 신규 투입금을 제외한 투자금으로 수익 계산
-    const newInv = (report.newInvestments || []).reduce((sum, inv) => sum + inv.krwAmount, 0);
-    const adjustedInvested = report.totalInvestedKrw - newInv;
-    const gain = report.totalCurrentKrw - adjustedInvested;
-    const isPositive = gain >= 0;
-    const returnRate = adjustedInvested !== 0 ? (gain / adjustedInvested) * 100 : 0;
+function ReportCard({
+    report,
+    intervalGainKrw,
+    intervalReturnRatePercent,
+}: {
+    report: ReportWithItems;
+    intervalGainKrw: number;
+    intervalReturnRatePercent: number;
+}) {
+    const isPositive = intervalGainKrw >= 0;
+    const returnRate = intervalReturnRatePercent;
     const total = report.totalCurrentKrw;
     const isDraft = (report as Report & { status?: string }).status === "DRAFT";
+    const barItems = sortPortfolioItemsForDisplay(
+        report.portfolioItems.filter((i) => i.krwAmount > 0),
+    );
 
     return (
         <Link href={`/reports/${report.id}`} className="group block">
@@ -81,20 +91,18 @@ function ReportCard({ report }: { report: ReportWithItems }) {
                             <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">{krw(report.totalCurrentKrw)}</p>
                         </div>
                         <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">수익금</p>
+                            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">당월 수익금</p>
                             <p className={`mt-0.5 text-sm font-semibold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                                {isPositive ? "+" : ""}{krw(gain)}
+                                {isPositive ? "+" : ""}{krw(intervalGainKrw)}
                             </p>
                         </div>
                     </div>
 
                     {/* Portfolio mini bar */}
-                    {report.portfolioItems.length > 0 && total > 0 && (
+                    {barItems.length > 0 && total > 0 && (
                         <div>
                             <div className="flex h-1.5 w-full overflow-hidden rounded-full">
-                                {report.portfolioItems
-                                    .filter((i) => i.krwAmount > 0)
-                                    .map((item, idx) => (
+                                {barItems.map((item, idx) => (
                                         <div
                                             key={item.id}
                                             style={{
@@ -105,8 +113,7 @@ function ReportCard({ report }: { report: ReportWithItems }) {
                                     ))}
                             </div>
                             <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-                                {report.portfolioItems
-                                    .filter((i) => i.krwAmount > 0)
+                                {barItems
                                     .slice(0, 5)
                                     .map((item, idx) => (
                                         <span key={item.id} className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
@@ -117,8 +124,8 @@ function ReportCard({ report }: { report: ReportWithItems }) {
                                             })}
                                         </span>
                                     ))}
-                                {report.portfolioItems.length > 5 && (
-                                    <span className="text-[10px] text-neutral-400">+{report.portfolioItems.length - 5}</span>
+                                {barItems.length > 5 && (
+                                    <span className="text-[10px] text-neutral-400">+{barItems.length - 5}</span>
                                 )}
                             </div>
                         </div>
@@ -153,7 +160,7 @@ export default function MonthlyReportPage() {
     if (!mounted || loading) {
         return (
             <div className="space-y-8">
-                <div className="h-7 w-48 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
+                <div className="h-10 w-56 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {[...Array(3)].map((_, i) => (
                         <div key={i} className="h-52 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
@@ -167,15 +174,7 @@ export default function MonthlyReportPage() {
         <div className="space-y-8">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
-                        Monthly Reports
-                    </h2>
-                    <p className="mt-1 text-sm text-neutral-500">
-                        월별 투자 스냅샷 아카이브
-                        <span className="hidden md:inline"> · </span>
-                        <br className="md:hidden" />
-                        <span>{getProfileLabel(profileId as "alpha-ceo" | "partner")}</span>
-                    </p>
+                    <PageMainTitle icon={BarChart2}>Monthly Reports</PageMainTitle>
                 </div>
                 <Link
                     href="/reports/new"
@@ -196,9 +195,18 @@ export default function MonthlyReportPage() {
                         </span>
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {reports.map((report) => (
-                            <ReportCard key={report.id} report={report} />
-                        ))}
+                        {reports.map((report, index) => {
+                            const { intervalGainKrw, intervalReturnRatePercent } =
+                                deriveMonthlyIntervalPerformance(reports, index);
+                            return (
+                                <ReportCard
+                                    key={report.id}
+                                    report={report}
+                                    intervalGainKrw={intervalGainKrw}
+                                    intervalReturnRatePercent={intervalReturnRatePercent}
+                                />
+                            );
+                        })}
                     </div>
                 </div>
             ) : (

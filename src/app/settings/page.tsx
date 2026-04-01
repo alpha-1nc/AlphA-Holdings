@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { 
-    getCurrentProfile, 
-    setCurrentProfile, 
-    getProfileLabel,
-    type WorkspaceProfile,
-    PROFILE_STORAGE_KEY 
-} from "@/lib/profile";
+import { getCurrentProfile, setCurrentProfile, type WorkspaceProfile } from "@/lib/profile";
+import { Settings } from "lucide-react";
 import { getAppVersion } from "@/lib/version";
+import { PageMainTitle } from "@/components/layout/page-main-title";
 import { PortfolioStrategyManager } from "@/components/settings/PortfolioStrategyManager";
+import { ProfileSegmentedControl } from "@/components/settings/profile-segmented-control";
 
 export default function SettingsPage() {
     const [profile, setProfile] = useState<WorkspaceProfile>("alpha-ceo");
@@ -30,15 +27,10 @@ export default function SettingsPage() {
     if (!mounted) return null;
 
     return (
-        <div className="mx-auto max-w-xl px-4 py-16">
+        <div className="mx-auto max-w-2xl pb-16">
             {/* Page Header */}
             <div className="mb-12">
-                <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">
-                    설정
-                </h1>
-                <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                    앱 전반의 환경을 구성합니다.
-                </p>
+                <PageMainTitle icon={Settings}>Settings</PageMainTitle>
             </div>
 
             {/* ── Section: Workspace Profile ─────────────────────────────── */}
@@ -47,23 +39,7 @@ export default function SettingsPage() {
                     운용 프로필
                 </p>
 
-                <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
-                    <ProfileOption
-                        value="alpha-ceo"
-                        selected={profile}
-                        label="AlphA Holdings Portfolio"
-                        description="직접 운용"
-                        onSelect={handleProfileChange}
-                    />
-                    <div className="mx-6 h-px bg-neutral-100 dark:bg-neutral-800" />
-                    <ProfileOption
-                        value="partner"
-                        selected={profile}
-                        label="MindongFolio"
-                        description="위탁 운용"
-                        onSelect={handleProfileChange}
-                    />
-                </div>
+                <ProfileSegmentedControl value={profile} onChange={handleProfileChange} />
 
                 <p className="mt-3 px-1 text-xs text-neutral-400 dark:text-neutral-500">
                     대시보드 조회 및 리포트 작성 시 사용되는 기본 운용 주체입니다.
@@ -128,48 +104,5 @@ export default function SettingsPage() {
             </section>
 
         </div>
-    );
-}
-
-/* ── Sub-component ─────────────────────────────────────────────────── */
-
-function ProfileOption({
-    value,
-    selected,
-    label,
-    description,
-    onSelect,
-}: {
-    value: WorkspaceProfile;
-    selected: WorkspaceProfile;
-    label: string;
-    description: string;
-    onSelect: (v: WorkspaceProfile) => void;
-}) {
-    const isSelected = value === selected;
-
-    return (
-        <button
-            onClick={() => onSelect(value)}
-            className="flex w-full items-center justify-between px-6 py-5 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
-        >
-            <div>
-                <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                    {label}
-                </p>
-                <p className="mt-0.5 text-xs text-neutral-400 dark:text-neutral-500">
-                    {description}
-                </p>
-            </div>
-
-            {/* Radio indicator */}
-            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center">
-                {isSelected ? (
-                    <span className="block h-[18px] w-[18px] rounded-full bg-neutral-900 dark:bg-neutral-100" />
-                ) : (
-                    <span className="block h-[18px] w-[18px] rounded-full ring-1 ring-neutral-300 dark:ring-neutral-600" />
-                )}
-            </span>
-        </button>
     );
 }

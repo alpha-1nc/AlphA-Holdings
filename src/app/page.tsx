@@ -8,7 +8,7 @@ import {
     ComposedChart, Line, Area,
     LineChart,
 } from "recharts";
-import { Globe, Wallet, BarChart3, ChevronDown } from "lucide-react";
+import { Globe, Wallet, BarChart3, ChevronDown, Home } from "lucide-react";
 import { getReportsByProfilePublished } from "@/app/actions/reports";
 import { getPortfolioStrategies } from "@/app/actions/strategy";
 import { getTickerColor, FALLBACK_COLORS } from "@/constants/brandColors";
@@ -19,7 +19,9 @@ import { computeRoleAllocation, computeTickerDeviation } from "@/lib/role-alloca
 import { RoleAllocationChart } from "@/components/dashboard/RoleAllocationChart";
 import { TargetVsActualBar } from "@/components/dashboard/TargetVsActualBar";
 import { AiBriefingBanner } from "@/components/dashboard/AiBriefingBanner";
+import { PageMainTitle } from "@/components/layout/page-main-title";
 import type { Report, PortfolioItem, NewInvestment, PortfolioStrategy } from "@/generated/prisma";
+import { computeGainKrw, computeReturnRatePercent } from "@/lib/report-performance";
 
 type ReportWithItems = Report & { 
     portfolioItems: PortfolioItem[];
@@ -472,11 +474,8 @@ export default function DashboardPage() {
     const latest = reports[0];
     const invested = latest.totalInvestedKrw;
     const current = latest.totalCurrentKrw;
-    // 신규 투자금을 제외한 투자금으로 수익 계산
-    const newInv = (latest.newInvestments || []).reduce((sum, inv) => sum + inv.krwAmount, 0);
-    const adjustedInvested = invested - newInv;
-    const profit = current - adjustedInvested;
-    const returnRate = adjustedInvested !== 0 ? (profit / adjustedInvested) * 100 : 0;
+    const profit = computeGainKrw(current, invested);
+    const returnRate = computeReturnRatePercent(current, invested);
     const isPositive = profit >= 0;
     const profitColor = isPositive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400";
     const profitSign = isPositive ? "+" : "";
@@ -504,7 +503,7 @@ export default function DashboardPage() {
             icon: <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isPositive ? "text-emerald-500" : "text-red-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>{isPositive ? <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />}</svg>,
         },
         {
-            label: "수익률",
+            label: "누적 수익률",
             value: `${profitSign}${returnRate.toFixed(2)}%`,
             colorClass: profitColor,
             sub: isPositive ? "수익 중 🎉" : "손실 중",
@@ -518,17 +517,12 @@ export default function DashboardPage() {
     const quarterlyReports = [...reports].filter((r) => r.type === "QUARTERLY").reverse();
     const chartReports = activeTab === "monthly" ? monthlyReports : quarterlyReports;
 
-    const barData = chartReports.map((r) => {
-        const newInv = (r.newInvestments || []).reduce((sum, inv) => sum + inv.krwAmount, 0);
-        const adjustedInvested = r.totalInvestedKrw - newInv;
-        const g = r.totalCurrentKrw - adjustedInvested;
-        return {
-            period: r.periodLabel,
-            "총 투자금": r.totalInvestedKrw,
-            "총 평가금": r.totalCurrentKrw,
-            "수익금": g,
-        };
-    });
+    const barData = chartReports.map((r) => ({
+        period: r.periodLabel,
+        "총 투자금": r.totalInvestedKrw,
+        "총 평가금": r.totalCurrentKrw,
+        "수익금": computeGainKrw(r.totalCurrentKrw, r.totalInvestedKrw),
+    }));
 
     const monthlyAscForNewInv = [...reports]
         .filter((r) => r.type === "MONTHLY")
@@ -547,16 +541,10 @@ export default function DashboardPage() {
         "신규 투자금(합계)": (r.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0),
     }));
 
-    const returnData = chartReports.map((r) => {
-        const newInv = (r.newInvestments || []).reduce((sum, inv) => sum + inv.krwAmount, 0);
-        const adjustedInvested = r.totalInvestedKrw - newInv;
-        const g = r.totalCurrentKrw - adjustedInvested;
-        const rate = adjustedInvested !== 0 ? (g / adjustedInvested) * 100 : 0;
-        return {
-            period: r.periodLabel,
-            "수익률(%)": parseFloat(rate.toFixed(2)),
-        };
-    });
+    const returnData = chartReports.map((r) => ({
+        period: r.periodLabel,
+        "수익률(%)": parseFloat(computeReturnRatePercent(r.totalCurrentKrw, r.totalInvestedKrw).toFixed(2)),
+    }));
 
     // ── 최신 분기별 리포트 (포트폴리오 도넛 차트용) ──────────────────
     const latestQuarterly = quarterlyReports[quarterlyReports.length - 1];
@@ -575,12 +563,10 @@ export default function DashboardPage() {
     return (
         <div className="w-full max-w-[100vw] space-y-8 overflow-hidden p-0 md:space-y-10">
             {/* Header */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-center gap-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-2xl">
-                            투자 현황 대시보드
-                        </h1>
+                        <PageMainTitle icon={Home}>Dashboard</PageMainTitle>
                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${profileId === "alpha-ceo"
                             ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                             : "bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
@@ -588,10 +574,6 @@ export default function DashboardPage() {
                             {getProfileLabel(profileId as "alpha-ceo" | "partner")}
                         </span>
                     </div>
-                    <p className="mt-1 break-words text-sm text-neutral-500 dark:text-neutral-400">
-                        가장 최근 리포트({latest.periodLabel}) 기준 &middot; 총{" "}
-                        <strong className="text-neutral-700 dark:text-neutral-300">{reports.length}개</strong> 리포트
-                    </p>
                 </div>
             </div>
 
@@ -696,7 +678,7 @@ export default function DashboardPage() {
 
                             <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
                                 <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                    수익률 (%)
+                                    누적 수익률 (%)
                                 </p>
                                 <div className="h-48 min-w-0 md:h-52">
                                     <ResponsiveContainer width="100%" height="100%" debounce={50}>
@@ -711,7 +693,7 @@ export default function DashboardPage() {
                                             <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
                                             <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={40} unit="%" />
                                             <Tooltip
-                                                formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "수익률"]}
+                                                formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "누적 수익률"]}
                                                 contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
                                                 cursor={{ fill: "rgba(0,0,0,0.04)" }}
                                             />

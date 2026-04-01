@@ -36,7 +36,7 @@ export default function RootLayout({
         <ThemeProvider>
           <div className="flex min-h-screen flex-col">
             <TopNavbar />
-            <main className="flex-1 px-4 py-6 md:px-8 md:py-10">{children}</main>
+            <main className="flex-1 px-5 py-6 md:px-10 md:py-10">{children}</main>
           </div>
           <Toaster richColors position="top-center" />
         </ThemeProvider>

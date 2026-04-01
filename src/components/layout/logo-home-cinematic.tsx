@@ -69,12 +69,12 @@ export function useLogoHomeCinematic() {
                 )}
             >
                 <div className="flex items-center justify-center">
-                    {/* 심볼: emerge에서 크게 등장 → reveal에서 160→72로 축소 */}
+                    {/* 심볼: emerge에서 크게 등장 → reveal에서 축소 (헤더 바 크기와 무관) */}
                     <div
                         className={clsx(
                             "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl",
                             "transition-[width,height] duration-[1000ms] ease-out will-change-[width,height]",
-                            phase === "emerge" ? "h-[160px] w-[160px]" : "h-[72px] w-[72px]"
+                            phase === "emerge" ? "h-[220px] w-[220px]" : "h-[96px] w-[96px]"
                         )}
                     >
                         <div
@@ -86,17 +86,17 @@ export function useLogoHomeCinematic() {
                             <Image
                                 src={logo}
                                 alt=""
-                                width={160}
-                                height={160}
-                                className="h-full w-full max-h-[160px] max-w-[160px] object-contain dark:hidden"
+                                width={220}
+                                height={220}
+                                className="h-full w-full max-h-[220px] max-w-[220px] object-contain dark:hidden"
                                 aria-hidden
                             />
                             <Image
                                 src={logoDark}
                                 alt=""
-                                width={160}
-                                height={160}
-                                className="hidden h-full w-full max-h-[160px] max-w-[160px] object-contain dark:block"
+                                width={220}
+                                height={220}
+                                className="hidden h-full w-full max-h-[220px] max-w-[220px] object-contain dark:block"
                                 aria-hidden
                             />
                         </div>
@@ -109,11 +109,11 @@ export function useLogoHomeCinematic() {
                             "transition-[max-width,margin-left,opacity] duration-[1050ms] ease-out",
                             phase === "emerge"
                                 ? "ml-0 max-w-0 opacity-0 delay-0"
-                                : "ml-3 max-w-[300px] opacity-100 delay-150"
+                                : "ml-4 max-w-[380px] opacity-100 delay-150"
                         )}
                     >
                         <span
-                            className="block whitespace-nowrap text-[17px] font-bold tracking-tight text-neutral-900 dark:text-neutral-50"
+                            className="block whitespace-nowrap text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 sm:text-3xl"
                             style={{
                                 fontFamily: "var(--font-inter), sans-serif",
                                 letterSpacing: "-0.025em",
