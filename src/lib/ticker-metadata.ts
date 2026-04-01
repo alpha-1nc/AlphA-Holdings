@@ -35,6 +35,7 @@ export const TICKER_METADATA: Record<string, TickerMetadata> = {
     SNOW: { name: "Snowflake Inc.", domain: "snowflake.com", color: "#29B5E8", sector: "Technology" },
     PLTR: { name: "Palantir Technologies Inc.", domain: "palantir.com", color: "#6E3FF3", sector: "Technology" },
     COIN: { name: "Coinbase Global Inc.", domain: "coinbase.com", color: "#0052FF", sector: "Financials" },
+    IREN: { name: "Iris Energy Limited", domain: "irisenergy.co", color: "#0D9488", sector: "Technology" },
     UBER: { name: "Uber Technologies Inc.", domain: "uber.com", color: "#000000", sector: "Consumer Discretionary" },
     ABNB: { name: "Airbnb Inc.", domain: "airbnb.com", color: "#FF5A5F", sector: "Consumer Discretionary" },
     SHOP: { name: "Shopify Inc.", domain: "shopify.com", color: "#96BF48", sector: "Technology" },

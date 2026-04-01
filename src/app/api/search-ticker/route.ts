@@ -71,6 +71,7 @@ const US_STOCKS: TickerSearchResult[] = [
     { symbol: "PYPL", name: "PayPal Holdings Inc.", exchange: "NASDAQ", type: "stock", region: "US", currency: "USD", domain: "paypal.com" },
     { symbol: "SQ", name: "Block Inc.", exchange: "NYSE", type: "stock", region: "US", currency: "USD", domain: "squareup.com" },
     { symbol: "COIN", name: "Coinbase Global Inc.", exchange: "NASDAQ", type: "stock", region: "US", currency: "USD", domain: "coinbase.com" },
+    { symbol: "IREN", name: "Iris Energy Limited", exchange: "NASDAQ", type: "stock", region: "US", currency: "USD", domain: "irisenergy.co" },
     { symbol: "HOOD", name: "Robinhood Markets Inc.", exchange: "NASDAQ", type: "stock", region: "US", currency: "USD", domain: "robinhood.com" },
     { symbol: "AFRM", name: "Affirm Holdings Inc.", exchange: "NASDAQ", type: "stock", region: "US", currency: "USD", domain: "affirm.com" },
     // Consumer / Retail

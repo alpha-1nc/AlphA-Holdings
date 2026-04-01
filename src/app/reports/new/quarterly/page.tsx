@@ -68,6 +68,7 @@ const TICKER_SECTOR_MAP: Record<string, Sector> = {
     DIS: "Communication Services", TWTR: "Communication Services",
     JPM: "Financials", GS: "Financials", V: "Financials", MA: "Financials",
     PYPL: "Financials", SQ: "Financials", COIN: "Financials", HOOD: "Financials",
+    IREN: "Technology",
     PLTR: "Technology", RBLX: "Communication Services",
     UBER: "Industrials",
     BABA: "Consumer Discretionary", JD: "Consumer Discretionary",

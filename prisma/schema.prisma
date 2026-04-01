@@ -185,16 +185,18 @@ model NewInvestment {
 }
 
 model AnalysisReport {
-  id           String   @id @default(cuid())
-  ticker       String
-  companyName  String
-  slug         String   @unique
-  reportDate   DateTime @default(now())
-  periodLabel  String
-  reportData   Json
-  rating       String
-  totalScore   Float
-  appliedModel String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  ticker            String
+  companyName       String
+  slug              String   @unique
+  reportDate        DateTime @default(now())
+  periodLabel       String
+  reportData        Json
+  rating            String
+  totalScore        Float
+  appliedModel      String
+  /** 목록 카드용 커버 이미지 (data URL, 붙여넣기·파일 선택) */
+  cardImageDataUrl  String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
