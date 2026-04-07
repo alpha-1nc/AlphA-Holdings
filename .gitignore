@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+# 로컬 자격 증명·백업 (실수로 커밋 방지)
+.envrc
+credentials.json
+*.pem.bak
 
 # database
 *.db

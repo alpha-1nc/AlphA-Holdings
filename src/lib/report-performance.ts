@@ -23,7 +23,7 @@ export function sumNewInvestmentKrw(newInvestments?: NewInvestment[] | null): nu
 
 type IntervalReportSlice = {
   periodLabel: string;
-  totalCurrentKrw: number;
+  totalCurrentKrw: number | null;
   newInvestments?: NewInvestment[] | null;
 };
 
@@ -41,10 +41,10 @@ function deriveSequentialIntervalPerformance(
     return { intervalGainKrw: 0, intervalReturnRatePercent: 0 };
   }
   const current = reports[index];
-  const prevEval = reports[index - 1].totalCurrentKrw;
+  const prevEval = reports[index - 1].totalCurrentKrw ?? 0;
   const periodNewInflowKrw = sumNewInvestmentKrw(current.newInvestments);
   const basis = prevEval + periodNewInflowKrw;
-  const intervalGainKrw = current.totalCurrentKrw - basis;
+  const intervalGainKrw = (current.totalCurrentKrw ?? 0) - basis;
   const intervalReturnRatePercent = basis > 0 ? (intervalGainKrw / basis) * 100 : 0;
   return { intervalGainKrw, intervalReturnRatePercent };
 }
@@ -83,7 +83,7 @@ export function deriveQuarterToDateFromMonthlyReports(
 
   const byLabel = new Map(reports.map((r) => [r.periodLabel, r]));
   const prevReport = byLabel.get(prevQEnd);
-  const prevEval = prevReport ? prevReport.totalCurrentKrw : 0;
+  const prevEval = prevReport ? (prevReport.totalCurrentKrw ?? 0) : 0;
 
   let sumNew = 0;
   for (const pl of monthsInQ) {
@@ -95,7 +95,7 @@ export function deriveQuarterToDateFromMonthlyReports(
   if (!current) return { intervalGainKrw: 0, intervalReturnRatePercent: 0 };
 
   const basis = prevEval + sumNew;
-  const intervalGainKrw = current.totalCurrentKrw - basis;
+  const intervalGainKrw = (current.totalCurrentKrw ?? 0) - basis;
   const intervalReturnRatePercent = basis > 0 ? (intervalGainKrw / basis) * 100 : 0;
   return { intervalGainKrw, intervalReturnRatePercent };
 }

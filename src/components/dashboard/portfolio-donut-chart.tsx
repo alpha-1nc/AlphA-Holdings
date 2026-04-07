@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { getTickerColor } from "@/constants/brandColors";
+import { hexForCurrencyCode } from "@/lib/currency-colors";
 
 const krwFormat = (n: number) =>
     new Intl.NumberFormat("ko-KR", {
@@ -53,11 +54,18 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
     const total = snapshots.reduce((s, d) => s + d.value, 0);
     const dataWithPct = snapshots
         .filter((d) => d.value > 0)
-        .map((d, idx) => ({
-            ...d,
-            pct: total > 0 ? (d.value / total) * 100 : 0,
-            color: getTickerColor(d.ticker, idx),
-        }));
+        .map((d, idx) => {
+            const u = d.ticker.trim().toUpperCase();
+            const color =
+                u === "USD" || u === "JPY" || u === "KRW"
+                    ? hexForCurrencyCode(u)
+                    : getTickerColor(d.ticker, idx);
+            return {
+                ...d,
+                pct: total > 0 ? (d.value / total) * 100 : 0,
+                color,
+            };
+        });
 
     if (dataWithPct.length === 0) {
         return (

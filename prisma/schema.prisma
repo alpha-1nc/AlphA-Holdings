@@ -21,8 +21,10 @@ enum Currency {
 // ── 계좌 유형 Enum ────────────────────────────────────────
 enum AccountType {
   US_DIRECT   // 미국 직투
-  ISA         // 한국 ISA
+  KR_DIRECT   // 한국 직투
   JP_DIRECT   // 일본 직투
+  ISA         // 한국 ISA
+  PENSION     // 연금저축펀드
   CASH        // 현금성 자산
 }
 
@@ -55,6 +57,7 @@ model Profile {
   label            String             @unique  // "AlphA Holdings Portfolio", "MindongFolio" 등
 
   portfolioStrategies PortfolioStrategy[]
+  accountInitialCapitals AccountInitialCapital[]
 
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -71,11 +74,12 @@ model PortfolioStrategy {
   displayName      String?            // 표시명 (검색·메타데이터 캐시, 예: ETF 한글명)
   role             AssetRole          @default(CORE)  // 역할군
   targetWeight     Float              // 목표 비중 (%)
+  accountType      AccountType        @default(US_DIRECT)
 
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  @@unique([profileId, ticker])
+  @@unique([profileId, ticker, accountType])
 }
 
 // ── 투자 리포트 (다중 통화 지원) ─────────────────────────
@@ -86,13 +90,13 @@ model Report {
   type            ReportType                        // MONTHLY / QUARTERLY
   periodLabel     String                            // "2026-03", "2026-Q1" 등 표시용
 
-  // 환율 스냅샷
-  usdRate         Float                             // 리포트 기준 USD/KRW 환율
-  jpyRate         Float                             // 리포트 기준 JPY/KRW 환율 (100엔 기준)
+  // 환율 스냅샷 (월별 리포트는 미사용 → null)
+  usdRate         Float?                            // 리포트 기준 USD/KRW 환율
+  jpyRate         Float?                            // 리포트 기준 JPY/KRW 환율 (100엔 기준)
 
-  // 원화 환산 총액
-  totalInvestedKrw  Float                           // 총투자금 (원화 환산)
-  totalCurrentKrw   Float                           // 현재평가금 (원화 환산)
+  // 원화 환산 총액 (월별 리포트는 미사용 → null 보존)
+  totalInvestedKrw  Float?                          // 총투자금 (원화 환산)
+  totalCurrentKrw   Float?                          // 현재평가금 (원화 환산)
 
   // 운용 프로필
   profile         String          @default("AlphA Holdings Portfolio") // 운용 프로필 ("AlphA Holdings Portfolio" / "MindongFolio")
@@ -110,9 +114,29 @@ model Report {
   portfolioItems   PortfolioItem[]
   newInvestments   NewInvestment[]
   reportAiComment ReportAiComment?
+  initialCapitals AccountInitialCapital[]
 
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+}
+
+// ── 계좌별 초기 원금 (프로필당 계좌 유형별 1건, 분기 리포트와 연동) ─────
+model AccountInitialCapital {
+  id          String      @id @default(cuid())
+
+  profileId   String
+  profile     Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  accountType AccountType             // US_DIRECT / KR_DIRECT / JP_DIRECT / ISA / PENSION
+  krwAmount   Float                   // 원화 환산 초기 원금
+
+  reportId    Int                     // 입력한 첫 번째 분기 리포트 ID
+  report      Report                  @relation(fields: [reportId], references: [id], onDelete: Restrict)
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([profileId, accountType])
 }
 
 // ── 리포트 AI 분석 결과 캐시 (월별/분기별) ─────────────────────────────
@@ -143,7 +167,7 @@ model PortfolioItem {
   logoUrl          String?                           // 사용자 지정 종목 대표 이미지 URL (붙여넣기)
   sector           String?                           // 섹터 분류 (Technology, Financials, Consumer Discretionary 등)
   role             AssetRole   @default(CORE)         // 역할군 (CORE, GROWTH, BOOSTER, DEFENSIVE, INDEX, UNASSIGNED)
-  accountType      AccountType                       // US_DIRECT / ISA / JP_DIRECT / CASH
+  accountType      AccountType                       // US_DIRECT / KR_DIRECT / ISA / JP_DIRECT / PENSION / CASH
   originalCurrency Currency                          // 원래 통화: USD / KRW / JPY
   originalAmount   Float                             // 원래 통화 기준 평가금액
   krwAmount        Float                             // 원화 환산 평가금액
@@ -176,7 +200,7 @@ model NewInvestment {
   reportId         Int
   report           Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
-  accountType      AccountType                       // US_DIRECT / ISA / JP_DIRECT / CASH
+  accountType      AccountType                       // US_DIRECT / KR_DIRECT / ISA / JP_DIRECT / PENSION / CASH
   originalCurrency Currency                          // 원래 통화: USD / KRW / JPY
   originalAmount   Float                             // 원래 통화 기준 신규 투자금
   krwAmount        Float                             // 원화 환산 신규 투자금

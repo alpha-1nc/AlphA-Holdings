@@ -1,9 +1,9 @@
 // ── 목표 포트폴리오 관련 타입 (프론트엔드용) ────────────────────────
 
-import type { AssetRole, PortfolioStrategy, Profile } from "@/generated/prisma";
+import type { AccountType, AssetRole, PortfolioStrategy, Profile } from "@/generated/prisma";
 
 // Re-export Prisma types for convenience
-export type { AssetRole, PortfolioStrategy, Profile };
+export type { AccountType, AssetRole, PortfolioStrategy, Profile };
 
 /** AssetRole 표시 라벨 */
 export const ASSET_ROLE_LABELS: Record<AssetRole, string> = {
@@ -21,12 +21,14 @@ export interface CreatePortfolioStrategyInput {
   ticker: string;
   role?: AssetRole;
   targetWeight: number;
+  accountType?: AccountType;
 }
 
 /** 전략 수정 입력 (부분 업데이트) */
 export interface UpdatePortfolioStrategyInput {
   role?: AssetRole;
   targetWeight?: number;
+  accountType?: AccountType;
 }
 
 /** 프로필과 함께 로드된 전략 */

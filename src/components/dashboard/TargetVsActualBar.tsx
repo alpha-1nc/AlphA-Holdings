@@ -2,9 +2,12 @@
 
 import type { TickerDeviationItem } from "@/lib/role-allocation";
 import { getTickerColor } from "@/constants/brandColors";
+import { ACCOUNT_TYPE_LABEL } from "@/lib/accountGroups";
 
 interface TargetVsActualBarProps {
   data: TickerDeviationItem[];
+  /** 직투 그룹 등 — 종목 행에 계좌 뱃지(🇺🇸/🇰🇷/🇯🇵) 표시 */
+  showAccountBadges?: boolean;
 }
 
 function getDiffColor(diff: number): string {
@@ -31,9 +34,10 @@ function getDiffLabel(diff: number): string {
 interface TickerRowProps {
   item: TickerDeviationItem;
   index: number;
+  showAccountBadge?: boolean;
 }
 
-function TickerRow({ item, index }: TickerRowProps) {
+function TickerRow({ item, index, showAccountBadge }: TickerRowProps) {
   const diff = item.diff;
   const diffColor = getDiffColor(diff);
   const accentColor = getBarAccentColor(diff);
@@ -53,8 +57,8 @@ function TickerRow({ item, index }: TickerRowProps) {
   return (
     <div className="space-y-1.5">
       {/* Label row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
+      <div className="flex flex-col gap-1.5 md:flex-row md:items-start md:justify-between">
+        <div className="flex min-w-0 items-center gap-1.5">
           <span
             className="h-2 w-2 shrink-0 rounded-full"
             style={{ background: tickerColor }}
@@ -66,9 +70,14 @@ function TickerRow({ item, index }: TickerRowProps) {
                 ({item.ticker})
               </span>
             )}
+            {showAccountBadge && (
+              <span className="ml-1.5 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
+                {ACCOUNT_TYPE_LABEL[item.accountType]}
+              </span>
+            )}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-x-2 gap-y-0.5 sm:justify-end">
           {hasTarget && (
             <span className={`text-[10px] font-medium ${diffColor}`}>
               {getDiffLabel(diff)}
@@ -127,7 +136,7 @@ function TickerRow({ item, index }: TickerRowProps) {
   );
 }
 
-export function TargetVsActualBar({ data }: TargetVsActualBarProps) {
+export function TargetVsActualBar({ data, showAccountBadges }: TargetVsActualBarProps) {
   if (!data.length) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
@@ -146,7 +155,12 @@ export function TargetVsActualBar({ data }: TargetVsActualBarProps) {
   return (
     <div className="flex flex-col gap-4">
       {data.map((item, idx) => (
-        <TickerRow key={`${item.ticker}-${idx}`} item={item} index={idx} />
+        <TickerRow
+          key={`${item.ticker}-${item.accountType}-${idx}`}
+          item={item}
+          index={idx}
+          showAccountBadge={showAccountBadges}
+        />
       ))}
 
       {/* Total target weight hint */}

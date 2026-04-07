@@ -74,20 +74,19 @@ export async function generateReportAiComment(reportId: number, profileId: strin
     strategies
   );
 
-  const gain = computeGainKrw(currentReport.totalCurrentKrw, currentReport.totalInvestedKrw);
-  const returnRatePct = computeReturnRatePercent(
-    currentReport.totalCurrentKrw,
-    currentReport.totalInvestedKrw
-  );
+  const curInv = currentReport.totalInvestedKrw ?? 0;
+  const curCur = currentReport.totalCurrentKrw ?? 0;
+  const gain = computeGainKrw(curCur, curInv);
+  const returnRatePct = computeReturnRatePercent(curCur, curInv);
 
   let prevReturnRate: number | null = null;
   let prevGainKrw: number | null = null;
   if (previousReport) {
-    prevGainKrw = computeGainKrw(previousReport.totalCurrentKrw, previousReport.totalInvestedKrw);
+    const pInv = previousReport.totalInvestedKrw ?? 0;
+    const pCur = previousReport.totalCurrentKrw ?? 0;
+    prevGainKrw = computeGainKrw(pCur, pInv);
     prevReturnRate =
-      previousReport.totalInvestedKrw > 0
-        ? computeReturnRatePercent(previousReport.totalCurrentKrw, previousReport.totalInvestedKrw)
-        : null;
+      pInv > 0 ? computeReturnRatePercent(pCur, pInv) : null;
   }
 
   const hasPortfolioData = flags.hasPortfolioData === true;
@@ -108,8 +107,8 @@ export async function generateReportAiComment(reportId: number, profileId: strin
     ...flags,
     returnRate: returnRatePct,
     gainKrw: gain,
-    totalInvestedKrw: currentReport.totalInvestedKrw,
-    totalCurrentKrw: currentReport.totalCurrentKrw,
+    totalInvestedKrw: currentReport.totalInvestedKrw ?? 0,
+    totalCurrentKrw: currentReport.totalCurrentKrw ?? 0,
     ...(cashHoldingKrw > 0 && { cashHoldingKrw }),
     ...(prevReturnRate != null && { prevReturnRate, prevGainKrw }),
     journal: {

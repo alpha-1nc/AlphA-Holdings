@@ -56,9 +56,11 @@ function RoleTooltip({
 
 interface RoleAllocationChartProps {
   data: RoleAllocationItem[];
+  /** 좁은 화면에서 도넛·라벨 축소 */
+  compactChart?: boolean;
 }
 
-export function RoleAllocationChart({ data }: RoleAllocationChartProps) {
+export function RoleAllocationChart({ data, compactChart }: RoleAllocationChartProps) {
   if (!data.length) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
@@ -83,18 +85,20 @@ export function RoleAllocationChart({ data }: RoleAllocationChartProps) {
   }));
 
   const totalKrw = activeData.reduce((s, d) => s + d.krwAmount, 0);
+  const ir = compactChart ? 52 : 60;
+  const or = compactChart ? 76 : 88;
 
   return (
     <div className="flex w-full min-w-0 flex-col items-center gap-4">
-      <div className="relative h-52 w-full min-w-0">
+      <div className={`relative w-full min-w-0 ${compactChart ? "h-44" : "h-52"}`}>
         <ResponsiveContainer width="100%" height="100%" debounce={50}>
           <PieChart>
             <Pie
               data={chartData}
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={88}
+              innerRadius={ir}
+              outerRadius={or}
               paddingAngle={2}
               dataKey="value"
               strokeWidth={0}
@@ -108,22 +112,26 @@ export function RoleAllocationChart({ data }: RoleAllocationChartProps) {
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">
+          <p
+            className={`font-medium uppercase tracking-widest text-neutral-400 ${compactChart ? "text-[9px]" : "text-[10px]"}`}
+          >
             역할군
           </p>
-          <p className="mt-0.5 text-base font-bold tracking-tight text-neutral-900 dark:text-white">
+          <p
+            className={`mt-0.5 font-bold tracking-tight text-neutral-900 dark:text-white ${compactChart ? "text-sm" : "text-base"}`}
+          >
             {activeData.length}개 역할
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap justify-center gap-x-3 gap-y-1.5">
+      <div className="flex flex-wrap justify-center gap-x-2 gap-y-1.5 md:gap-x-3">
         {activeData.map((d) => {
           const pct =
             totalKrw > 0 ? ((d.krwAmount / totalKrw) * 100).toFixed(1) : "0";
           return (
             <div
               key={d.role}
-              className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400"
+              className={`flex min-w-0 max-w-full items-center gap-1.5 text-neutral-600 dark:text-neutral-400 ${compactChart ? "text-[10px]" : "text-xs"}`}
             >
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"

@@ -58,7 +58,6 @@ export interface AnalysisReportCardProps {
   ticker: string;
   rating: string;
   totalScore: number;
-  periodLabel: string;
   initialCardImageDataUrl: string | null;
 }
 
@@ -69,7 +68,6 @@ export function AnalysisReportCard({
   ticker,
   rating,
   totalScore,
-  periodLabel,
   initialCardImageDataUrl,
 }: AnalysisReportCardProps) {
   const router = useRouter();
@@ -273,13 +271,7 @@ export function AnalysisReportCard({
               : totalScore.toFixed(1)}
           </p>
         </Link>
-        <div className="flex items-center justify-between gap-2 border-t border-border/40 pt-2">
-          <Link
-            href={href}
-            className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground outline-none transition-colors hover:text-foreground"
-          >
-            {periodLabel}
-          </Link>
+        <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-2">
           <AnalysisReportDeleteButton
             reportId={reportId}
             companyName={companyName}

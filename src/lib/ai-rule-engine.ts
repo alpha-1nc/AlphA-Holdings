@@ -5,7 +5,17 @@ import {
   computeTickerDeviation,
   type RoleKey,
 } from "./role-allocation";
-import type { NewInvestment, PortfolioItem, PortfolioStrategy, Report } from "@/generated/prisma";
+import type {
+  AccountType,
+  NewInvestment,
+  PortfolioItem,
+  PortfolioStrategy,
+  Report,
+} from "@/generated/prisma";
+
+function strategyCompositeKey(ticker: string, accountType: AccountType): string {
+  return `${ticker.trim().toUpperCase()}|${accountType}`;
+}
 
 export interface ReportWithItems extends Report {
   portfolioItems: PortfolioItem[];
@@ -57,9 +67,11 @@ export function buildAiAnalysisInput(
   // 데이터가 없으면 비중 관련 플래그를 전부 null/false로 단락 반환
   if (!hasPortfolioData) {
     let isReturnRateDropped = false;
-    if (previousReport && previousReport.totalInvestedKrw > 0 && currentReport.totalInvestedKrw > 0) {
-      const prevReturn = previousReport.totalCurrentKrw / previousReport.totalInvestedKrw;
-      const currReturn = currentReport.totalCurrentKrw / currentReport.totalInvestedKrw;
+    const prevInv = previousReport?.totalInvestedKrw ?? 0;
+    const curInv = currentReport.totalInvestedKrw ?? 0;
+    if (previousReport && prevInv > 0 && curInv > 0) {
+      const prevReturn = (previousReport.totalCurrentKrw ?? 0) / prevInv;
+      const currReturn = (currentReport.totalCurrentKrw ?? 0) / curInv;
       isReturnRateDropped = currReturn < prevReturn;
     }
     return {
@@ -86,7 +98,7 @@ export function buildAiAnalysisInput(
   const tickerToRole = new Map<string, RoleKey>();
   for (const s of strategies) {
     tickerToRole.set(
-      ((s as { ticker?: string }).ticker ?? "").trim().toUpperCase(),
+      strategyCompositeKey(s.ticker, s.accountType),
       ((s as { role?: string }).role ?? "UNASSIGNED") as RoleKey,
     );
   }
@@ -102,7 +114,8 @@ export function buildAiAnalysisInput(
   }
   for (const d of deviation) {
     const role =
-      tickerToRole.get(d.ticker.trim().toUpperCase()) ?? ("UNASSIGNED" as RoleKey);
+      tickerToRole.get(strategyCompositeKey(d.ticker, d.accountType)) ??
+      ("UNASSIGNED" as RoleKey);
     roleActual.set(role, (roleActual.get(role) ?? 0) + d.actualWeight);
   }
 
@@ -143,21 +156,16 @@ export function buildAiAnalysisInput(
     (i) => !isCashLike(i) && i.krwAmount > 0
   );
 
-  // 전략이 하나도 없으면 비교 기준이 없으므로 미분류 판정 불가 → false
-  const validStrategyTickers = strategies
-    .map((s) => ((s as { ticker?: string }).ticker ?? "").trim().toUpperCase())
-    .filter((t) => t.length > 0);
-
   const hasUnassignedHoldings =
-    validStrategyTickers.length > 0 &&
+    strategies.length > 0 &&
     realHoldings.some((item) => {
       const itemTicker = ((item as { ticker?: string }).ticker ?? "").trim().toUpperCase();
-      const itemStr =
-        `${itemTicker} ${(item as { symbol?: string }).symbol ?? ""} ${(item as { name?: string }).name ?? ""}`.toUpperCase();
-      const isAssigned = validStrategyTickers.some(
-        (sTicker) => itemStr.includes(sTicker) || sTicker.includes(itemTicker)
+      const assigned = strategies.some(
+        (s) =>
+          s.ticker.trim().toUpperCase() === itemTicker &&
+          s.accountType === item.accountType,
       );
-      return !isAssigned;
+      return !assigned;
     });
 
   // 최대 보유 종목 비중 (30% 초과 시 집중)
@@ -175,11 +183,11 @@ export function buildAiAnalysisInput(
 
   // 수익률 하락 여부 (이전 리포트와 비교)
   let isReturnRateDropped = false;
-  if (previousReport && previousReport.totalInvestedKrw > 0 && currentReport.totalInvestedKrw > 0) {
-    const prevReturn =
-      previousReport.totalCurrentKrw / previousReport.totalInvestedKrw;
-    const currReturn =
-      currentReport.totalCurrentKrw / currentReport.totalInvestedKrw;
+  const prevInvQ = previousReport?.totalInvestedKrw ?? 0;
+  const curInvQ = currentReport.totalInvestedKrw ?? 0;
+  if (previousReport && prevInvQ > 0 && curInvQ > 0) {
+    const prevReturn = (previousReport.totalCurrentKrw ?? 0) / prevInvQ;
+    const currReturn = (currentReport.totalCurrentKrw ?? 0) / curInvQ;
     isReturnRateDropped = currReturn < prevReturn;
   }
 

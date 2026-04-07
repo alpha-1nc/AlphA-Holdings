@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { TopNavbar } from "@/components/layout/top-navbar";
+import { MobileBottomTabBar } from "@/components/layout/mobile-bottom-tab-bar";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "sonner";
 
@@ -34,9 +35,12 @@ export default function RootLayout({
     <html lang="ko" className={inter.variable} suppressHydrationWarning>
       <body className="overflow-x-hidden bg-neutral-50 font-sans antialiased dark:bg-neutral-950">
         <ThemeProvider>
-          <div className="flex min-h-screen flex-col">
+          <div className="flex min-h-screen min-w-0 flex-col">
             <TopNavbar />
-            <main className="flex-1 px-5 py-6 md:px-10 md:py-10">{children}</main>
+            <main className="flex-1 px-4 pb-24 pt-6 md:px-10 md:py-10 md:pb-10">
+              {children}
+            </main>
+            <MobileBottomTabBar />
           </div>
           <Toaster richColors position="top-center" />
         </ThemeProvider>

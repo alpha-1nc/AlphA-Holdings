@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import type { AssetRole, ReportType, ReportStatus } from "@/generated/prisma";
 import {
@@ -8,6 +9,66 @@ import {
   monthPeriodLabelsInQuarter,
   quarterEndMonthPeriodLabel,
 } from "@/lib/report-period";
+import { INITIAL_CAPITAL_ACCOUNT_TYPES, type InitialCapitalAccountType } from "@/lib/initial-capital";
+
+type DbForInitialCapital = Pick<PrismaClient, "profile" | "report" | "accountInitialCapital">;
+
+async function resolveProfileIdFromLabel(
+  db: Pick<PrismaClient, "profile">,
+  profileLabel: string,
+): Promise<string> {
+  const p = await db.profile.upsert({
+    where: { label: profileLabel },
+    create: { label: profileLabel },
+    update: {},
+  });
+  return p.id;
+}
+
+/**
+ * 분기 리포트 작성 페이지 진입 시: 첫 분기이거나 초기 원금 레코드가 없으면 섹션 표시
+ */
+export async function getQuarterlyInitialCapitalSectionState(profileLabel: string) {
+  const profileId = await resolveProfileIdFromLabel(prisma, profileLabel);
+  const [quarterlyReportCount, initialCapitalCount] = await Promise.all([
+    prisma.report.count({ where: { profile: profileLabel, type: "QUARTERLY" } }),
+    prisma.accountInitialCapital.count({ where: { profileId } }),
+  ]);
+  const isFirstQuarterly = quarterlyReportCount === 0;
+  const hasNoInitialCapital = initialCapitalCount === 0;
+  const showInitialCapitalSection = isFirstQuarterly || hasNoInitialCapital;
+  return {
+    quarterlyReportCount,
+    initialCapitalCount,
+    showInitialCapitalSection,
+  };
+}
+
+async function upsertAccountInitialCapitalsIfApplicable(
+  db: DbForInitialCapital,
+  profileLabel: string,
+  reportId: number,
+  initialCapitalByAccount: Partial<Record<InitialCapitalAccountType, number>> | undefined,
+): Promise<void> {
+  if (initialCapitalByAccount == null) return;
+  const profileId = await resolveProfileIdFromLabel(db, profileLabel);
+  const [totalQuarterly, icCount] = await Promise.all([
+    db.report.count({ where: { profile: profileLabel, type: "QUARTERLY" } }),
+    db.accountInitialCapital.count({ where: { profileId } }),
+  ]);
+  const showInitialCapitalSection = totalQuarterly === 1 || icCount === 0;
+  if (!showInitialCapitalSection) return;
+
+  for (const accountType of INITIAL_CAPITAL_ACCOUNT_TYPES) {
+    const raw = initialCapitalByAccount[accountType];
+    const krwAmount = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+    await db.accountInitialCapital.upsert({
+      where: { profileId_accountType: { profileId, accountType } },
+      create: { profileId, accountType, krwAmount, reportId },
+      update: {},
+    });
+  }
+}
 
 export type ReportTypeInput = "MONTHLY" | "QUARTERLY";
 export type ReportStatusInput = "DRAFT" | "PUBLISHED";
@@ -88,12 +149,20 @@ function validateReportPayload(
     return { ok: false, error: "분기 형식이 올바르지 않습니다. (예: 2026-Q1)" };
   }
 
-  // 공통: 수치 데이터 필수
-  if (typeof totalInvestedKrw !== "number" || totalInvestedKrw < 0) {
-    return { ok: false, error: "총 투자금을 입력해주세요." };
-  }
-  if (typeof totalCurrentKrw !== "number" || totalCurrentKrw < 0) {
-    return { ok: false, error: "총 평가금을 입력해주세요." };
+  // 분기별: 환율·총액 필수 (월별은 null 허용)
+  if (type === "QUARTERLY") {
+    if (typeof totalInvestedKrw !== "number" || totalInvestedKrw < 0) {
+      return { ok: false, error: "총 투자금을 입력해주세요." };
+    }
+    if (typeof totalCurrentKrw !== "number" || totalCurrentKrw < 0) {
+      return { ok: false, error: "총 평가금을 입력해주세요." };
+    }
+    if (typeof payload.usdRate !== "number" || payload.usdRate < 0) {
+      return { ok: false, error: "USD/KRW 환율을 입력해주세요." };
+    }
+    if (typeof payload.jpyRate !== "number" || payload.jpyRate < 0) {
+      return { ok: false, error: "JPY/KRW 환율을 입력해주세요." };
+    }
   }
 
   // MONTHLY: 신규 투입금 행 검증 (입금·출금(음수) 허용, 0만 불가)
@@ -141,6 +210,7 @@ function validateReportPayload(
     }
     if (type === "QUARTERLY") {
       if (!(summary || "").trim()) return { ok: false, error: "분기 시장 요약을 입력해주세요." };
+      if (!(journal || "").trim()) return { ok: false, error: "느낀 점을 입력해주세요." };
       if (!(strategy || "").trim()) return { ok: false, error: "다음 분기 전략을 입력해주세요." };
       if (!(earningsReview || "").trim()) return { ok: false, error: "어닝/실적 리뷰를 입력해주세요." };
     }
@@ -189,10 +259,11 @@ export interface CreateReportPayload {
   profile?: string;
   status?: ReportStatusInput;  // DRAFT: 임시저장, PUBLISHED: 작성 완료
   periodLabel: string;
-  usdRate: number;
-  jpyRate: number;
-  totalInvestedKrw: number;
-  totalCurrentKrw: number;
+  /** 월별 리포트는 null 저장 가능. 분기별은 필수(검증에서 확인). */
+  usdRate?: number | null;
+  jpyRate?: number | null;
+  totalInvestedKrw?: number | null;
+  totalCurrentKrw?: number | null;
   summary?: string;
   journal?: string;
   strategy?: string;
@@ -203,22 +274,32 @@ export interface CreateReportPayload {
     sector?: string;
     logoUrl?: string | null;
     role?: AssetRole;
-    accountType: "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
+    accountType: "US_DIRECT" | "KR_DIRECT" | "ISA" | "JP_DIRECT" | "PENSION" | "CASH";
     originalCurrency: "USD" | "KRW" | "JPY";
     originalAmount: number;
     krwAmount: number;
   }[];
   newInvestments?: {
-    accountType: "US_DIRECT" | "ISA" | "JP_DIRECT" | "CASH";
+    accountType: "US_DIRECT" | "KR_DIRECT" | "ISA" | "JP_DIRECT" | "PENSION" | "CASH";
     originalCurrency: "USD" | "KRW" | "JPY";
     originalAmount: number;
     krwAmount: number;
   }[];
+  /** 첫 분기(또는 초기 원금 미기록) 작성 시 계좌별 초기 원금 — 서버에서 조건 충족 시에만 저장 */
+  initialCapitalByAccount?: Partial<Record<InitialCapitalAccountType, number>>;
 }
 
 // ── 리포트 생성 ────────────────────────────────────────────
 export async function createReport(payload: CreateReportPayload) {
-  const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
+  const {
+    portfolioItems,
+    newInvestments = [],
+    earningsReview,
+    profile,
+    status: statusInput,
+    initialCapitalByAccount,
+    ...rest
+  } = payload;
 
   const status: ReportStatusInput = statusInput ?? "DRAFT";
   const validation = validateReportPayload({ ...payload, status }, status);
@@ -227,6 +308,20 @@ export async function createReport(payload: CreateReportPayload) {
   }
 
   const profileValue = profile || "AlphA Holdings Portfolio";
+
+  const reportData = {
+    ...rest,
+    usdRate: rest.usdRate ?? null,
+    jpyRate: rest.jpyRate ?? null,
+    totalInvestedKrw: rest.totalInvestedKrw ?? null,
+    totalCurrentKrw: rest.totalCurrentKrw ?? null,
+  };
+  if (payload.type === "MONTHLY") {
+    reportData.usdRate = null;
+    reportData.jpyRate = null;
+    reportData.totalInvestedKrw = null;
+    reportData.totalCurrentKrw = null;
+  }
 
   const createData = {
     ...reportData,
@@ -251,216 +346,45 @@ export async function createReport(payload: CreateReportPayload) {
     include,
   });
 
-  revalidatePath("/");
-  revalidatePath("/monthly");
-  revalidatePath("/quarterly");
-  return report;
-}
-
-/** 분기 말월(3·6·9·12월) 월별 리포트의 총 평가금 — 분기 작성 시 동기화 비교용 */
-export async function getQuarterEndMonthMonthlyValuationForSync(
-  profile: string,
-  year: number,
-  quarter: number,
-): Promise<{
-  reportId: number;
-  totalCurrentKrw: number;
-  periodLabel: string;
-  monthNumber: number;
-} | null> {
-  const label = quarterEndMonthPeriodLabel(year, quarter);
-  const r = await prisma.report.findFirst({
-    where: { profile, type: "MONTHLY", periodLabel: label },
-    select: { id: true, totalCurrentKrw: true, periodLabel: true },
-  });
-  if (!r) return null;
-  return {
-    reportId: r.id,
-    totalCurrentKrw: r.totalCurrentKrw,
-    periodLabel: r.periodLabel,
-    monthNumber: quarter * 3,
-  };
-}
-
-/**
- * 분기 리포트(PUBLISHED) 저장 + 선택 시 같은 트랜잭션에서 분기 말월 월별 리포트의 totalCurrentKrw 갱신
- */
-export async function createQuarterlyPublishedWithMonthValuationSync(
-  payload: CreateReportPayload,
-  syncMonthEndReportId?: number,
-) {
-  const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
-
-  const status: ReportStatusInput = statusInput ?? "DRAFT";
-  if (payload.type !== "QUARTERLY" || status !== "PUBLISHED") {
-    throw new Error("분기 리포트 작성 완료(PUBLISHED) 저장에만 사용할 수 있습니다.");
+  if (payload.type === "QUARTERLY") {
+    await upsertAccountInitialCapitalsIfApplicable(
+      prisma,
+      profileValue,
+      report.id,
+      initialCapitalByAccount,
+    );
   }
-
-  const validation = validateReportPayload({ ...payload, status }, status);
-  if (!validation.ok) {
-    throw new Error(validation.error);
-  }
-
-  const profileValue = profile || "AlphA Holdings Portfolio";
-  const periodMatch = /^(\d{4})-Q([1-4])$/.exec(payload.periodLabel.trim());
-  if (!periodMatch) {
-    throw new Error("분기 형식이 올바르지 않습니다.");
-  }
-  const y = Number(periodMatch[1]);
-  const q = Number(periodMatch[2]);
-  const expectedMonthLabel = quarterEndMonthPeriodLabel(y, q);
-
-  const createData = {
-    ...reportData,
-    status: status as ReportStatus,
-    profile: profileValue,
-    earningsReview: earningsReview || null,
-    portfolioItems: {
-      create: portfolioItems,
-    },
-    newInvestments:
-      newInvestments.length > 0
-        ? {
-            create: newInvestments,
-          }
-        : undefined,
-  };
-
-  const include = { portfolioItems: true as const, newInvestments: true as const };
-
-  const report = await prisma.$transaction(async (tx) => {
-    const created = await tx.report.create({
-      data: createData,
-      include,
-    });
-
-    if (syncMonthEndReportId != null) {
-      const monthly = await tx.report.findFirst({
-        where: {
-          id: syncMonthEndReportId,
-          profile: profileValue,
-          type: "MONTHLY",
-        },
-      });
-      if (!monthly) {
-        throw new Error("연동할 월별 리포트를 찾을 수 없습니다.");
-      }
-      if (monthly.periodLabel !== expectedMonthLabel) {
-        throw new Error("선택한 월별 리포트가 이 분기의 말월 리포트와 일치하지 않습니다.");
-      }
-      await tx.report.update({
-        where: { id: syncMonthEndReportId },
-        data: { totalCurrentKrw: payload.totalCurrentKrw },
-      });
-    }
-
-    return created;
-  });
 
   revalidatePath("/");
   revalidatePath("/monthly");
   revalidatePath("/quarterly");
-  if (syncMonthEndReportId != null) {
-    revalidatePath(`/reports/${syncMonthEndReportId}`);
-    revalidatePath(`/reports/${syncMonthEndReportId}/edit`);
-  }
-  return report;
-}
-
-/**
- * 분기 리포트(PUBLISHED) 수정 + 선택 시 같은 트랜잭션에서 분기 말월 월별 리포트의 totalCurrentKrw 갱신
- */
-export async function updateQuarterlyPublishedWithMonthValuationSync(
-  quarterlyReportId: number,
-  payload: CreateReportPayload,
-  syncMonthEndReportId?: number,
-) {
-  const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
-
-  const status: ReportStatusInput = statusInput ?? "DRAFT";
-  if (payload.type !== "QUARTERLY" || status !== "PUBLISHED") {
-    throw new Error("분기 리포트 작성 완료(PUBLISHED) 수정에만 사용할 수 있습니다.");
-  }
-
-  const validation = validateReportPayload({ ...payload, status }, status);
-  if (!validation.ok) {
-    throw new Error(validation.error);
-  }
-
-  const profileValue = profile || "AlphA Holdings Portfolio";
-  const periodMatch = /^(\d{4})-Q([1-4])$/.exec(payload.periodLabel.trim());
-  if (!periodMatch) {
-    throw new Error("분기 형식이 올바르지 않습니다.");
-  }
-  const y = Number(periodMatch[1]);
-  const q = Number(periodMatch[2]);
-  const expectedMonthLabel = quarterEndMonthPeriodLabel(y, q);
-
-  const report = await prisma.$transaction(async (tx) => {
-    await tx.portfolioItem.deleteMany({ where: { reportId: quarterlyReportId } });
-    await tx.newInvestment.deleteMany({ where: { reportId: quarterlyReportId } });
-
-    const updatedReport = await tx.report.update({
-      where: { id: quarterlyReportId },
-      data: {
-        ...reportData,
-        status: status as ReportStatus,
-        profile: profile || undefined,
-        earningsReview: earningsReview || null,
-        portfolioItems: {
-          create: portfolioItems,
-        },
-        newInvestments:
-          newInvestments.length > 0
-            ? {
-                create: newInvestments,
-              }
-            : undefined,
-      },
-      include: {
-        portfolioItems: true,
-        newInvestments: true,
-      },
-    });
-
-    if (syncMonthEndReportId != null) {
-      const monthly = await tx.report.findFirst({
-        where: {
-          id: syncMonthEndReportId,
-          profile: profileValue,
-          type: "MONTHLY",
-        },
-      });
-      if (!monthly) {
-        throw new Error("연동할 월별 리포트를 찾을 수 없습니다.");
-      }
-      if (monthly.periodLabel !== expectedMonthLabel) {
-        throw new Error("선택한 월별 리포트가 이 분기의 말월 리포트와 일치하지 않습니다.");
-      }
-      await tx.report.update({
-        where: { id: syncMonthEndReportId },
-        data: { totalCurrentKrw: payload.totalCurrentKrw },
-      });
-    }
-
-    return updatedReport;
-  });
-
-  revalidatePath("/");
-  revalidatePath("/monthly");
-  revalidatePath("/quarterly");
-  revalidatePath(`/reports/${quarterlyReportId}`);
-  revalidatePath(`/reports/${quarterlyReportId}/edit`);
-  if (syncMonthEndReportId != null) {
-    revalidatePath(`/reports/${syncMonthEndReportId}`);
-    revalidatePath(`/reports/${syncMonthEndReportId}/edit`);
-  }
   return report;
 }
 
 // ── 리포트 전체 수정 (포트폴리오 아이템 포함) ──────────────────────────────
 export async function updateReportFull(id: number, payload: CreateReportPayload) {
-  const { portfolioItems, newInvestments = [], earningsReview, profile, status: statusInput, ...reportData } = payload;
+  const {
+    portfolioItems,
+    newInvestments = [],
+    earningsReview,
+    profile,
+    status: statusInput,
+    initialCapitalByAccount: _initialCapitalIgnored,
+    ...rest
+  } = payload;
+  const reportData = {
+    ...rest,
+    usdRate: rest.usdRate ?? null,
+    jpyRate: rest.jpyRate ?? null,
+    totalInvestedKrw: rest.totalInvestedKrw ?? null,
+    totalCurrentKrw: rest.totalCurrentKrw ?? null,
+  };
+  if (payload.type === "MONTHLY") {
+    reportData.usdRate = null;
+    reportData.jpyRate = null;
+    reportData.totalInvestedKrw = null;
+    reportData.totalCurrentKrw = null;
+  }
 
   const status: ReportStatusInput = statusInput ?? "DRAFT";
   const validation = validateReportPayload({ ...payload, status }, status);

@@ -1,3 +1,22 @@
+/**
+ * 리포트 periodLabel을 구간 끝 시점으로 정렬·비교하기 위한 Date.
+ * 월별(YYYY-MM): 해당 월 말일. 분기(YYYY-Qn): 해당 분기 말일.
+ */
+export function parseReportPeriodEndDate(periodLabel: string): Date {
+  if (/^\d{4}-\d{2}$/.test(periodLabel)) {
+    const [year, month] = periodLabel.split("-").map(Number);
+    return new Date(year, month, 0);
+  }
+  if (/^\d{4}-Q[1-4]$/.test(periodLabel)) {
+    const [yearStr, quarterStr] = periodLabel.split("-Q");
+    const year = Number(yearStr);
+    const quarter = Number(quarterStr);
+    const monthIndex = quarter * 3;
+    return new Date(year, monthIndex, 0);
+  }
+  return new Date();
+}
+
 /** "2026-03" → "2026-02" */
 export function getPreviousMonthPeriodLabel(periodLabel: string): string | null {
   if (!/^\d{4}-\d{2}$/.test(periodLabel)) return null;

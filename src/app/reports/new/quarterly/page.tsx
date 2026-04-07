@@ -722,7 +722,7 @@ export default function NewQuarterlyReportPage() {
     if (!mounted) return null;
 
     return (
-        <div className="mx-auto max-w-2xl px-4 py-12">
+        <div className="mx-auto max-w-2xl px-4 py-8 md:py-12">
             {/* Header */}
             <div className="mb-10 space-y-6">
                 {/* Top bar: Type selector */}
@@ -992,13 +992,13 @@ export default function NewQuarterlyReportPage() {
             </section>
 
             {/* 저장 버튼 */}
-            <div className="flex justify-end gap-3 pb-16">
+            <div className="flex flex-col-reverse gap-3 pb-8 sm:flex-row sm:justify-end md:pb-16">
                 <button
                     type="button"
                     onClick={() => handleSubmit(true)}
                     disabled={isSubmitting || syncModal !== null}
                     className={[
-                        "relative inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5",
+                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-6 py-3.5 sm:w-auto",
                         "text-sm font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
                         "transition-all duration-200",
                         isSubmitting
@@ -1013,7 +1013,7 @@ export default function NewQuarterlyReportPage() {
                     onClick={() => handleSubmit(false)}
                     disabled={isSubmitting || syncModal !== null}
                     className={[
-                        "relative inline-flex items-center gap-2.5 rounded-2xl px-8 py-3.5",
+                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 sm:w-auto",
                         "text-sm font-semibold tracking-tight text-white shadow-lg",
                         "transition-all duration-200",
                         isSubmitting

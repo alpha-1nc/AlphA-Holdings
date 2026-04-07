@@ -3,22 +3,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Home, PenLine, Settings, Moon, Sun, BarChart2, TrendingUp, FileSearch } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/components/layout/theme-provider";
 import clsx from "clsx";
 import { useState } from "react";
 import logo from "@assets/logo.png";
 import logoDark from "@assets/logo-dark.png";
 import { useLogoHomeCinematic } from "@/components/layout/logo-home-cinematic";
-
-const navItems = [
-    { href: "/", icon: Home, label: "홈" },
-    { href: "/monthly", icon: BarChart2, label: "월별 리포트" },
-    { href: "/quarterly", icon: TrendingUp, label: "분기별 리포트" },
-    { href: "/analysis", icon: FileSearch, label: "투자 분석" },
-    { href: "/reports/new", icon: PenLine, label: "새 리포트" },
-    { href: "/settings", icon: Settings, label: "설정" },
-];
+import { MobileTopHeader } from "@/components/layout/mobile-top-header";
+import { MAIN_NAV_ITEMS } from "@/lib/nav-items";
 
 interface NavIconButtonProps {
     href: string;
@@ -35,13 +28,25 @@ function NavIconButton({ href, icon: Icon, label, isActive }: NavIconButtonProps
             <Link
                 href={href}
                 aria-label={label}
+                aria-current={isActive ? "page" : undefined}
                 onMouseEnter={() => setHovered(true)}
                 onMouseLeave={() => setHovered(false)}
                 className={clsx(
                     "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
                     isActive
-                        ? "bg-neutral-100 text-neutral-900 dark:bg-white/12 dark:text-white shadow-sm"
-                        : "text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 hover:-translate-y-0.5 dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-neutral-200"
+                        ? [
+                              "bg-neutral-100 text-neutral-900",
+                              "ring-1 ring-neutral-200/90 shadow-sm shadow-neutral-900/[0.06]",
+                              "dark:bg-white/12 dark:text-white",
+                              "dark:ring-white/20 dark:shadow-[0_1px_4px_rgba(0,0,0,0.55),inset_0_1px_0_0_rgba(255,255,255,0.07)]",
+                          ]
+                        : [
+                              "text-neutral-400 ring-1 ring-transparent",
+                              "hover:-translate-y-0.5 hover:bg-neutral-100 hover:text-neutral-800",
+                              "hover:ring-neutral-200/70 hover:shadow-sm hover:shadow-neutral-900/[0.05]",
+                              "dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-neutral-200",
+                              "dark:hover:ring-white/12 dark:hover:shadow-[0_1px_3px_rgba(0,0,0,0.45)]",
+                          ]
                 )}
             >
                 <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -74,7 +79,13 @@ export function TopNavbar() {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-neutral-200/60 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-950/85">
             {logoHomePortal}
-            <div className="mx-auto flex h-[68px] max-w-screen-2xl items-center justify-between px-5 md:px-10">
+            <div className="mx-auto max-w-screen-2xl px-4 md:px-10">
+                {/* 모바일 전용: 좌 로고 · 가운데 메뉴 아이콘+제목 · 우 프로필 */}
+                <div className="md:hidden">
+                    <MobileTopHeader onLogoClick={startLogoHome} />
+                </div>
+
+                <div className="hidden h-[68px] items-center justify-between md:flex">
                 {/* Logo + Brand — 클릭 시 시네마틱 홈 전환 */}
                 <button
                     type="button"
@@ -111,9 +122,9 @@ export function TopNavbar() {
                     </span>
                 </button>
 
-                {/* Icon Navigation */}
-                <nav className="flex items-center gap-0.5 md:gap-1.5">
-                    {navItems.map(({ href, icon, label }) => {
+                {/* Icon Navigation — 데스크톱만 상단 아이콘 줄; 모바일은 하단 탭 */}
+                <nav className="hidden items-center gap-0.5 md:flex md:gap-1.5">
+                    {MAIN_NAV_ITEMS.map(({ href, icon, label }) => {
                         const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
                         return (
                             <NavIconButton
@@ -138,8 +149,10 @@ export function TopNavbar() {
                             onMouseLeave={() => setThemeHovered(false)}
                             className={clsx(
                                 "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
-                                "text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 hover:-translate-y-0.5",
-                                "dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-neutral-200"
+                                "ring-1 ring-transparent hover:-translate-y-0.5",
+                                theme === "dark"
+                                    ? "text-amber-400 hover:bg-amber-500/15 hover:text-amber-300 hover:ring-amber-400/30 hover:shadow-[0_1px_4px_rgba(0,0,0,0.45)]"
+                                    : "text-violet-600 hover:bg-violet-100 hover:text-violet-700 hover:ring-violet-300/55 hover:shadow-sm hover:shadow-violet-900/10"
                             )}
                         >
                             {theme === "dark" ? (
@@ -164,6 +177,7 @@ export function TopNavbar() {
                         </div>
                     </div>
                 </nav>
+                </div>
             </div>
         </header>
     );

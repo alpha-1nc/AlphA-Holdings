@@ -29,17 +29,19 @@ export async function GET() {
         ];
 
         const rows = reports.map((r) => {
+            const inv = r.totalInvestedKrw;
+            const cur = r.totalCurrentKrw;
             const 수익률 =
-                r.totalInvestedKrw > 0
-                    ? (((r.totalCurrentKrw - r.totalInvestedKrw) / r.totalInvestedKrw) * 100).toFixed(2)
+                inv != null && cur != null && inv > 0
+                    ? (((cur - inv) / inv) * 100).toFixed(2)
                     : "-";
 
             return [
                 r.createdAt.toISOString().slice(0, 10),
                 escapeCsvField(r.periodLabel),
                 r.type,
-                r.totalInvestedKrw.toFixed(2),
-                r.totalCurrentKrw.toFixed(2),
+                inv != null ? inv.toFixed(2) : "",
+                cur != null ? cur.toFixed(2) : "",
                 수익률,
                 escapeCsvField(r.profile),
                 r.status,

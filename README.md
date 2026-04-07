@@ -70,6 +70,14 @@ npm run dev
 
 - **데이터베이스 파일**: `prisma/dev.db`는 로컬에만 저장되며 Git에 커밋되지 않습니다.
 - **환경 변수**: `.env` 파일은 절대 커밋하지 마세요. `.env.example`을 참고하세요.
+- **GitHub 토큰**: `git remote` URL에 토큰을 넣지 마세요. `https://github.com/...` 형태만 사용하고, 푸시 시 macOS 키체인·Git Credential Manager·SSH 키로 인증합니다. 예전에 URL에 넣었던 토큰은 [GitHub → Settings → Developer settings](https://github.com/settings/tokens)에서 **즉시 폐기**하세요.
+- **Pre-commit 훅**: 이 저장소를 클론한 뒤 한 번 실행하면, 커밋에 `ghp_` / `github_pat_` 패턴이 섞이는 것을 막습니다.
+
+```bash
+npm run git:hooks
+```
+
+- **배포(Vercel 등)**: API 키·`DATABASE_URL`은 호스팅 콘솔의 **Environment Variables**에만 넣고, 저장소에는 넣지 않습니다. 코드 변경 후 배포하면 콘솔에 설정한 값이 그대로 적용됩니다.
 
 ## 라이선스
 

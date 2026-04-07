@@ -20,12 +20,12 @@ export function ProfileSegmentedControl({
     const activeIndex = Math.max(0, SEGMENTS.findIndex((s) => s.id === value));
 
     return (
-        <div className="w-full rounded-full bg-neutral-200/95 p-1.5 ring-1 ring-neutral-300/80 dark:bg-neutral-800/95 dark:ring-0">
+        <div className="w-full rounded-full bg-neutral-200/95 p-1 ring-1 ring-neutral-300/80 dark:bg-neutral-800/95 dark:ring-0 md:p-1.5">
             <div className="relative flex w-full">
                 <motion.div
                     layout
                     layoutDependency={value}
-                    className="pointer-events-none absolute inset-y-0 left-0 z-0 w-1/2 rounded-full bg-white shadow-lg ring-1 ring-black/5 dark:bg-neutral-600/95 dark:shadow-black/40 dark:ring-0"
+                    className="pointer-events-none absolute inset-y-0 left-0 z-0 w-1/2 rounded-full bg-white shadow-md ring-1 ring-black/5 dark:bg-neutral-600/95 dark:shadow-black/40 dark:ring-0 md:shadow-lg"
                     initial={false}
                     animate={{
                         x: activeIndex === 0 ? 0 : "100%",
@@ -45,7 +45,7 @@ export function ProfileSegmentedControl({
                             type="button"
                             onClick={() => onChange(seg.id)}
                             className={
-                                "relative z-10 flex min-h-[44px] flex-1 items-center justify-center rounded-full px-6 py-3 text-center text-sm font-semibold leading-snug transition-colors " +
+                                "relative z-10 flex min-h-[38px] flex-1 items-center justify-center rounded-full px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition-colors md:min-h-[44px] md:px-6 md:py-3 md:text-sm md:leading-snug " +
                                 (isActive
                                     ? "text-neutral-900 dark:text-neutral-50"
                                     : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200")

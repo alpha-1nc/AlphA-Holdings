@@ -1,7 +1,11 @@
 import type { PortfolioItem } from "@/generated/prisma";
 import type { PortfolioStrategy } from "@/generated/prisma";
-import type { AssetRole } from "@/generated/prisma";
+import type { AccountType, AssetRole } from "@/generated/prisma";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
+import {
+  ACCOUNT_GROUPS,
+  type AccountGroupKey,
+} from "@/lib/accountGroups";
 
 export type RoleKey = AssetRole | "UNASSIGNED";
 
@@ -18,6 +22,7 @@ export interface RoleAllocationItem {
 /** 종목별 목표 대비 괴리율 (기능 B) */
 export interface TickerDeviationItem {
   ticker: string;
+  accountType: AccountType;
   displayLabel: string;
   targetWeight: number;
   actualWeight: number;
@@ -45,7 +50,8 @@ export const ROLE_COLORS: Record<RoleKey, string> = {
 
 const CASH_TICKER_PATTERNS = /^(KRW|USD|JPY|EUR|GBP|CNY|CASH|현금)$/i;
 
-function isCashLike(item: PortfolioItem): boolean {
+/** 도넛·비중 계산 등에서 현금/현금성 행 식별 */
+export function isCashLikePortfolioItem(item: PortfolioItem): boolean {
   const t = (item.ticker ?? "").trim();
   const n = (item as { name?: string }).name ?? "";
   if (!t && !n) return false;
@@ -59,13 +65,17 @@ function isCashLike(item: PortfolioItem): boolean {
   );
 }
 
+function strategyCompositeKey(ticker: string, accountType: AccountType): string {
+  return `${ticker.trim().toUpperCase()}|${accountType}`;
+}
+
 /**
  * 기능 A: 역할군 비중 — 최신 리포트의 PortfolioItem만 사용, Strategy 테이블 미참조.
  * 각 아이템의 role 값 기준으로 실제 비중(%)을 그룹화하여 반환. (도넛 차트용)
  */
 export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationItem[] {
   const nonCashItems = items.filter(
-    (i) => i.accountType !== "CASH" && i.krwAmount > 0 && !isCashLike(i),
+    (i) => i.accountType !== "CASH" && i.krwAmount > 0 && !isCashLikePortfolioItem(i),
   );
   const totalKrw = nonCashItems.reduce((s, i) => s + i.krwAmount, 0);
 
@@ -118,44 +128,92 @@ export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationIte
 }
 
 /**
- * 기능 B: 종목별 목표 대비 괴리율.
- * PortfolioStrategy(목표 포트폴리오)의 개별 종목을 기준으로,
- * 최신 리포트 PortfolioItem의 실제 비중을 매핑.
- * 실제 보유율이 0%인 목표 종목도 포함.
+ * 계좌 그룹별 목표 대비 괴리율 (최신 리포트 PortfolioItem 기준, 그룹 내 총액 대비 비중).
+ * 해당 그룹에 보유 종목이 없으면 빈 배열.
+ */
+export function computeTickerDeviationsByAccountGroups(
+  items: PortfolioItem[],
+  strategies: PortfolioStrategy[],
+): Record<AccountGroupKey, TickerDeviationItem[]> {
+  const strategyMap = new Map<string, PortfolioStrategy>();
+  for (const s of strategies) {
+    strategyMap.set(
+      strategyCompositeKey(s.ticker, s.accountType),
+      s,
+    );
+  }
+
+  const result = {} as Record<AccountGroupKey, TickerDeviationItem[]>;
+  const groupKeys = Object.keys(ACCOUNT_GROUPS) as AccountGroupKey[];
+
+  for (const groupKey of groupKeys) {
+    const types = ACCOUNT_GROUPS[groupKey];
+    const rawItems = items.filter(
+      (i) =>
+        i.accountType !== "CASH" &&
+        i.krwAmount > 0 &&
+        (types as readonly AccountType[]).includes(i.accountType),
+    );
+
+    if (rawItems.length === 0) {
+      result[groupKey] = [];
+      continue;
+    }
+
+    const merged = new Map<
+      string,
+      { ticker: string; accountType: AccountType; krwAmount: number; displayName: string | null | undefined }
+    >();
+    for (const i of rawItems) {
+      const k = strategyCompositeKey(i.ticker, i.accountType);
+      const prev = merged.get(k);
+      const displayName = (i as { displayName?: string | null }).displayName;
+      merged.set(k, {
+        ticker: i.ticker,
+        accountType: i.accountType,
+        krwAmount: (prev?.krwAmount ?? 0) + i.krwAmount,
+        displayName: prev?.displayName ?? displayName,
+      });
+    }
+
+    const totalKrw = [...merged.values()].reduce((s, x) => s + x.krwAmount, 0);
+
+    const mergedSorted = [...merged.values()].sort((a, b) => b.krwAmount - a.krwAmount);
+    const rows: TickerDeviationItem[] = [];
+    for (const row of mergedSorted) {
+      const sk = strategyCompositeKey(row.ticker, row.accountType);
+      const strat = strategyMap.get(sk);
+      const targetWeight = strat?.targetWeight ?? 0;
+      const actualWeight =
+        totalKrw > 0 ? (row.krwAmount / totalKrw) * 100 : 0;
+      const diff = actualWeight - targetWeight;
+      const displayLabel = getPortfolioItemDisplayLabel({
+        ticker: row.ticker,
+        displayName: strat?.displayName ?? row.displayName,
+      });
+      rows.push({
+        ticker: row.ticker,
+        accountType: row.accountType,
+        displayLabel,
+        targetWeight,
+        actualWeight,
+        diff,
+      });
+    }
+
+    result[groupKey] = rows;
+  }
+
+  return result;
+}
+
+/**
+ * 기능 B: 종목별 목표 대비 괴리율 (AI·호환용 — 전체 그룹 결과를 평탄화).
  */
 export function computeTickerDeviation(
   items: PortfolioItem[],
   strategies: PortfolioStrategy[],
 ): TickerDeviationItem[] {
-  const nonCashItems = items.filter(
-    (i) => i.accountType !== "CASH" && i.krwAmount > 0,
-  );
-  const totalKrw = nonCashItems.reduce((s, i) => s + i.krwAmount, 0);
-
-  // 실제 비중: 티커별 krwAmount 합산 (동일 종목 여러 계좌 보유 시 합산)
-  const actualKrwByTicker = new Map<string, number>();
-  for (const item of nonCashItems) {
-    const key = item.ticker.trim().toUpperCase();
-    const current = actualKrwByTicker.get(key) ?? 0;
-    actualKrwByTicker.set(key, current + item.krwAmount);
-  }
-
-  return strategies.map((s) => {
-    const ticker = s.ticker.trim().toUpperCase();
-    const targetWeight = s.targetWeight ?? 0;
-    const actualKrw = actualKrwByTicker.get(ticker) ?? 0;
-    const actualWeight =
-      totalKrw > 0 ? (actualKrw / totalKrw) * 100 : 0;
-    const diff = actualWeight - targetWeight;
-    return {
-      ticker: s.ticker,
-      displayLabel: getPortfolioItemDisplayLabel({
-        ticker: s.ticker,
-        displayName: (s as { displayName?: string | null }).displayName,
-      }),
-      targetWeight,
-      actualWeight,
-      diff,
-    };
-  });
+  const byGroup = computeTickerDeviationsByAccountGroups(items, strategies);
+  return [...byGroup.직투, ...byGroup.ISA, ...byGroup.연금저축];
 }

@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { getCurrentProfile, setCurrentProfile, type WorkspaceProfile } from "@/lib/profile";
-import { Settings } from "lucide-react";
+import { Moon, Settings, Sun } from "lucide-react";
 import { getAppVersion } from "@/lib/version";
 import { PageMainTitle } from "@/components/layout/page-main-title";
 import { PortfolioStrategyManager } from "@/components/settings/PortfolioStrategyManager";
 import { ProfileSegmentedControl } from "@/components/settings/profile-segmented-control";
+import { useTheme } from "@/components/layout/theme-provider";
+import clsx from "clsx";
 
 export default function SettingsPage() {
     const [profile, setProfile] = useState<WorkspaceProfile>("alpha-ceo");
     const [mounted, setMounted] = useState(false);
+    const { theme, toggleTheme } = useTheme();
 
     useEffect(() => {
         setMounted(true);
@@ -32,6 +36,68 @@ export default function SettingsPage() {
             <div className="mb-12">
                 <PageMainTitle icon={Settings}>Settings</PageMainTitle>
             </div>
+
+            {/* ── Section: 화면 (모바일만 — 상단바 테마 토글이 없을 때) ───────── */}
+            <section className="mb-10 md:hidden">
+                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                    화면
+                </p>
+                <div className="w-full rounded-full bg-neutral-200/95 p-1 ring-1 ring-neutral-300/80 dark:bg-neutral-800/95 dark:ring-0 md:p-1.5">
+                    <div className="relative flex w-full">
+                        <motion.div
+                            layout
+                            layoutDependency={theme}
+                            className="pointer-events-none absolute inset-y-0 left-0 z-0 w-1/2 rounded-full bg-white shadow-md ring-1 ring-black/5 dark:bg-neutral-600/95 dark:shadow-black/40 dark:ring-0 md:shadow-lg"
+                            initial={false}
+                            animate={{
+                                x: theme === "light" ? 0 : "100%",
+                            }}
+                            transition={{
+                                type: "spring",
+                                stiffness: 520,
+                                damping: 38,
+                                mass: 0.8,
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => theme === "dark" && toggleTheme()}
+                            className={clsx(
+                                "relative z-10 flex min-h-[38px] flex-1 select-none items-center justify-center gap-2 rounded-full px-2 py-1.5 text-center text-[13px] font-semibold transition-colors active:opacity-90 md:min-h-[44px] md:px-4 md:text-sm",
+                                theme === "light"
+                                    ? "text-amber-400 dark:text-amber-300"
+                                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200",
+                            )}
+                            aria-pressed={theme === "light"}
+                        >
+                            <Sun
+                                className="h-4 w-4 shrink-0 text-inherit"
+                                strokeWidth={1.8}
+                                aria-hidden
+                            />
+                            라이트
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => theme === "light" && toggleTheme()}
+                            className={clsx(
+                                "relative z-10 flex min-h-[38px] flex-1 select-none items-center justify-center gap-2 rounded-full px-2 py-1.5 text-center text-[13px] font-semibold transition-colors active:opacity-90 md:min-h-[44px] md:px-4 md:text-sm",
+                                theme === "dark"
+                                    ? "text-violet-600 dark:text-violet-400"
+                                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200",
+                            )}
+                            aria-pressed={theme === "dark"}
+                        >
+                            <Moon
+                                className="h-4 w-4 shrink-0 text-inherit"
+                                strokeWidth={1.8}
+                                aria-hidden
+                            />
+                            다크
+                        </button>
+                    </div>
+                </div>
+            </section>
 
             {/* ── Section: Workspace Profile ─────────────────────────────── */}
             <section className="mb-10">

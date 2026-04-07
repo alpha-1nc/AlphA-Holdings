@@ -1,0 +1,15 @@
+#!/bin/sh
+# Staged additions에 GitHub Personal Access Token 패턴이 들어가면 커밋을 막습니다.
+set -e
+
+if git diff --cached -p 2>/dev/null | grep -E '^\+.*ghp_[A-Za-z0-9]{20,}' >/dev/null 2>&1; then
+  printf '%s\n' "커밋 거부: GitHub classic PAT(ghp_...) 패턴이 스테이징된 추가 줄에 있습니다." >&2
+  exit 1
+fi
+
+if git diff --cached -p 2>/dev/null | grep -E '^\+.*github_pat_[A-Za-z0-9_]{20,}' >/dev/null 2>&1; then
+  printf '%s\n' "커밋 거부: GitHub fine-grained PAT(github_pat_...) 패턴이 스테이징된 추가 줄에 있습니다." >&2
+  exit 1
+fi
+
+exit 0

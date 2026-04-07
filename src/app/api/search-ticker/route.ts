@@ -982,6 +982,8 @@ function getRegionFilter(accountType: string | null): RegionFilter {
     switch (accountType) {
         case "US_DIRECT": return "US";
         case "ISA": return "KR";
+        case "KR_DIRECT": return "KR";
+        case "PENSION": return "KR";
         case "JP_DIRECT": return "JP";
         default: return "all";
     }
