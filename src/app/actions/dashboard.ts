@@ -2,13 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { parseReportPeriodEndDate } from "@/lib/report-period";
-import {
-  calcAccountCapital,
-  sumPortfolioValueKrwForAccounts,
-  sumNewInvestmentsForAccounts,
-} from "@/lib/calcCapital";
+import { calcAccountCapital, sumNewInvestmentsForAccounts } from "@/lib/calcCapital";
 import {
   accountTypesForDashboardGroup,
+  sumPortfolioValueKrwForDashboardGroup,
   type DashboardAccountGroupFilter,
 } from "@/lib/accountGroups";
 import { computeGainKrw, computeReturnRatePercent } from "@/lib/report-performance";
@@ -83,7 +80,7 @@ export async function getDashboardQuarterlyMetrics(
       }
     }
     const totalInvested = initialSum + cumulativeNew;
-    const totalCurrent = sumPortfolioValueKrwForAccounts(q.portfolioItems, accountTypes);
+    const totalCurrent = sumPortfolioValueKrwForDashboardGroup(q.portfolioItems, group);
     const profit = computeGainKrw(totalCurrent, totalInvested);
     const returnRate = computeReturnRatePercent(totalCurrent, totalInvested);
     return {
@@ -101,9 +98,9 @@ export async function getDashboardQuarterlyMetrics(
     accountTypes,
     profileLabel
   );
-  const totalCurrentSummary = sumPortfolioValueKrwForAccounts(
+  const totalCurrentSummary = sumPortfolioValueKrwForDashboardGroup(
     latestQuarter.portfolioItems,
-    accountTypes
+    group
   );
   const profit = computeGainKrw(totalCurrentSummary, totalInvestedSummary);
   const returnRate = computeReturnRatePercent(totalCurrentSummary, totalInvestedSummary);

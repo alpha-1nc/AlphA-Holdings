@@ -25,6 +25,10 @@ import {
     ACCOUNT_GROUPS,
     type AccountGroupKey,
     accountTypesForDashboardGroup,
+    cashBelongsToDashboardGroup,
+    isIsaCashHint,
+    isPensionCashHint,
+    portfolioItemsForDashboardGroup,
     type DashboardAccountGroupFilter,
 } from "@/lib/accountGroups";
 import { getDashboardQuarterlyMetrics } from "@/app/actions/dashboard";
@@ -65,35 +69,6 @@ const GROUP_QUERY_VALUE: Record<DashboardAccountGroupFilter, string | null> = {
     연금저축: "연금저축",
 };
 
-/** 분기 리포트 현금 행(DB accountType CASH) — displayName/ticker로 ISA·연금 구분 보조 */
-function isIsaCashHint(item: PortfolioItem): boolean {
-    const t = `${item.displayName ?? ""} ${item.ticker ?? ""}`.toUpperCase();
-    return t.includes("ISA");
-}
-
-function isPensionCashHint(item: PortfolioItem): boolean {
-    const t = `${item.displayName ?? ""} ${item.ticker ?? ""}`;
-    return t.includes("연금") || t.toUpperCase().includes("PENSION");
-}
-
-/**
- * 대시보드 계좌 필터와 연동 — DB에는 현금이 accountType CASH로만 저장되므로
- * 통화·표시명 힌트로 그룹을 나눕니다. (ACCOUNT_GROUPS와 동일한 그룹 키)
- */
-function cashBelongsToDashboardGroup(
-    item: PortfolioItem,
-    group: DashboardAccountGroupFilter,
-): boolean {
-    if (item.accountType !== "CASH") return false;
-    if (group === "all") return true;
-    if (group === "ISA") return isIsaCashHint(item);
-    if (group === "연금저축") return isPensionCashHint(item);
-    if (group === "직투") {
-        return !isIsaCashHint(item) && !isPensionCashHint(item);
-    }
-    return false;
-}
-
 function cashSliceLabelForItem(
     item: PortfolioItem,
     group: DashboardAccountGroupFilter
@@ -112,14 +87,6 @@ function cashSliceLabelForItem(
         return "KRW 현금";
     }
     return "현금";
-}
-
-function portfolioItemsForGroup(
-    items: PortfolioItem[],
-    group: DashboardAccountGroupFilter
-): PortfolioItem[] {
-    const types = accountTypesForDashboardGroup(group);
-    return items.filter((i) => types.includes(i.accountType));
 }
 
 /* ── Empty State ─────────────────────────────────────────────────────────*/
@@ -754,7 +721,7 @@ export function DashboardPageClient() {
     const latestQuarterly = quarterlyReports[quarterlyReports.length - 1];
 
     const itemsScopedForRole = latestQuarterly
-        ? portfolioItemsForGroup(latestQuarterly.portfolioItems, group)
+        ? portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group)
         : [];
 
     const roleAllocationData = latestQuarterly
@@ -766,7 +733,7 @@ export function DashboardPageClient() {
             ? null
             : group === "all"
               ? latestQuarterly.portfolioItems
-              : portfolioItemsForGroup(latestQuarterly.portfolioItems, group);
+              : portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group);
 
     const deviationByGroup =
         itemsForDeviation != null && strategies.length > 0

@@ -1,4 +1,5 @@
 import { AccountType } from "@/generated/prisma";
+import type { PortfolioItem } from "@/generated/prisma";
 
 export const ACCOUNT_GROUPS = {
   직투: [AccountType.US_DIRECT, AccountType.KR_DIRECT, AccountType.JP_DIRECT],
@@ -52,4 +53,54 @@ export function getGroupKey(accountType: AccountType): AccountGroupKey | null {
     }
   }
   return null;
+}
+
+/** 분기 리포트 현금 행(DB accountType CASH) — displayName/ticker로 ISA·연금 구분 보조 */
+export function isIsaCashHint(item: PortfolioItem): boolean {
+  const t = `${item.displayName ?? ""} ${item.ticker ?? ""}`.toUpperCase();
+  return t.includes("ISA");
+}
+
+export function isPensionCashHint(item: PortfolioItem): boolean {
+  const t = `${item.displayName ?? ""} ${item.ticker ?? ""}`;
+  return t.includes("연금") || t.toUpperCase().includes("PENSION");
+}
+
+/**
+ * 대시보드 계좌 필터와 연동 — DB에는 현금이 accountType CASH로만 저장되므로
+ * 통화·표시명 힌트로 그룹을 나눕니다.
+ */
+export function cashBelongsToDashboardGroup(
+  item: PortfolioItem,
+  group: DashboardAccountGroupFilter,
+): boolean {
+  if (item.accountType !== "CASH") return false;
+  if (group === "all") return true;
+  if (group === "ISA") return isIsaCashHint(item);
+  if (group === "연금저축") return isPensionCashHint(item);
+  if (group === "직투") {
+    return !isIsaCashHint(item) && !isPensionCashHint(item);
+  }
+  return false;
+}
+
+/** 필터 그룹에 속하는 포트폴리오 행(종목 + 해당 그룹에 포함되는 현금) */
+export function portfolioItemsForDashboardGroup(
+  items: PortfolioItem[],
+  group: DashboardAccountGroupFilter,
+): PortfolioItem[] {
+  const types = accountTypesForDashboardGroup(group);
+  return items.filter((i) => {
+    if (i.krwAmount <= 0) return false;
+    if (i.accountType === "CASH") return cashBelongsToDashboardGroup(i, group);
+    return types.includes(i.accountType);
+  });
+}
+
+/** 대시보드 상단·분기 추이용 총 평가금(현금 포함, 그룹 필터 반영) */
+export function sumPortfolioValueKrwForDashboardGroup(
+  items: PortfolioItem[],
+  group: DashboardAccountGroupFilter,
+): number {
+  return portfolioItemsForDashboardGroup(items, group).reduce((s, i) => s + i.krwAmount, 0);
 }

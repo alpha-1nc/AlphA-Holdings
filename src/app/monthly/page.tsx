@@ -5,11 +5,7 @@ import Link from "next/link";
 import { FileText, BarChart2 } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
-import { getTickerColor } from "@/constants/brandColors";
-import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
-import { deriveMonthlyIntervalPerformance } from "@/lib/report-performance";
-import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
 import { PageMainTitle } from "@/components/layout/page-main-title";
 
 type ReportWithItems = Report & { 
@@ -24,22 +20,14 @@ const krw = (n: number) =>
         maximumFractionDigits: 0,
     }).format(n);
 
-function ReportCard({
-    report,
-    intervalGainKrw,
-    intervalReturnRatePercent,
-}: {
-    report: ReportWithItems;
-    intervalGainKrw: number;
-    intervalReturnRatePercent: number;
-}) {
-    const isPositive = intervalGainKrw >= 0;
-    const returnRate = intervalReturnRatePercent;
-    const total = report.totalCurrentKrw ?? 0;
+function sumNewInvestmentKrw(report: ReportWithItems): number {
+    const rows = report.newInvestments ?? [];
+    return rows.reduce((s, inv) => s + (inv.krwAmount ?? 0), 0);
+}
+
+function ReportCard({ report }: { report: ReportWithItems }) {
     const isDraft = (report as Report & { status?: string }).status === "DRAFT";
-    const barItems = sortPortfolioItemsForDisplay(
-        report.portfolioItems.filter((i) => i.krwAmount > 0),
-    );
+    const newInvSum = sumNewInvestmentKrw(report);
 
     return (
         <Link href={`/reports/${report.id}`} className="group block">
@@ -48,88 +36,37 @@ function ReportCard({
                     ? "border-amber-200/70 opacity-90 hover:opacity-100 dark:border-amber-800/50"
                     : "border-neutral-100 hover:border-neutral-200 hover:ring-neutral-200/70 dark:border-neutral-800 dark:hover:border-neutral-700"
             }`}>
-                {/* Top accent bar */}
-                <div className={`absolute inset-x-0 top-0 h-[3px] ${isPositive ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500"}`} />
+                <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-neutral-300 via-neutral-400 to-neutral-500 dark:from-neutral-600 dark:via-neutral-500 dark:to-neutral-600" />
 
                 <div className="p-5 pt-6">
-                    {/* Header row */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
-                                    {new Date(report.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })}
-                                </p>
-                                {isDraft && (
-                                    <span className="rounded-full border border-amber-300/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-600/40 dark:bg-amber-900/30 dark:text-amber-400">
-                                        임시저장
-                                    </span>
-                                )}
-                            </div>
-                            <h3 className={`mt-0.5 text-base font-semibold tracking-tight ${isDraft ? "text-neutral-600 dark:text-neutral-400" : "text-neutral-900 dark:text-white"}`}>
-                                {report.periodLabel}
-                            </h3>
+                    <div className="mb-3">
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
+                                {new Date(report.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })}
+                            </p>
+                            {isDraft && (
+                                <span className="rounded-full border border-amber-300/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-600/40 dark:bg-amber-900/30 dark:text-amber-400">
+                                    임시저장
+                                </span>
+                            )}
                         </div>
-                        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${isPositive
-                            ? "border-emerald-300/40 bg-emerald-50/70 text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-900/40 dark:text-emerald-400"
-                            : "border-red-300/40 bg-red-50/70 text-red-600 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-400"
-                            }`}>
-                            {isPositive ? "+" : ""}{returnRate.toFixed(2)}%
-                        </span>
+                        <h3 className={`mt-0.5 text-base font-semibold tracking-tight ${isDraft ? "text-neutral-600 dark:text-neutral-400" : "text-neutral-900 dark:text-white"}`}>
+                            {report.periodLabel}
+                        </h3>
                     </div>
 
-                    {/* Summary text */}
                     {report.summary && (
                         <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
                             {report.summary}
                         </p>
                     )}
 
-                    {/* Financials */}
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">평가금</p>
-                            <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">{krw(total)}</p>
-                        </div>
-                        <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">당월 수익금</p>
-                            <p className={`mt-0.5 text-sm font-semibold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                                {isPositive ? "+" : ""}{krw(intervalGainKrw)}
-                            </p>
-                        </div>
+                    <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
+                        <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">이번 달 신규 투자금 합계</p>
+                        <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white tabular-nums">
+                            {newInvSum === 0 ? "—" : krw(newInvSum)}
+                        </p>
                     </div>
-
-                    {/* Portfolio mini bar */}
-                    {barItems.length > 0 && total > 0 && (
-                        <div>
-                            <div className="flex h-1.5 w-full overflow-hidden rounded-full">
-                                {barItems.map((item, idx) => (
-                                        <div
-                                            key={item.id}
-                                            style={{
-                                                width: `${(item.krwAmount / total) * 100}%`,
-                                                background: getTickerColor(item.ticker, idx),
-                                            }}
-                                        />
-                                    ))}
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-                                {barItems
-                                    .slice(0, 5)
-                                    .map((item, idx) => (
-                                        <span key={item.id} className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-                                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: getTickerColor(item.ticker, idx) }} />
-                                            {getPortfolioItemDisplayLabel({
-                                                ticker: item.ticker,
-                                                displayName: item.displayName,
-                                            })}
-                                        </span>
-                                    ))}
-                                {barItems.length > 5 && (
-                                    <span className="text-[10px] text-neutral-400">+{barItems.length - 5}</span>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
         </Link>
@@ -195,18 +132,9 @@ export default function MonthlyReportPage() {
                         </span>
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {reports.map((report, index) => {
-                            const { intervalGainKrw, intervalReturnRatePercent } =
-                                deriveMonthlyIntervalPerformance(reports, index);
-                            return (
-                                <ReportCard
-                                    key={report.id}
-                                    report={report}
-                                    intervalGainKrw={intervalGainKrw}
-                                    intervalReturnRatePercent={intervalReturnRatePercent}
-                                />
-                            );
-                        })}
+                        {reports.map((report) => (
+                            <ReportCard key={report.id} report={report} />
+                        ))}
                     </div>
                 </div>
             ) : (

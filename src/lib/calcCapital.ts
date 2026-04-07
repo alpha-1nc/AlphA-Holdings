@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { AccountType } from "@/generated/prisma";
-import type { NewInvestment, PortfolioItem } from "@/generated/prisma";
+import type { NewInvestment } from "@/generated/prisma";
 
 function sumNewInvestmentsForAccounts(
   investments: NewInvestment[] | undefined | null,
@@ -40,24 +40,6 @@ export async function calcAccountCapital(
   const investSum = investments.reduce((sum, i) => sum + i.krwAmount, 0);
 
   return initialSum + investSum;
-}
-
-/**
- * 계좌별 현재 평가금: PortfolioItem 중 accountTypes에 포함되며 CASH 계좌 유형은 제외
- * (현금은 도넛 등에서 별도 처리)
- */
-export function sumPortfolioValueKrwForAccounts(
-  items: PortfolioItem[],
-  accountTypes: AccountType[]
-): number {
-  return items
-    .filter(
-      (i) =>
-        accountTypes.includes(i.accountType) &&
-        i.accountType !== "CASH" &&
-        i.krwAmount > 0
-    )
-    .reduce((sum, i) => sum + i.krwAmount, 0);
 }
 
 export { sumNewInvestmentsForAccounts };
