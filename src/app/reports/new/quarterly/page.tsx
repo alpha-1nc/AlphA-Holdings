@@ -484,6 +484,7 @@ export default function NewQuarterlyReportPage() {
     const [earningsReview, setEarningsReview] = useState("");
     const [strategy, setStrategy] = useState("");
     const [summary, setSummary] = useState("");
+    const [feedback, setFeedback] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
     const addCashRow = useCallback(() => setRows((prev) => [...prev, newCashRow()]), []);
@@ -520,7 +521,7 @@ export default function NewQuarterlyReportPage() {
         totalInvestedKrw: Math.round(Math.max(0, parseNumber(principalInput))),
         totalCurrentKrw: totalValuation,
         summary,
-        journal: "",
+        journal: feedback,
         strategy,
         earningsReview,
         portfolioItems: validRows.map((r) => {
@@ -869,6 +870,15 @@ export default function NewQuarterlyReportPage() {
                         placeholder="이번 분기 거시 경제 흐름, 금리/환율 변화, 주요 이벤트 등을 기록하세요."
                         value={summary}
                         onChange={setSummary}
+                        rows={6}
+                    />
+                    <JournalField
+                        id="journal-feedback"
+                        label="느낀 점"
+                        sublabel="Feedback"
+                        placeholder="이번 분기 투자를 통해 배운 점, 아쉬웠던 점, 감정적으로 느낀 것들을 솔직하게 적어보세요."
+                        value={feedback}
+                        onChange={setFeedback}
                         rows={6}
                     />
                     <JournalField
