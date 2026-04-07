@@ -7,23 +7,10 @@ import { toast } from "sonner";
 import { Lock, Unlock } from "lucide-react";
 import {
     getReportById,
-    getQuarterEndMonthMonthlyValuationForSync,
+    getPreviousMonthEndPrincipalKrw,
     updateReportFull,
-    updateQuarterlyPublishedWithMonthValuationSync,
-    getPreviousMonthMonthlyReportPrincipalState,
-    getQuarterEndPrincipalFromMonthlyReports,
-    sumMonthlyNewInvestmentsInQuarterKrw,
     type CreateReportPayload,
 } from "@/app/actions/reports";
-import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import { computeGainKrw, computeReturnRatePercent } from "@/lib/report-performance";
 import { sortPortfolioFormRowsByDisplay } from "@/lib/portfolio-display-order";
 import {
@@ -652,7 +639,6 @@ export default function EditReportPage() {
     const [overridePrincipal, setOverridePrincipal] = useState(false);
 
     const [principalKrw, setPrincipalKrw] = useState<number | null>(null);
-    const [principalLoading, setPrincipalLoading] = useState(false);
 
     const [currentValuationRaw, setCurrentValuationRaw] = useState("");
     const [summary, setSummary] = useState("");
@@ -660,16 +646,8 @@ export default function EditReportPage() {
     const [strategy, setStrategy] = useState("");
     const [earningsReview, setEarningsReview] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [syncModal, setSyncModal] = useState<null | {
-        payload: CreateReportPayload;
-        monthEndReportId: number;
-        monthlyTotal: number;
-        quarterlyTotal: number;
-        monthNumber: number;
-    }>(null);
     const [rows, setRows] = useState<PortfolioRow[]>([newRow()]);
     const [newInvestmentRows, setNewInvestmentRows] = useState<NewInvestmentRow[]>([]);
-    const [quarterNewInvFromMonthly, setQuarterNewInvFromMonthly] = useState(0);
 
     useEffect(() => {
         if (!report) return;
@@ -694,10 +672,11 @@ export default function EditReportPage() {
             });
             setNewInvestmentRows(initialNew);
             const newSum = (report.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0);
-            const derivedBase = report.totalInvestedKrw - newSum;
+            const derivedBase = (report.totalInvestedKrw ?? 0) - newSum;
             setManualPrincipalRaw(String(Math.round(derivedBase)));
             setOverridePrincipal(false);
             setRows([newRow()]);
+            setPrincipalKrw(null);
         } else {
             const initialRows: PortfolioRow[] = (report.portfolioItems || []).map((item) => {
                 const oc = (item.originalCurrency || "KRW") as string;
@@ -730,6 +709,7 @@ export default function EditReportPage() {
             });
             setRows(initialRows.length > 0 ? initialRows : [newRow()]);
             setNewInvestmentRows([]);
+            setPrincipalKrw(report.totalInvestedKrw);
         }
     }, [report]);
 
@@ -746,45 +726,16 @@ export default function EditReportPage() {
         }
         let cancelled = false;
         setPrevLoading(true);
-        getPreviousMonthMonthlyReportPrincipalState(getProfileLabel(profile), period.trim()).then((s) => {
+        getPreviousMonthEndPrincipalKrw(getProfileLabel(profile), period.trim()).then((krw) => {
             if (cancelled) return;
-            setHasPreviousReport(s.hasPreviousReport);
-            setDbPrincipalPrev(s.totalInvestedKrw);
+            setHasPreviousReport(krw != null);
+            setDbPrincipalPrev(krw);
             setPrevLoading(false);
         });
         return () => {
             cancelled = true;
         };
     }, [period, profile, isMonthly]);
-
-    useEffect(() => {
-        if (!report || isMonthly) return;
-        const m = /^(\d{4})-Q([1-4])$/.exec(report.periodLabel);
-        if (!m) {
-            setPrincipalKrw(null);
-            setPrincipalLoading(false);
-            return;
-        }
-        let cancelled = false;
-        setPrincipalLoading(true);
-        getQuarterEndPrincipalFromMonthlyReports(getProfileLabel(profile), Number(m[1]), Number(m[2])).then((p) => {
-            if (cancelled) return;
-            setPrincipalKrw(p != null ? Math.round(p) : null);
-            setPrincipalLoading(false);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [report, isMonthly, profile]);
-
-    useEffect(() => {
-        if (!report || isMonthly) return;
-        const m = /^(\d{4})-Q([1-4])$/.exec(report.periodLabel);
-        if (!m) return;
-        sumMonthlyNewInvestmentsInQuarterKrw(getProfileLabel(profile), Number(m[1]), Number(m[2])).then(
-            setQuarterNewInvFromMonthly,
-        );
-    }, [report, isMonthly, profile]);
 
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
     const addCashRow = useCallback(() => setRows((prev) => [...prev, newCashRow()]), []);
@@ -1013,60 +964,11 @@ export default function EditReportPage() {
 
         setIsSubmitting(true);
         try {
-            const profileLabel = getProfileLabel(profile);
-            const monthSnap = await getQuarterEndMonthMonthlyValuationForSync(
-                profileLabel,
-                Number(qm[1]),
-                Number(qm[2]),
-            );
-            if (monthSnap && Math.round(totalValuation) !== Math.round(monthSnap.totalCurrentKrw)) {
-                setSyncModal({
-                    payload: qPayload,
-                    monthEndReportId: monthSnap.reportId,
-                    monthlyTotal: monthSnap.totalCurrentKrw,
-                    quarterlyTotal: totalValuation,
-                    monthNumber: monthSnap.monthNumber,
-                });
-                setIsSubmitting(false);
-                return;
-            }
             await updateReportFull(reportId, qPayload);
             toast.success("리포트가 성공적으로 수정되었습니다.");
             router.push(`/reports/${reportId}`);
         } catch (err) {
             console.error("[리포트 수정 오류]", err);
-            toast.error(err instanceof Error ? err.message : "수정 중 오류가 발생했습니다. 다시 시도해 주세요.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleSyncModalKeepExisting = async () => {
-        if (!syncModal) return;
-        setIsSubmitting(true);
-        try {
-            await updateReportFull(reportId, syncModal.payload);
-            toast.success("리포트가 성공적으로 수정되었습니다.");
-            setSyncModal(null);
-            router.push(`/reports/${reportId}`);
-        } catch (err) {
-            console.error("[리포트 수정 오류]", err);
-            toast.error(err instanceof Error ? err.message : "수정 중 오류가 발생했습니다. 다시 시도해 주세요.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleSyncModalSaveWithSync = async () => {
-        if (!syncModal) return;
-        setIsSubmitting(true);
-        try {
-            await updateQuarterlyPublishedWithMonthValuationSync(reportId, syncModal.payload, syncModal.monthEndReportId);
-            toast.success("리포트가 수정되었고, 말월 월별 리포트 총평가가 동기화되었습니다.");
-            setSyncModal(null);
-            router.push(`/reports/${reportId}`);
-        } catch (err) {
-            console.error("[리포트 동기화 수정 오류]", err);
             toast.error(err instanceof Error ? err.message : "수정 중 오류가 발생했습니다. 다시 시도해 주세요.");
         } finally {
             setIsSubmitting(false);
@@ -1358,25 +1260,27 @@ export default function EditReportPage() {
             {!isMonthly && (
                 <FormSection label="투자금 및 수익">
                     <FormRow
-                        label="이 분기 월별 신규 납입 합계"
-                        sublabel="월별 리포트에 기록된 신규 납입액 합계 (참고)"
-                    >
-                        <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
-                            {formatKRW(quarterNewInvFromMonthly)}
-                        </div>
-                    </FormRow>
-                    <FormRow
                         label="총 투자금 (원금)"
-                        sublabel="해당 분기 말월 월별 리포트의 말일 누적 원금(totalInvestedKrw)입니다. DB에서만 불러옵니다."
+                        sublabel="말일 누적 원금 기준(원화). 수익·수익률 계산에 사용됩니다."
                     >
-                        <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
-                            {principalLoading ? (
-                                <span className="text-neutral-400">불러오는 중…</span>
-                            ) : principalKrw != null ? (
-                                formatKRW(principalKrw)
-                            ) : (
-                                <span className="text-neutral-400">해당 말월 월별 리포트가 없습니다.</span>
-                            )}
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                value={principalKrw === null ? "" : String(Math.round(principalKrw))}
+                                onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (raw.trim() === "") {
+                                        setPrincipalKrw(null);
+                                        return;
+                                    }
+                                    const n = parseNumber(raw);
+                                    setPrincipalKrw(Number.isFinite(n) ? Math.round(n) : null);
+                                }}
+                                placeholder="예: 50000000"
+                                className={inputCls}
+                            />
+                            <span className="shrink-0 text-sm text-neutral-400">KRW</span>
                         </div>
                     </FormRow>
                     {(totalValuation > 0 || principalQuarter > 0) && (
@@ -1536,7 +1440,7 @@ export default function EditReportPage() {
                 <button
                     type="button"
                     onClick={() => handleSubmit(true)}
-                    disabled={isSubmitting || syncModal !== null}
+                    disabled={isSubmitting}
                     className={[
                         "relative inline-flex items-center gap-2.5 rounded-2xl px-6 py-3.5",
                         "text-sm font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
@@ -1551,7 +1455,7 @@ export default function EditReportPage() {
                 <button
                     type="button"
                     onClick={() => handleSubmit(false)}
-                    disabled={isSubmitting || syncModal !== null}
+                    disabled={isSubmitting}
                     className={[
                         "relative inline-flex items-center gap-2.5 rounded-2xl px-8 py-3.5",
                         "text-sm font-semibold tracking-tight text-white shadow-lg",
@@ -1584,47 +1488,6 @@ export default function EditReportPage() {
                 </button>
             </div>
 
-            <Dialog
-                open={syncModal !== null}
-                onOpenChange={(open) => {
-                    if (!open && !isSubmitting) setSyncModal(null);
-                }}
-            >
-                <DialogContent showCloseButton={false} className="sm:max-w-md">
-                    {syncModal && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>평가금액 동기화 안내</DialogTitle>
-                                <DialogDescription className="text-left text-neutral-600 dark:text-neutral-400">
-                                    계산된 분기 총 평가금({formatKRW(syncModal.quarterlyTotal)})과 기존{" "}
-                                    {syncModal.monthNumber}월 리포트에 기록된 총 평가금(
-                                    {formatKRW(syncModal.monthlyTotal)}) 간에 차이가 있습니다. 더 정밀한 환율과
-                                    종목 데이터가 반영된 현재 금액으로 {syncModal.monthNumber}월 리포트의 자산
-                                    총액을 업데이트하시겠습니까?
-                                </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter className="gap-2 sm:justify-end">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    disabled={isSubmitting}
-                                    onClick={handleSyncModalKeepExisting}
-                                >
-                                    기존 데이터 유지
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="default"
-                                    disabled={isSubmitting}
-                                    onClick={handleSyncModalSaveWithSync}
-                                >
-                                    {isSubmitting ? "저장 중…" : "동기화 후 저장"}
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

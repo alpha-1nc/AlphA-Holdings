@@ -7,21 +7,8 @@ import { toast } from "sonner";
 import { ArrowLeft } from "lucide-react";
 import {
     createReport,
-    createQuarterlyPublishedWithMonthValuationSync,
-    getQuarterEndMonthMonthlyValuationForSync,
-    getQuarterEndPrincipalFromMonthlyReports,
-    sumMonthlyNewInvestmentsInQuarterKrw,
     type CreateReportPayload,
 } from "@/app/actions/reports";
-import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from "@/components/ui/dialog";
 import { computeGainKrw, computeReturnRatePercent } from "@/lib/report-performance";
 import { sortPortfolioFormRowsByDisplay } from "@/lib/portfolio-display-order";
 import {
@@ -491,25 +478,13 @@ export default function NewQuarterlyReportPage() {
     const [quarter, setQuarter] = useState("");
     const [usdKrw, setUsdKrw] = useState("");
     const [jpyKrw, setJpyKrw] = useState("");
-    /** 분기 말월 월별 리포트의 totalInvestedKrw (DB, 읽기 전용) */
-    const [principalKrw, setPrincipalKrw] = useState<number | null>(null);
-    const [principalLoading, setPrincipalLoading] = useState(false);
+    /** 총 투자금(원금) — 수동 입력 */
+    const [principalInput, setPrincipalInput] = useState("");
     const [rows, setRows] = useState<PortfolioRow[]>([newRow()]);
     const [earningsReview, setEarningsReview] = useState("");
     const [strategy, setStrategy] = useState("");
     const [summary, setSummary] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    /** 작성 완료 시 분기 총평가 vs 말월 월별 총평가 불일치 → 사용자 선택 */
-    const [syncModal, setSyncModal] = useState<null | {
-        payload: CreateReportPayload;
-        monthEndReportId: number;
-        monthlyTotal: number;
-        quarterlyTotal: number;
-        monthNumber: number;
-    }>(null);
-    /** 해당 분기 월별 리포트 신규 납입 합계 (표시용) */
-    const [quarterNewInvFromMonthly, setQuarterNewInvFromMonthly] = useState(0);
-
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
     const addCashRow = useCallback(() => setRows((prev) => [...prev, newCashRow()]), []);
     const removeRow = useCallback((id: string) => setRows((prev) => prev.filter((r) => r.id !== id)), []);
@@ -527,43 +502,13 @@ export default function NewQuarterlyReportPage() {
     );
     const totalValuation = useMemo(() => rowKRWs.reduce((acc, v) => acc + v, 0), [rowKRWs]);
 
-    const principal = principalKrw ?? 0;
+    const principal = parseNumber(principalInput);
 
     const profit =
         principal > 0 && totalValuation >= 0 ? computeGainKrw(totalValuation, principal) : null;
     const profitRate =
         principal > 0 ? computeReturnRatePercent(totalValuation, principal) : null;
     const isPositive = profit !== null ? profit >= 0 : true;
-
-    useEffect(() => {
-        if (!year.trim() || !quarter.trim()) {
-            setPrincipalKrw(null);
-            setPrincipalLoading(false);
-            return;
-        }
-        const y = parseInt(year.trim(), 10);
-        const q = parseInt(quarter.trim(), 10);
-        if (isNaN(y) || isNaN(q) || q < 1 || q > 4) {
-            setPrincipalKrw(null);
-            setPrincipalLoading(false);
-            return;
-        }
-        let cancelled = false;
-        const label = getProfileLabel(profile);
-        setPrincipalLoading(true);
-        Promise.all([
-            getQuarterEndPrincipalFromMonthlyReports(label, y, q),
-            sumMonthlyNewInvestmentsInQuarterKrw(label, y, q),
-        ]).then(([p, s]) => {
-            if (cancelled) return;
-            setQuarterNewInvFromMonthly(s);
-            setPrincipalKrw(p != null ? Math.round(p) : null);
-            setPrincipalLoading(false);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [year, quarter, profile]);
 
     const buildQuarterlyPayload = (asDraft: boolean, yearNum: number, quarterNum: number, validRows: PortfolioRow[]): CreateReportPayload => ({
         type: "QUARTERLY",
@@ -572,7 +517,7 @@ export default function NewQuarterlyReportPage() {
         periodLabel: `${yearNum}-Q${quarterNum}`,
         usdRate,
         jpyRate,
-        totalInvestedKrw: principalKrw ?? 0,
+        totalInvestedKrw: Math.round(Math.max(0, parseNumber(principalInput))),
         totalCurrentKrw: totalValuation,
         summary,
         journal: "",
@@ -661,58 +606,13 @@ export default function NewQuarterlyReportPage() {
             return;
         }
 
-        // 작성 완료(PUBLISHED): 말월 월별 총평가와 비교
         setIsSubmitting(true);
         try {
-            const profileLabel = getProfileLabel(profile);
-            const monthSnap = await getQuarterEndMonthMonthlyValuationForSync(profileLabel, yearNum, quarterNum);
-            if (monthSnap && Math.round(totalValuation) !== Math.round(monthSnap.totalCurrentKrw)) {
-                setSyncModal({
-                    payload,
-                    monthEndReportId: monthSnap.reportId,
-                    monthlyTotal: monthSnap.totalCurrentKrw,
-                    quarterlyTotal: totalValuation,
-                    monthNumber: monthSnap.monthNumber,
-                });
-                setIsSubmitting(false);
-                return;
-            }
             await createReport(payload);
             toast.success("분기별 리포트가 저장되었습니다.");
             router.push("/");
         } catch (err) {
             console.error("[분기별 리포트 저장 오류]", err);
-            toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleSyncModalKeepExisting = async () => {
-        if (!syncModal) return;
-        setIsSubmitting(true);
-        try {
-            await createReport(syncModal.payload);
-            toast.success("분기별 리포트가 저장되었습니다.");
-            setSyncModal(null);
-            router.push("/");
-        } catch (err) {
-            console.error("[분기별 리포트 저장 오류]", err);
-            toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleSyncModalSaveWithSync = async () => {
-        if (!syncModal) return;
-        setIsSubmitting(true);
-        try {
-            await createQuarterlyPublishedWithMonthValuationSync(syncModal.payload, syncModal.monthEndReportId);
-            toast.success("분기 리포트가 저장되었고, 말월 월별 리포트 총평가가 동기화되었습니다.");
-            setSyncModal(null);
-            router.push("/");
-        } catch (err) {
-            console.error("[분기별 리포트 동기화 저장 오류]", err);
             toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
         } finally {
             setIsSubmitting(false);
@@ -904,27 +804,19 @@ export default function NewQuarterlyReportPage() {
             {/* Section 4: 투자금 및 수익 */}
             <FormSection label="투자금 및 수익">
                 <FormRow
-                    label="이 분기 월별 신규 납입 합계"
-                    sublabel="월별 리포트에만 입력한 신규 납입을 같은 분기에 합산합니다 (참고)"
-                >
-                    <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
-                        {formatKRW(quarterNewInvFromMonthly)}
-                    </div>
-                </FormRow>
-                <FormRow
                     label="총 투자금 (원금)"
-                    sublabel="해당 분기 말월(예: Q1 → 3월) 월별 리포트의 말일 누적 원금(totalInvestedKrw)입니다. DB에서만 불러옵니다."
+                    sublabel="말일 누적 원금 기준(원화). 수익·수익률 계산에 사용됩니다."
                 >
-                    <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700">
-                        {!year.trim() || !quarter.trim() ? (
-                            <span className="text-neutral-400">연도·분기를 선택하세요.</span>
-                        ) : principalLoading ? (
-                            <span className="text-neutral-400">불러오는 중…</span>
-                        ) : principalKrw != null ? (
-                            formatKRW(principalKrw)
-                        ) : (
-                            <span className="text-neutral-400">해당 말월 월별 리포트가 없습니다.</span>
-                        )}
+                    <div className="flex items-center gap-2">
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={principalInput}
+                            onChange={(e) => setPrincipalInput(e.target.value)}
+                            placeholder="예: 50000000"
+                            className={inputCls}
+                        />
+                        <span className="shrink-0 text-sm text-neutral-400">KRW</span>
                     </div>
                 </FormRow>
                 {(totalValuation > 0 || principal > 0) && (
@@ -996,7 +888,7 @@ export default function NewQuarterlyReportPage() {
                 <button
                     type="button"
                     onClick={() => handleSubmit(true)}
-                    disabled={isSubmitting || syncModal !== null}
+                    disabled={isSubmitting}
                     className={[
                         "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-6 py-3.5 sm:w-auto",
                         "text-sm font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
@@ -1011,7 +903,7 @@ export default function NewQuarterlyReportPage() {
                 <button
                     type="button"
                     onClick={() => handleSubmit(false)}
-                    disabled={isSubmitting || syncModal !== null}
+                    disabled={isSubmitting}
                     className={[
                         "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 sm:w-auto",
                         "text-sm font-semibold tracking-tight text-white shadow-lg",
@@ -1042,47 +934,6 @@ export default function NewQuarterlyReportPage() {
                 </button>
             </div>
 
-            <Dialog
-                open={syncModal !== null}
-                onOpenChange={(open) => {
-                    if (!open && !isSubmitting) setSyncModal(null);
-                }}
-            >
-                <DialogContent showCloseButton={false} className="sm:max-w-md">
-                    {syncModal && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle>평가금액 동기화 안내</DialogTitle>
-                                <DialogDescription className="text-left text-neutral-600 dark:text-neutral-400">
-                                    계산된 분기 총 평가금({formatKRW(syncModal.quarterlyTotal)})과 기존{" "}
-                                    {syncModal.monthNumber}월 리포트에 기록된 총 평가금(
-                                    {formatKRW(syncModal.monthlyTotal)}) 간에 차이가 있습니다. 더 정밀한 환율과
-                                    종목 데이터가 반영된 현재 금액으로 {syncModal.monthNumber}월 리포트의 자산
-                                    총액을 업데이트하시겠습니까?
-                                </DialogDescription>
-                            </DialogHeader>
-                            <DialogFooter className="gap-2 sm:justify-end">
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    disabled={isSubmitting}
-                                    onClick={handleSyncModalKeepExisting}
-                                >
-                                    기존 데이터 유지
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant="default"
-                                    disabled={isSubmitting}
-                                    onClick={handleSyncModalSaveWithSync}
-                                >
-                                    {isSubmitting ? "저장 중…" : "동기화 후 저장"}
-                                </Button>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

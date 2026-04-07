@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import clsx from "clsx";
 import logo from "@assets/logo.png";
 import logoDark from "@assets/logo-dark.png";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/profile";
 
 type MobileTopHeaderProps = {
-  onLogoClick: () => void;
+  onLogoClick: (e: MouseEvent<HTMLButtonElement>) => void;
 };
 
 /**

@@ -4,11 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { PrismaClient } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import type { AssetRole, ReportType, ReportStatus } from "@/generated/prisma";
-import {
-  getPreviousMonthPeriodLabel,
-  monthPeriodLabelsInQuarter,
-  quarterEndMonthPeriodLabel,
-} from "@/lib/report-period";
+import { getPreviousMonthPeriodLabel, monthPeriodLabelsInQuarter } from "@/lib/report-period";
 import { INITIAL_CAPITAL_ACCOUNT_TYPES, type InitialCapitalAccountType } from "@/lib/initial-capital";
 
 type DbForInitialCapital = Pick<PrismaClient, "profile" | "report" | "accountInitialCapital">;
@@ -446,31 +442,6 @@ export async function getPreviousMonthEndPrincipalKrw(profile: string, currentMo
   if (!prev) return null;
   const r = await prisma.report.findFirst({
     where: { profile, type: "MONTHLY", periodLabel: prev },
-    select: { totalInvestedKrw: true },
-  });
-  return r?.totalInvestedKrw ?? null;
-}
-
-/** 직전 월 리포트 존재 여부 + 말일 누적 원금 (최초 작성 vs 연속 구분용) */
-export async function getPreviousMonthMonthlyReportPrincipalState(
-  profile: string,
-  currentMonthlyPeriodLabel: string,
-): Promise<{ hasPreviousReport: boolean; totalInvestedKrw: number | null }> {
-  const prev = getPreviousMonthPeriodLabel(currentMonthlyPeriodLabel);
-  if (!prev) return { hasPreviousReport: false, totalInvestedKrw: null };
-  const r = await prisma.report.findFirst({
-    where: { profile, type: "MONTHLY", periodLabel: prev },
-    select: { totalInvestedKrw: true },
-  });
-  if (!r) return { hasPreviousReport: false, totalInvestedKrw: null };
-  return { hasPreviousReport: true, totalInvestedKrw: r.totalInvestedKrw };
-}
-
-/** 분기 말 월(3·6·9·12월) 월별 리포트의 누적 원금 — 분기 원금 기준으로 사용 */
-export async function getQuarterEndPrincipalFromMonthlyReports(profile: string, year: number, quarter: number) {
-  const label = quarterEndMonthPeriodLabel(year, quarter);
-  const r = await prisma.report.findFirst({
-    where: { profile, type: "MONTHLY", periodLabel: label },
     select: { totalInvestedKrw: true },
   });
   return r?.totalInvestedKrw ?? null;

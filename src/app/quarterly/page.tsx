@@ -35,7 +35,7 @@ function ReportCard({
 }) {
     const isPositive = intervalGainKrw >= 0;
     const returnRate = intervalReturnRatePercent;
-    const total = report.totalCurrentKrw;
+    const total = report.totalCurrentKrw ?? 0;
     const isDraft = (report as Report & { status?: string }).status === "DRAFT";
     const barItems = sortPortfolioItemsForDisplay(
         report.portfolioItems.filter((i) => i.krwAmount > 0),
@@ -84,7 +84,7 @@ function ReportCard({
                     <div className="grid grid-cols-2 gap-2 mb-4">
                         <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
                             <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">평가금</p>
-                            <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">{krw(report.totalCurrentKrw)}</p>
+                            <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">{krw(total)}</p>
                         </div>
                         <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
                             <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">분기 수익금</p>
