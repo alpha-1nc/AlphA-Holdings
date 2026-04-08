@@ -259,10 +259,9 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                         {editingId ? "목표 수정" : "종목 목표 추가"}
                     </p>
 
-                    <div className="flex flex-wrap items-end gap-2 lg:flex-nowrap lg:gap-1.5 xl:gap-2 lg:overflow-x-auto lg:pb-0.5 lg:pl-0.5">
-                        {/* Ticker — 검색(미국·한국·일본 통합) 또는 수정 시 읽기 전용
-                            lg에서 flex-1+min-w-0만 두면 나머지 shrink-0 컬럼에 밀려 입력칸이 ~100px까지 줄어듦 → 최소 너비 확보 */}
-                        <div className="flex w-full min-w-0 basis-full flex-col gap-1 lg:basis-auto lg:flex-1 lg:min-w-[min(100%,16rem)]">
+                    <div className="flex min-w-0 flex-wrap items-end gap-2 lg:flex-nowrap lg:gap-1.5 xl:gap-2">
+                        {/* Ticker — 남은 폭을 차지하고 min-w-0으로 한 줄 레이아웃에서 가로 스크롤 없이 축소 가능 */}
+                        <div className="flex w-full min-w-0 basis-full flex-col gap-1 lg:basis-auto lg:flex-1 lg:min-w-0">
                             <label className="whitespace-nowrap text-xs text-neutral-400 dark:text-neutral-500">
                                 종목 심볼
                             </label>

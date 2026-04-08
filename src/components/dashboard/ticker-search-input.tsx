@@ -315,9 +315,9 @@ export function TickerSearchInput({
 
     return (
         <>
-        <div ref={wrapRef} className="relative z-0 w-full">
+        <div ref={wrapRef} className="relative z-0 min-w-0 w-full">
             {/* Input row */}
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-2">
                 {selectedMeta && value === selectedMeta.symbol && (
                     <TickerLogo symbol={selectedMeta.symbol} region={selectedMeta.region} size={22} />
                 )}
@@ -336,7 +336,7 @@ export function TickerSearchInput({
                         }
                     }}
                     onKeyDown={handleKeyDown}
-                    className="w-full rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none ring-1 ring-neutral-200/80 transition placeholder:text-neutral-300 focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700 dark:placeholder:text-neutral-600 dark:focus:ring-neutral-500"
+                    className="min-w-0 w-full rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none ring-1 ring-neutral-200/80 transition placeholder:text-neutral-300 focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700 dark:placeholder:text-neutral-600 dark:focus:ring-neutral-500"
                 />
             </div>
         </div>
