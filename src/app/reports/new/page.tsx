@@ -232,7 +232,7 @@ export default function NewMonthlyReportPage() {
                 }),
             });
             toast.success(asDraft ? "임시 저장되었습니다." : "월별 리포트가 저장되었습니다.");
-            router.push(asDraft ? "/monthly" : "/");
+            router.push("/monthly");
         } catch (err) {
             console.error("[월별 리포트 저장 오류]", err);
             toast.error(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");

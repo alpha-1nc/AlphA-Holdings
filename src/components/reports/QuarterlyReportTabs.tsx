@@ -15,7 +15,7 @@ export function QuarterlyReportTabs({
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/80">
+            <div className="inline-flex w-fit flex-wrap gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800/80">
                 <button
                     type="button"
                     onClick={() => setTab("overview")}
@@ -38,7 +38,7 @@ export function QuarterlyReportTabs({
                             : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200",
                     ].join(" ")}
                 >
-                    회고 · Journal
+                    주식 일지
                 </button>
             </div>
             {tab === "overview" ? overview : journal}
