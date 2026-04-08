@@ -20,55 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-/** 미국 주요 종목 — 클라이언트 검색용 (외부 검색 API 없음) */
-const POPULAR_TICKERS: readonly { symbol: string; name: string }[] = [
-  { symbol: "AAPL", name: "Apple Inc." },
-  { symbol: "MSFT", name: "Microsoft Corporation" },
-  { symbol: "GOOGL", name: "Alphabet Inc. (Class A)" },
-  { symbol: "GOOG", name: "Alphabet Inc. (Class C)" },
-  { symbol: "AMZN", name: "Amazon.com Inc." },
-  { symbol: "NVDA", name: "NVIDIA Corporation" },
-  { symbol: "META", name: "Meta Platforms Inc." },
-  { symbol: "TSLA", name: "Tesla Inc." },
-  { symbol: "BRK.B", name: "Berkshire Hathaway Inc." },
-  { symbol: "JPM", name: "JPMorgan Chase & Co." },
-  { symbol: "V", name: "Visa Inc." },
-  { symbol: "UNH", name: "UnitedHealth Group Inc." },
-  { symbol: "XOM", name: "Exxon Mobil Corporation" },
-  { symbol: "JNJ", name: "Johnson & Johnson" },
-  { symbol: "WMT", name: "Walmart Inc." },
-  { symbol: "MA", name: "Mastercard Inc." },
-  { symbol: "PG", name: "Procter & Gamble Co." },
-  { symbol: "LLY", name: "Eli Lilly and Company" },
-  { symbol: "AVGO", name: "Broadcom Inc." },
-  { symbol: "HD", name: "The Home Depot Inc." },
-  { symbol: "MRK", name: "Merck & Co. Inc." },
-  { symbol: "COST", name: "Costco Wholesale Corporation" },
-  { symbol: "PEP", name: "PepsiCo Inc." },
-  { symbol: "ABBV", name: "AbbVie Inc." },
-  { symbol: "KO", name: "The Coca-Cola Company" },
-  { symbol: "AMD", name: "Advanced Micro Devices" },
-  { symbol: "BAC", name: "Bank of America Corp." },
-  { symbol: "CRM", name: "Salesforce Inc." },
-  { symbol: "ORCL", name: "Oracle Corporation" },
-  { symbol: "NFLX", name: "Netflix Inc." },
-  { symbol: "DIS", name: "The Walt Disney Company" },
-  { symbol: "ADBE", name: "Adobe Inc." },
-  { symbol: "INTC", name: "Intel Corporation" },
-  { symbol: "CSCO", name: "Cisco Systems Inc." },
-  { symbol: "QCOM", name: "Qualcomm Inc." },
-  { symbol: "IBM", name: "International Business Machines" },
-  { symbol: "GE", name: "General Electric Company" },
-  { symbol: "CAT", name: "Caterpillar Inc." },
-  { symbol: "NOW", name: "ServiceNow Inc." },
-  { symbol: "PANW", name: "Palo Alto Networks Inc." },
-  { symbol: "SHOP", name: "Shopify Inc." },
-  { symbol: "COIN", name: "Coinbase Global Inc." },
-  { symbol: "PLTR", name: "Palantir Technologies Inc." },
-  { symbol: "MCD", name: "McDonald's Corporation" },
-  { symbol: "NKE", name: "Nike Inc." },
-];
-
 const TICKER_INPUT_RE = /^[A-Za-z][A-Za-z0-9.\-]{0,14}$/;
 
 function isValidTickerToken(s: string): boolean {
@@ -88,10 +39,48 @@ export default function AnalysisTickerModal({
   const [highlight, setHighlight] = useState(0);
   const [pending, startTransition] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [apiResults, setApiResults] = useState<
+    { symbol: string; name: string }[]
+  >([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const q = query.trim();
   const qUpper = q.toUpperCase();
-  const qLower = q.toLowerCase();
+
+  useEffect(() => {
+    if (!q) {
+      setApiResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    const ac = new AbortController();
+    const t = window.setTimeout(() => {
+      setSearchLoading(true);
+      fetch(`/api/search-ticker?q=${encodeURIComponent(q)}`, {
+        signal: ac.signal,
+      })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("search failed");
+          const data = (await res.json()) as {
+            results?: { symbol: string; name: string }[];
+          };
+          setApiResults(data.results ?? []);
+        })
+        .catch(() => {
+          if (!ac.signal.aborted) setApiResults([]);
+        })
+        .finally(() => {
+          if (!ac.signal.aborted) setSearchLoading(false);
+        });
+    }, 300);
+
+    return () => {
+      window.clearTimeout(t);
+      ac.abort();
+      setSearchLoading(false);
+    };
+  }, [q]);
 
   const rows = useMemo(() => {
     type Row =
@@ -107,21 +96,15 @@ export default function AnalysisTickerModal({
     const seen = new Set<string>();
     if (out[0]?.kind === "primary") seen.add(out[0].symbol);
 
-    const filtered = POPULAR_TICKERS.filter((t) => {
-      if (seen.has(t.symbol)) return false;
-      return (
-        t.symbol.includes(qUpper) ||
-        t.name.toLowerCase().includes(qLower)
-      );
-    }).slice(0, 12);
-
-    for (const t of filtered) {
+    for (const t of apiResults) {
+      if (out.length >= 1 + 12) break;
+      if (seen.has(t.symbol)) continue;
       seen.add(t.symbol);
       out.push({ kind: "suggest", symbol: t.symbol, name: t.name });
     }
 
     return out;
-  }, [q, qLower, qUpper]);
+  }, [q, qUpper, apiResults]);
 
   useEffect(() => {
     setHighlight(0);
@@ -248,9 +231,11 @@ export default function AnalysisTickerModal({
           >
             {rows.length === 0 ? (
               <li className="px-4 py-8 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                {q
-                  ? "일치하는 제안이 없습니다. 영문 티커를 입력한 뒤 Enter로 분석을 시작할 수 있습니다."
-                  : "티커 또는 회사명을 입력하세요."}
+                {!q
+                  ? "티커 또는 회사명을 입력하세요."
+                  : searchLoading
+                    ? "검색 중…"
+                    : "일치하는 제안이 없습니다. 영문 티커를 입력한 뒤 Enter로 분석을 시작할 수 있습니다."}
               </li>
             ) : (
               rows.map((row, i) => {

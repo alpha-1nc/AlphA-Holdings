@@ -24,6 +24,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { TickerSearchInput, type TickerSearchChangeMeta } from "@/components/dashboard/ticker-search-input";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import {
@@ -63,6 +64,8 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
     const [role, setRole] = useState<AssetRole>("CORE");
     const [targetWeight, setTargetWeight] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
+    /** 수정 중인 행의 계좌 유형 — strategies.find 대신 고정해 upsert 키가 어긋나지 않게 함 */
+    const [editingAccountType, setEditingAccountType] = useState<AccountType | null>(null);
     /** 직투 탭 종목 추가 시에만 사용 */
     const [directAccountType, setDirectAccountType] = useState<AccountType>("US_DIRECT");
 
@@ -93,6 +96,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
     function handleEdit(strategy: PortfolioStrategy) {
         setEditingId(strategy.id);
+        setEditingAccountType(strategy.accountType);
         setTicker(strategy.ticker);
         setStrategyDisplayName(strategy.displayName ?? null);
         setRole(strategy.role);
@@ -105,6 +109,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
     function handleCancelEdit() {
         setEditingId(null);
+        setEditingAccountType(null);
         setTicker("");
         setStrategyDisplayName(null);
         setRole("CORE");
@@ -118,8 +123,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
         const trimmedTicker = ticker.trim().toUpperCase();
         const weight = parseFloat(targetWeight);
         const accountType = editingId
-            ? (strategies.find((s) => s.id === editingId)?.accountType ??
-              defaultAccountTypeForTab(activeTab))
+            ? (editingAccountType ?? defaultAccountTypeForTab(activeTab))
             : defaultAccountTypeForTab(activeTab);
 
         if (!trimmedTicker) {
@@ -163,7 +167,8 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                 );
                 handleCancelEdit();
                 await loadStrategies();
-            } catch {
+            } catch (err) {
+                console.error("[목표 포트폴리오 저장]", err);
                 toast.error("저장 중 오류가 발생했습니다.");
             }
         });
@@ -341,15 +346,20 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             <label className="text-xs text-neutral-400 dark:text-neutral-500">
                                 목표 비중 (%)
                             </label>
-                            <Input
-                                type="number"
-                                min="0.01"
-                                max="100"
-                                step="0.01"
+                            {/* 네이티브 input: Base UI Input(FieldControl)의 controlled 고정 ref 이슈로 편집 시 값이 갱신되지 않는 경우 방지 */}
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                autoComplete="off"
+                                name="targetWeight"
                                 value={targetWeight}
                                 onChange={(e) => setTargetWeight(e.target.value)}
                                 placeholder="10.00"
-                                className="h-9 w-[4.5rem] text-sm tabular-nums lg:w-20"
+                                className={cn(
+                                    "h-9 w-[4.5rem] min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm tabular-nums",
+                                    "outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                                    "lg:w-20 dark:bg-input/30",
+                                )}
                             />
                         </div>
 

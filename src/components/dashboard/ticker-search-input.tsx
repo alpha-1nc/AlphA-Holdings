@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Globe } from "lucide-react";
 
 import { getTickerDomain } from "@/lib/ticker-metadata";
@@ -83,8 +84,8 @@ export type TickerSearchChangeMeta = {
 
 /* ══════════════════════════════════════════════════════════════════════════
    TickerSearchInput
-   - Portal 없음: 부모가 overflow:visible 이어야 함
-   - 드롭다운은 absolute로 input 바로 아래 렌더링
+   - 드롭다운은 Portal + position:fixed 로 렌더 (부모 overflow:hidden 에 안 가림)
+   - 뷰포트 기준 위/아래 자동 배치 및 max-height 조정
    - 여러 번 검색 가능, accountType 변경 시 자동 초기화
 ══════════════════════════════════════════════════════════════════════════ */
 interface TickerSearchInputProps {
@@ -115,13 +116,26 @@ export function TickerSearchInput({
     const [selectedMeta, setSelectedMeta] = useState<{ symbol: string; region: string } | null>(null);
 
     const wrapRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const [mounted, setMounted] = useState(false);
+    const [dropdownLayout, setDropdownLayout] = useState<{
+        top?: number;
+        bottom?: number;
+        left: number;
+        width: number;
+        maxHeight: number;
+    } | null>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     // 현재 진행 중인 fetch를 취소하기 위한 AbortController
     const abortRef = useRef<AbortController | null>(null);
     // onChange 콜백을 ref로 저장하여 accountType 변경 시 안전하게 호출
     const onChangeRef = useRef(onChange);
     useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // 외부에서 value가 바뀌면 inputVal 동기화
     useEffect(() => {
@@ -150,16 +164,64 @@ export function TickerSearchInput({
         }
     }, [accountType]);
 
-    // 외부 클릭 시 닫기
+    // 외부 클릭 시 닫기 (Portal 드롭다운은 wrap 밖이므로 dropdownRef 포함)
     useEffect(() => {
         const onDown = (e: MouseEvent) => {
-            if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-                setIsOpen(false);
-            }
+            const t = e.target as Node;
+            if (wrapRef.current?.contains(t) || dropdownRef.current?.contains(t)) return;
+            setIsOpen(false);
         };
         document.addEventListener("mousedown", onDown);
         return () => document.removeEventListener("mousedown", onDown);
     }, []);
+
+    const updateDropdownLayout = useCallback(() => {
+        const wrap = wrapRef.current;
+        if (!wrap) return;
+        const rect = wrap.getBoundingClientRect();
+        const margin = 6;
+        const maxListH = 240;
+        const spaceBelow = window.innerHeight - rect.bottom - margin;
+        const spaceAbove = rect.top - 8;
+        const minH = 80;
+        if (spaceBelow >= minH && (spaceBelow >= spaceAbove || spaceBelow >= maxListH * 0.5)) {
+            setDropdownLayout({
+                top: rect.bottom + margin,
+                left: rect.left,
+                width: rect.width,
+                maxHeight: Math.min(maxListH, Math.max(minH, spaceBelow - 4)),
+            });
+        } else {
+            const mh = Math.min(maxListH, Math.max(minH, spaceAbove - 4));
+            setDropdownLayout({
+                bottom: window.innerHeight - rect.top + margin,
+                left: rect.left,
+                width: rect.width,
+                maxHeight: mh,
+            });
+        }
+    }, []);
+
+    const showDropdown = isOpen && (isLoading || results.length > 0 || inputVal.trim().length > 0);
+
+    useLayoutEffect(() => {
+        if (!showDropdown || !mounted) {
+            setDropdownLayout(null);
+            return;
+        }
+        updateDropdownLayout();
+    }, [showDropdown, mounted, updateDropdownLayout, results, isLoading, inputVal]);
+
+    useEffect(() => {
+        if (!showDropdown || !mounted) return;
+        const onScrollOrResize = () => updateDropdownLayout();
+        window.addEventListener("resize", onScrollOrResize);
+        window.addEventListener("scroll", onScrollOrResize, true);
+        return () => {
+            window.removeEventListener("resize", onScrollOrResize);
+            window.removeEventListener("scroll", onScrollOrResize, true);
+        };
+    }, [showDropdown, mounted, updateDropdownLayout]);
 
     /* ── Search ──────────────────────────────────────────────────────────*/
     const doSearch = useCallback(async (q: string, acct?: string) => {
@@ -251,10 +313,9 @@ export function TickerSearchInput({
         }
     };
 
-    const showDropdown = isOpen && (isLoading || results.length > 0 || inputVal.trim().length > 0);
-
     return (
-        <div ref={wrapRef} className="relative w-full">
+        <>
+        <div ref={wrapRef} className="relative z-0 w-full">
             {/* Input row */}
             <div className="flex items-center gap-2">
                 {selectedMeta && value === selectedMeta.symbol && (
@@ -278,10 +339,25 @@ export function TickerSearchInput({
                     className="w-full rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none ring-1 ring-neutral-200/80 transition placeholder:text-neutral-300 focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700 dark:placeholder:text-neutral-600 dark:focus:ring-neutral-500"
                 />
             </div>
-
-            {/* Dropdown — absolute, 부모 overflow:visible 필요 */}
-            {showDropdown && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-1.5 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+        </div>
+        {mounted &&
+            showDropdown &&
+            dropdownLayout &&
+            createPortal(
+                <div
+                    ref={dropdownRef}
+                    className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
+                    style={{
+                        position: "fixed",
+                        zIndex: 100,
+                        left: dropdownLayout.left,
+                        width: dropdownLayout.width,
+                        maxHeight: dropdownLayout.maxHeight,
+                        ...(dropdownLayout.top !== undefined
+                            ? { top: dropdownLayout.top }
+                            : { bottom: dropdownLayout.bottom }),
+                    }}
+                >
                     {isLoading ? (
                         <div className="flex items-center justify-center gap-2 py-5">
                             <svg className="h-4 w-4 animate-spin text-neutral-400" fill="none" viewBox="0 0 24 24">
@@ -291,7 +367,10 @@ export function TickerSearchInput({
                             <span className="text-sm text-neutral-400">검색 중...</span>
                         </div>
                     ) : results.length > 0 ? (
-                        <ul className="max-h-[240px] overflow-y-auto py-1">
+                        <ul
+                            className="overflow-y-auto py-1"
+                            style={{ maxHeight: dropdownLayout.maxHeight - 2 }}
+                        >
                             {results.map((t, idx) => (
                                 <li key={`${t.symbol}-${t.exchange}-${idx}`}>
                                     <button
@@ -335,8 +414,9 @@ export function TickerSearchInput({
                             <p className="mt-0.5 text-xs text-neutral-500">다른 키워드로 검색하거나 직접 입력하세요</p>
                         </div>
                     ) : null}
-                </div>
+                </div>,
+                document.body,
             )}
-        </div>
+        </>
     );
 }
