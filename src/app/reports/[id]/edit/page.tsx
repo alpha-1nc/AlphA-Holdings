@@ -1,14 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    validateQuarterlyReportClient,
+    getFirstQuarterlyErrorFieldId,
+    QF,
+} from "@/lib/quarterly-report-client-validation";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
     getReportById,
+    getQuarterlyInitialCapitalSectionStateForEdit,
     updateReportFull,
     type CreateReportPayload,
 } from "@/app/actions/reports";
+import {
+    INITIAL_CAPITAL_ACCOUNT_TYPES,
+    type InitialCapitalAccountType,
+} from "@/lib/initial-capital";
 import { sortPortfolioFormRowsByDisplay } from "@/lib/portfolio-display-order";
 import {
     getCurrentProfile,
@@ -276,12 +286,21 @@ function FormRow({
 
 function JournalField({
     id, label, sublabel, placeholder, value, onChange, rows = 6,
+    errorMessage, scrollId,
 }: {
     id: string; label: string; sublabel: string; placeholder: string;
     value: string; onChange: (v: string) => void; rows?: number;
+    errorMessage?: string;
+    scrollId?: string;
 }) {
     return (
-        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
+        <div
+            id={scrollId}
+            className={[
+                "overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800",
+                errorMessage ? "ring-2 ring-red-500 dark:ring-red-500" : "",
+            ].join(" ")}
+        >
             <div className="flex items-baseline gap-2 border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
                 <label htmlFor={id} className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                     {label}
@@ -301,6 +320,11 @@ function JournalField({
                     "dark:text-neutral-100 dark:placeholder:text-neutral-600",
                 ].join(" ")}
             />
+            {errorMessage ? (
+                <p className="border-t border-red-100 px-5 py-2 text-sm text-red-600 dark:border-red-900/40 dark:text-red-400">
+                    {errorMessage}
+                </p>
+            ) : null}
         </div>
     );
 }
@@ -308,11 +332,14 @@ function JournalField({
 /* ── Portfolio Row Item (분기별) ───────────────────────────────────────────*/
 function PortfolioRowItem({
     row, krwValue, onChange, onDelete,
+    tickerError, amountError,
 }: {
     row: PortfolioRow;
     krwValue: number;
     onChange: (patch: Partial<Omit<PortfolioRow, "id">>) => void;
     onDelete?: () => void;
+    tickerError?: string;
+    amountError?: string;
 }) {
     if (row.kind === "cash") {
         const cashAt = row.stockAccountType ?? "US_DIRECT";
@@ -354,18 +381,28 @@ function PortfolioRowItem({
                                 </p>
                             )}
                         </div>
-                        <div className="w-full shrink-0 sm:w-[160px]">
+                        <div className="w-full shrink-0 sm:w-[160px]" id={QF.rowAmount(row.id)}>
                             <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
-                            <div className="flex items-center gap-1.5">
-                                <input
-                                    type="text"
-                                    inputMode="decimal"
-                                    value={row.amount}
-                                    onChange={(e) => onChange({ amount: e.target.value })}
-                                    placeholder="0"
-                                    className="no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700"
-                                />
-                                <span className="shrink-0 text-[10px] font-medium text-neutral-400">{cashVc}</span>
+                            <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={row.amount}
+                                        onChange={(e) => onChange({ amount: e.target.value })}
+                                        placeholder="0"
+                                        className={[
+                                            "no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 outline-none transition focus:ring-2 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600",
+                                            amountError
+                                                ? "ring-2 ring-red-500 dark:ring-red-500"
+                                                : "ring-neutral-200/80 focus:ring-neutral-400 dark:ring-neutral-700",
+                                        ].join(" ")}
+                                    />
+                                    <span className="shrink-0 text-[10px] font-medium text-neutral-400">{cashVc}</span>
+                                </div>
+                                {amountError ? (
+                                    <p className="text-[11px] leading-snug text-red-600 dark:text-red-400">{amountError}</p>
+                                ) : null}
                             </div>
                         </div>
                         <div className="flex justify-end sm:justify-start sm:pt-5">
@@ -453,14 +490,25 @@ function PortfolioRowItem({
                             {vc === "USD" ? "달러(USD)" : vc === "JPY" ? "엔(JPY)" : "원화(KRW)"}
                         </p>
                     </div>
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1" id={QF.rowTicker(row.id)}>
                         <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">종목</label>
-                        <TickerSearchInput
-                            value={row.ticker}
-                            onChange={handleTickerChange}
-                            accountType={searchAccountType}
-                            placeholder={tickerPlaceholder}
-                        />
+                        <div
+                            className={
+                                tickerError
+                                    ? "rounded-xl p-0.5 ring-2 ring-red-500 dark:ring-red-500"
+                                    : ""
+                            }
+                        >
+                            <TickerSearchInput
+                                value={row.ticker}
+                                onChange={handleTickerChange}
+                                accountType={searchAccountType}
+                                placeholder={tickerPlaceholder}
+                            />
+                        </div>
+                        {tickerError ? (
+                            <p className="mt-1 text-[11px] leading-snug text-red-600 dark:text-red-400">{tickerError}</p>
+                        ) : null}
                         {row.ticker.trim().length > 0 && (
                             <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-sm font-medium text-neutral-800 dark:text-neutral-100">
                                 <span>{displayLabel}</span>
@@ -472,18 +520,28 @@ function PortfolioRowItem({
                             </p>
                         )}
                     </div>
-                    <div className="w-full shrink-0 sm:w-[160px]">
+                    <div className="w-full shrink-0 sm:w-[160px]" id={QF.rowAmount(row.id)}>
                         <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
-                        <div className="flex items-center gap-1.5">
-                            <input
-                                type="text"
-                                inputMode="decimal"
-                                value={row.amount}
-                                onChange={(e) => onChange({ amount: e.target.value })}
-                                placeholder="0"
-                                className="no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700"
-                            />
-                            <span className="shrink-0 text-[10px] font-medium text-neutral-400">{vc}</span>
+                        <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={row.amount}
+                                    onChange={(e) => onChange({ amount: e.target.value })}
+                                    placeholder="0"
+                                    className={[
+                                        "no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 outline-none transition focus:ring-2 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600",
+                                        amountError
+                                            ? "ring-2 ring-red-500 dark:ring-red-500"
+                                            : "ring-neutral-200/80 focus:ring-neutral-400 dark:ring-neutral-700",
+                                    ].join(" ")}
+                                />
+                                <span className="shrink-0 text-[10px] font-medium text-neutral-400">{vc}</span>
+                            </div>
+                            {amountError ? (
+                                <p className="text-[11px] leading-snug text-red-600 dark:text-red-400">{amountError}</p>
+                            ) : null}
                         </div>
                     </div>
                     <div className="flex justify-end sm:justify-start sm:pt-5">
@@ -690,6 +748,20 @@ export default function EditReportPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [rows, setRows] = useState<PortfolioRow[]>([newRow()]);
     const [newInvestmentRows, setNewInvestmentRows] = useState<NewInvestmentRow[]>([]);
+    const [quarterlyFieldErrors, setQuarterlyFieldErrors] = useState<Record<string, string>>({});
+    const [showInitialCapitalSection, setShowInitialCapitalSection] = useState(false);
+    const [initialCapitalByAccount, setInitialCapitalByAccount] = useState<
+        Partial<Record<InitialCapitalAccountType, number>>
+    >({});
+
+    const clearQuarterlyFieldError = useCallback((key: string) => {
+        setQuarterlyFieldErrors((prev) => {
+            if (!(key in prev)) return prev;
+            const next = { ...prev };
+            delete next[key];
+            return next;
+        });
+    }, []);
 
     useEffect(() => {
         if (!report) return;
@@ -751,6 +823,27 @@ export default function EditReportPage() {
         }
     }, [report]);
 
+    useEffect(() => {
+        if (!report || report.type !== "QUARTERLY") {
+            setShowInitialCapitalSection(false);
+            setInitialCapitalByAccount({});
+            return;
+        }
+        let cancelled = false;
+        getQuarterlyInitialCapitalSectionStateForEdit(report.profile, reportId)
+            .then((s) => {
+                if (cancelled) return;
+                setShowInitialCapitalSection(s.showInitialCapitalSection);
+                setInitialCapitalByAccount(s.initialCapitalByAccount ?? {});
+            })
+            .catch((err) => {
+                console.error("[초기 원금 섹션]", err);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [report, reportId]);
+
     const addRow = useCallback(() => setRows((prev) => [...prev, newRow()]), []);
     const addCashRow = useCallback(() => setRows((prev) => [...prev, newCashRow()]), []);
     const removeRow = useCallback((id: string) => setRows((prev) => prev.filter((r) => r.id !== id)), []);
@@ -796,6 +889,7 @@ export default function EditReportPage() {
         journal: feedback,
         strategy,
         earningsReview,
+        initialCapitalByAccount: showInitialCapitalSection ? initialCapitalByAccount : undefined,
         portfolioItems: validRows.map((r) => {
             const krw = rowToKrw(r, usdRate, jpyRate);
             if (r.kind === "cash") {
@@ -878,25 +972,47 @@ export default function EditReportPage() {
             return;
         }
 
-        const incompletePortfolio = rows.filter((r) => {
-            if (r.kind === "cash") return false;
-            const hasTicker = r.ticker.trim().length > 0;
-            const hasAmount = parseNumber(r.amount) > 0;
-            return (hasTicker && !hasAmount) || (!hasTicker && hasAmount);
+        const orderedRows = sortPortfolioFormRowsByDisplay(rows, (r) => rowToKrw(r, usdRate, jpyRate));
+        const rowIdsOrder = orderedRows.map((r) => r.id);
+
+        const clientErrors = validateQuarterlyReportClient({
+            status: asDraft ? "DRAFT" : "PUBLISHED",
+            usdKrwRaw: usdKrw,
+            jpyKrwRaw: jpyKrw,
+            usdRate,
+            jpyRate,
+            rows: rows.map((r) => ({
+                id: r.id,
+                kind: r.kind,
+                ticker: r.ticker,
+                amount: r.amount,
+            })),
+            parseAmount: parseNumber,
+            newInvestments: [],
+            summary,
+            journal: feedback,
+            strategy,
+            earningsReview,
         });
-        if (incompletePortfolio.length > 0) {
-            toast.error("종목명과 평가액을 모두 입력해 주세요. 비어 있는 행은 삭제해 주세요.");
+
+        if (Object.keys(clientErrors).length > 0) {
+            setQuarterlyFieldErrors(clientErrors);
+            const firstId = getFirstQuarterlyErrorFieldId(clientErrors, rowIdsOrder, []);
+            queueMicrotask(() => {
+                document.getElementById(firstId ?? "")?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                });
+            });
             return;
         }
+        setQuarterlyFieldErrors({});
+
         const validRows = rows.filter((r) => {
             const amt = parseNumber(r.amount);
             if (r.kind === "cash") return amt > 0;
             return r.ticker.trim().length > 0 && amt > 0;
         });
-        if (validRows.length === 0) {
-            toast.error("포트폴리오 스냅샷에 최소 1개 이상의 항목을 입력해주세요.");
-            return;
-        }
 
         const qPayload = buildQuarterlyEditPayload(asDraft, validRows);
 
@@ -912,12 +1028,6 @@ export default function EditReportPage() {
             } finally {
                 setIsSubmitting(false);
             }
-            return;
-        }
-
-        const qm = /^(\d{4})-Q([1-4])$/.exec(period.trim());
-        if (!qm) {
-            toast.error("분기 형식이 올바르지 않습니다.");
             return;
         }
 
@@ -974,29 +1084,93 @@ export default function EditReportPage() {
             {!isMonthly && (
                 <FormSection label="적용 환율">
                     <FormRow label="1 USD =" sublabel="달러/원 환율">
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                value={usdKrw}
-                                onChange={(e) => setUsdKrw(e.target.value)}
-                                placeholder="예: 1380"
-                                className={inputCls}
-                            />
-                            <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                        <div id={QF.usd} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    value={usdKrw}
+                                    onChange={(e) => {
+                                        setUsdKrw(e.target.value);
+                                        clearQuarterlyFieldError(QF.usd);
+                                    }}
+                                    placeholder="예: 1380"
+                                    className={[
+                                        inputCls,
+                                        quarterlyFieldErrors[QF.usd] ? "ring-2 ring-red-500 dark:ring-red-500" : "",
+                                    ].join(" ")}
+                                />
+                                <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                            </div>
+                            {quarterlyFieldErrors[QF.usd] ? (
+                                <p className="text-sm text-red-600 dark:text-red-400">{quarterlyFieldErrors[QF.usd]}</p>
+                            ) : null}
                         </div>
                     </FormRow>
                     <FormRow label="100 JPY =" sublabel="엔/원 환율 (100엔 기준)">
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                value={jpyKrw}
-                                onChange={(e) => setJpyKrw(e.target.value)}
-                                placeholder="예: 920"
-                                className={inputCls}
-                            />
-                            <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                        <div id={QF.jpy} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    value={jpyKrw}
+                                    onChange={(e) => {
+                                        setJpyKrw(e.target.value);
+                                        clearQuarterlyFieldError(QF.jpy);
+                                    }}
+                                    placeholder="예: 920"
+                                    className={[
+                                        inputCls,
+                                        quarterlyFieldErrors[QF.jpy] ? "ring-2 ring-red-500 dark:ring-red-500" : "",
+                                    ].join(" ")}
+                                />
+                                <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                            </div>
+                            {quarterlyFieldErrors[QF.jpy] ? (
+                                <p className="text-sm text-red-600 dark:text-red-400">{quarterlyFieldErrors[QF.jpy]}</p>
+                            ) : null}
                         </div>
                     </FormRow>
+                </FormSection>
+            )}
+
+            {!isMonthly && showInitialCapitalSection && (
+                <FormSection label="계좌별 초기 원금 수정">
+                    <p className="px-6 pb-2 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                        (최초 분기 리포트에서만 수정 가능합니다.) 계좌 유형별 원화 기준 초기 투입 원금을 입력하세요. (미입력 시 0으로 저장)
+                    </p>
+                    {INITIAL_CAPITAL_ACCOUNT_TYPES.map((at) => {
+                        const label =
+                            QUARTERLY_STOCK_ACCOUNT_OPTIONS.find((o) => o.value === at)?.label ?? at;
+                        return (
+                            <FormRow key={at} label={label} sublabel="원화 (KRW)">
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={
+                                            initialCapitalByAccount[at] !== undefined
+                                                ? String(initialCapitalByAccount[at])
+                                                : ""
+                                        }
+                                        onChange={(e) => {
+                                            const raw = e.target.value.replace(/[^\d]/g, "");
+                                            setInitialCapitalByAccount((prev) => {
+                                                const next = { ...prev };
+                                                if (raw === "") delete next[at];
+                                                else next[at] = parseInt(raw, 10) || 0;
+                                                return next;
+                                            });
+                                        }}
+                                        placeholder="0"
+                                        className={inputCls}
+                                    />
+                                    <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                                </div>
+                            </FormRow>
+                        );
+                    })}
+                    <p className="border-t border-neutral-100 px-6 py-3 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+                        원화 환산 금액 기준으로 입력하세요
+                    </p>
                 </FormSection>
             )}
 
@@ -1017,7 +1191,7 @@ export default function EditReportPage() {
             </FormSection>
 
             {!isMonthly && (
-                <section className="mb-8">
+                <section id={QF.portfolio} className="mb-8">
                     <div className="mb-4 flex items-center justify-between">
                         <div>
                             <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
@@ -1026,6 +1200,11 @@ export default function EditReportPage() {
                             <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
                                 종목 행은 티커·평가액을, 현금 행은 계좌·금액만 입력하세요. 통화는 계좌에 맞게 적용되며 원화 환산은 상단 환율로 자동 계산됩니다.
                             </p>
+                            {quarterlyFieldErrors[QF.portfolio] ? (
+                                <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                                    {quarterlyFieldErrors[QF.portfolio]}
+                                </p>
+                            ) : null}
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                             <button
@@ -1053,8 +1232,15 @@ export default function EditReportPage() {
                                 key={row.id}
                                 row={row}
                                 krwValue={rowToKrw(row, usdRate, jpyRate)}
-                                onChange={(patch) => updateRow(row.id, patch)}
+                                onChange={(patch) => {
+                                    updateRow(row.id, patch);
+                                    clearQuarterlyFieldError(QF.rowTicker(row.id));
+                                    clearQuarterlyFieldError(QF.rowAmount(row.id));
+                                    clearQuarterlyFieldError(QF.portfolio);
+                                }}
                                 onDelete={rows.length > 1 ? () => removeRow(row.id) : undefined}
+                                tickerError={quarterlyFieldErrors[QF.rowTicker(row.id)]}
+                                amountError={quarterlyFieldErrors[QF.rowAmount(row.id)]}
                             />
                         ))}
                     </div>
@@ -1164,39 +1350,59 @@ export default function EditReportPage() {
                         <>
                             <JournalField
                                 id="journal-earnings"
+                                scrollId={QF.earningsReview}
                                 label="어닝 / 실적 리뷰"
                                 sublabel="Earnings Review"
                                 placeholder="이번 분기 보유 종목들의 실적 발표 내용을 요약하고 코멘트를 남기세요."
                                 value={earningsReview}
-                                onChange={setEarningsReview}
+                                onChange={(v) => {
+                                    setEarningsReview(v);
+                                    clearQuarterlyFieldError(QF.earningsReview);
+                                }}
                                 rows={8}
+                                errorMessage={quarterlyFieldErrors[QF.earningsReview]}
                             />
                             <JournalField
                                 id="journal-summary"
+                                scrollId={QF.summary}
                                 label="분기 시장 요약"
                                 sublabel="Market Summary"
                                 placeholder="이번 분기 거시 경제 흐름, 금리/환율 변화, 주요 이벤트 등을 기록하세요."
                                 value={summary}
-                                onChange={setSummary}
+                                onChange={(v) => {
+                                    setSummary(v);
+                                    clearQuarterlyFieldError(QF.summary);
+                                }}
                                 rows={6}
+                                errorMessage={quarterlyFieldErrors[QF.summary]}
                             />
                             <JournalField
                                 id="journal-feedback"
+                                scrollId={QF.journal}
                                 label="느낀 점"
                                 sublabel="Feedback"
                                 placeholder="이번 분기 투자를 통해 배운 점, 아쉬웠던 점, 감정적으로 느낀 것들을 솔직하게 적어보세요."
                                 value={feedback}
-                                onChange={setFeedback}
+                                onChange={(v) => {
+                                    setFeedback(v);
+                                    clearQuarterlyFieldError(QF.journal);
+                                }}
                                 rows={6}
+                                errorMessage={quarterlyFieldErrors[QF.journal]}
                             />
                             <JournalField
                                 id="journal-strategy"
+                                scrollId={QF.strategy}
                                 label="다음 분기 전략"
                                 sublabel="Next Quarter Strategy"
                                 placeholder="다음 분기 신규 투자금 투입 계획, 리밸런싱 방향, 주목할 종목 및 섹터 등을 작성하세요."
                                 value={strategy}
-                                onChange={setStrategy}
+                                onChange={(v) => {
+                                    setStrategy(v);
+                                    clearQuarterlyFieldError(QF.strategy);
+                                }}
                                 rows={6}
+                                errorMessage={quarterlyFieldErrors[QF.strategy]}
                             />
                         </>
                     )}

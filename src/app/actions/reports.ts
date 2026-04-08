@@ -42,6 +42,35 @@ export async function getQuarterlyInitialCapitalSectionState(profileLabel: strin
   };
 }
 
+/** 분기 리포트 수정 페이지: 가장 오래된 QUARTERLY가 현재 리포트일 때만 섹션 표시 + 기존 초기 원금 */
+export async function getQuarterlyInitialCapitalSectionStateForEdit(
+  profileLabel: string,
+  currentReportId: number,
+) {
+  const profileId = await resolveProfileIdFromLabel(prisma, profileLabel);
+  const oldestQuarterly = await prisma.report.findFirst({
+    where: { type: "QUARTERLY", profile: profileLabel },
+    orderBy: { createdAt: "asc" },
+  });
+  const showInitialCapitalSection = oldestQuarterly?.id === currentReportId;
+
+  if (!showInitialCapitalSection) {
+    return {
+      showInitialCapitalSection: false as const,
+      initialCapitalByAccount: {} as Partial<Record<InitialCapitalAccountType, number>>,
+    };
+  }
+
+  const rows = await prisma.accountInitialCapital.findMany({ where: { profileId } });
+  const initialCapitalByAccount: Partial<Record<InitialCapitalAccountType, number>> = {};
+  for (const row of rows) {
+    if (INITIAL_CAPITAL_ACCOUNT_TYPES.includes(row.accountType as InitialCapitalAccountType)) {
+      initialCapitalByAccount[row.accountType as InitialCapitalAccountType] = row.krwAmount;
+    }
+  }
+  return { showInitialCapitalSection: true as const, initialCapitalByAccount };
+}
+
 /** 폼 표시용 누적 원금: AccountInitialCapital 합 + PUBLISHED 월별 리포트의 NewInvestment 합 */
 export async function getProfileCumulativePrincipalKrw(profileLabel: string): Promise<number> {
   const profileId = await resolveProfileIdFromLabel(prisma, profileLabel);
@@ -154,6 +183,31 @@ export async function upsertAccountInitialCapitalsIfApplicable(
       where: { profileId_accountType: { profileId, accountType } },
       create: { profileId, accountType, krwAmount, reportId },
       update: {},
+    });
+  }
+}
+
+/** 최초 분기 리포트 수정 시에만 호출 — update에서 krwAmount 덮어쓰기 (작성 페이지 upsert와 구분) */
+export async function upsertAccountInitialCapitalsOnEdit(
+  tx: PrismaTransaction,
+  profileLabel: string,
+  reportId: number,
+  initialCapitalByAccount: Partial<Record<InitialCapitalAccountType, number>>,
+): Promise<void> {
+  const oldest = await tx.report.findFirst({
+    where: { type: "QUARTERLY", profile: profileLabel },
+    orderBy: { createdAt: "asc" },
+  });
+  if (oldest?.id !== reportId) return;
+
+  const profileId = await resolveProfileIdFromLabel(tx, profileLabel);
+  for (const accountType of INITIAL_CAPITAL_ACCOUNT_TYPES) {
+    const raw = initialCapitalByAccount[accountType];
+    const krwAmount = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+    await tx.accountInitialCapital.upsert({
+      where: { profileId_accountType: { profileId, accountType } },
+      create: { profileId, accountType, krwAmount, reportId },
+      update: { krwAmount },
     });
   }
 }
@@ -463,7 +517,7 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
     earningsReview,
     profile,
     status: statusInput,
-    initialCapitalByAccount: _initialCapitalIgnored,
+    initialCapitalByAccount,
     ...rest
   } = payload;
   const reportData = {
@@ -488,6 +542,8 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
   if (!validation.ok) {
     throw new Error(validation.error);
   }
+
+  const profileValue = profile || "AlphA Holdings Portfolio";
 
   const report = await prisma.$transaction(async (tx) => {
     await tx.portfolioItem.deleteMany({ where: { reportId: id } });
@@ -515,6 +571,18 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
         newInvestments: true,
       },
     });
+
+    if (
+      payload.type === "QUARTERLY" &&
+      initialCapitalByAccount !== undefined
+    ) {
+      await upsertAccountInitialCapitalsOnEdit(
+        tx,
+        profileValue,
+        id,
+        initialCapitalByAccount,
+      );
+    }
 
     return updatedReport;
   });
