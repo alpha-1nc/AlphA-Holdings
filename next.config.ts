@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import withPWA from "next-pwa";
 
 /**
  * Cloudflare / 리버스 프록시 뒤에서 접속할 때 브라우저 Origin(공개 도메인)과
@@ -15,6 +16,7 @@ function parseServerActionAllowedOrigins(): string[] | undefined {
 const serverActionAllowedOrigins = parseServerActionAllowedOrigins();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   images: {
     remotePatterns: [
       {
@@ -33,4 +35,9 @@ const nextConfig: NextConfig = {
   }),
 };
 
-export default nextConfig;
+export default withPWA({
+  dest: "public",
+  disable: process.env.NODE_ENV === "development",
+  register: true,
+  skipWaiting: true,
+})(nextConfig);

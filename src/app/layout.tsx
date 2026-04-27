@@ -15,6 +15,14 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "AlphA Holdings — Report Archive",
   description: "스냅샷 기반 개인 투자 리포트 아카이브",
+  manifest: "/manifest.json",
+  // @ts-expect-error themeColor is valid in Next.js metadata
+  themeColor: "#ffffff",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AlphA Holdings",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -33,6 +41,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+      </head>
       <body className="overflow-x-hidden bg-neutral-50 font-sans antialiased dark:bg-neutral-950">
         <ThemeProvider>
           <div className="flex min-h-screen min-w-0 flex-col">
