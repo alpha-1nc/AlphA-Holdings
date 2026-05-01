@@ -1369,7 +1369,7 @@ export async function fetchFinancialData(ticker: string): Promise<FinancialData>
       ) {
         netDilutionRate = (shareRepurchase - stockBasedCompensation) / cap;
         const netFlow = shareRepurchase - stockBasedCompensation;
-        netDilutionDetail = `자사주 ${formatUsdDilutionLabel(shareRepurchase)} - SBC ${formatUsdDilutionLabel(stockBasedCompensation)} = 순환원/희석 ${formatUsdDilutionLabel(netFlow)} (시총 대비 ${(netDilutionRate * 100).toFixed(2)}%)`;
+        netDilutionDetail = `자사주 ${formatUsdDilutionLabel(shareRepurchase)} - SBC ${formatUsdDilutionLabel(stockBasedCompensation)} = 순환원/희석 ${formatUsdDilutionLabel(netFlow)} (시총 대비 ${Math.round(netDilutionRate * 100)}%)`;
       }
     } catch {
       stockBasedCompensation = null;

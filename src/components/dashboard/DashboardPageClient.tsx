@@ -1,18 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+    Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell,
-    ComposedChart, Line, Area,
+    Area,
+    ComposedChart,
     LineChart,
+    Line,
 } from "recharts";
-import { ChevronDown, Home } from "lucide-react";
+import { Home } from "lucide-react";
 import { getReportsByProfilePublished } from "@/app/actions/reports";
 import { getPortfolioStrategies } from "@/app/actions/strategy";
-import { getTickerColor, FALLBACK_COLORS } from "@/constants/brandColors";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { WorkspaceProfile } from "@/lib/profile";
@@ -20,34 +21,202 @@ import {
     computeRoleAllocation,
     computeTickerDeviationsByAccountGroups,
     isCashLikePortfolioItem,
+    type RoleAllocationItem,
+    type TickerDeviationItem,
 } from "@/lib/role-allocation";
 import {
     ACCOUNT_GROUPS,
+    ACCOUNT_TYPE_LABEL,
     type AccountGroupKey,
     accountTypesForDashboardGroup,
-    cashBelongsToDashboardGroup,
-    isIsaCashHint,
-    isPensionCashHint,
     portfolioItemsForDashboardGroup,
     type DashboardAccountGroupFilter,
 } from "@/lib/accountGroups";
-import { getDashboardQuarterlyMetrics } from "@/app/actions/dashboard";
-import { hexForCashSliceLabel } from "@/lib/currency-colors";
-import { RoleAllocationChart } from "@/components/dashboard/RoleAllocationChart";
-import { TargetVsActualBar } from "@/components/dashboard/TargetVsActualBar";
+import {
+    getDashboardInvestmentNewInflows,
+    getDashboardQuarterlyMetrics,
+    type QuarterlyDashboardSeriesPoint,
+} from "@/app/actions/dashboard";
 import { AiBriefingBanner } from "@/components/dashboard/AiBriefingBanner";
 import { PageMainTitle } from "@/components/layout/page-main-title";
 import { useIsMobileLayout } from "@/hooks/use-is-mobile-layout";
+import { DashboardSummaryStatCard } from "@/components/ui/dashboard-summary-stat-card";
+import { MiniChart } from "@/components/ui/mini-chart";
+import { cn } from "@/lib/utils";
 import type { Report, PortfolioItem, NewInvestment, PortfolioStrategy } from "@/generated/prisma";
-import type { Currency } from "@/generated/prisma";
 type ReportWithItems = Report & { 
     portfolioItems: PortfolioItem[];
     newInvestments?: NewInvestment[];
 };
 
+const GROUP_DEVIATION_TITLES: Record<AccountGroupKey, string> = {
+    직투: "직투",
+    ISA: "ISA",
+    연금저축: "연금저축",
+};
+const DEVIATION_GROUP_ORDER: AccountGroupKey[] = ["직투", "ISA", "연금저축"];
+
+function DeviationDivergingBar({ data, groupTitle }: { data: TickerDeviationItem[]; groupTitle: string }) {
+    if (!data.length) return null;
+
+    const maxAbs = Math.max(
+        ...data.map((d) => Math.abs(d.diff)),
+        10,
+    );
+
+    return (
+        <div>
+            <p
+                className="mb-3 text-xs font-bold uppercase tracking-widest"
+                style={{ color: "var(--ah-text-subtle)" }}
+            >
+                {groupTitle}
+            </p>
+
+            <div className="mb-2 flex items-center text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+                <span className="w-28 shrink-0" />
+                <div className="flex flex-1 items-center justify-between px-1">
+                    <span>← 부족</span>
+                    <span className="font-medium" style={{ color: "var(--ah-text-muted)" }}>
+                        목표 기준
+                    </span>
+                    <span>초과 →</span>
+                </div>
+                <span className="w-20 shrink-0" />
+            </div>
+
+            <div className="space-y-2">
+                {data.map((item, i) => {
+                    const diff = item.diff;
+                    const absD = Math.abs(diff);
+                    const isOver = diff > 0;
+                    const isNormal = absD < 5;
+                    const pct = Math.min((absD / maxAbs) * 50, 50);
+
+                    /** 상단 요약 카드 스파크와 동일: --dashboard-spark-success / --dashboard-spark-negative */
+                    const barColor = isNormal
+                        ? "var(--ah-text-muted)"
+                        : isOver
+                          ? "var(--dashboard-spark-success)"
+                          : "var(--dashboard-spark-negative)";
+
+                    const badgeClass = isNormal
+                        ? "bg-[var(--neutral-soft)] text-[var(--neutral-state)]"
+                        : isOver
+                          ? "bg-[var(--positive-soft)] text-[var(--positive)]"
+                          : "bg-[var(--negative-soft)] text-[var(--negative)]";
+
+                    const badgeLabel = isNormal ? "정상" : isOver ? `+${Math.round(diff)}%` : `${Math.round(diff)}%`;
+
+                    return (
+                        <div
+                            key={`${item.ticker}-${i}`}
+                            className="group flex items-center gap-2 rounded-lg px-2 py-1 transition-colors duration-150"
+                            style={{ "--hover-bg": "var(--ah-card-soft)" } as CSSProperties}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "var(--ah-card-soft)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                            }}
+                        >
+                            <div className="flex w-28 shrink-0 items-center gap-1.5 min-w-0">
+                                <span className="truncate text-sm font-semibold" style={{ color: "var(--ah-text-pri)" }}>
+                                    {item.displayLabel}
+                                </span>
+                                {item.accountType && (
+                                    <span
+                                        className="shrink-0 rounded px-1 py-0.5 text-[10px] font-medium"
+                                        style={{
+                                            background: "var(--ah-card-soft)",
+                                            color: "var(--ah-text-subtle)",
+                                        }}
+                                    >
+                                        {ACCOUNT_TYPE_LABEL[item.accountType]}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="relative flex flex-1 items-center">
+                                <div
+                                    className="relative h-4 w-full rounded-full overflow-hidden"
+                                    style={{ background: "var(--ah-card-soft)" }}
+                                >
+                                    {!isOver && (
+                                        <div
+                                            className="absolute inset-y-0 right-1/2 transition-all duration-700 ease-out"
+                                            style={{
+                                                width: `${pct}%`,
+                                                background: barColor,
+                                                opacity: 0.7,
+                                                borderRadius: "9999px 0 0 9999px",
+                                            }}
+                                        />
+                                    )}
+
+                                    {isOver && (
+                                        <div
+                                            className="absolute inset-y-0 left-1/2 transition-all duration-700 ease-out"
+                                            style={{
+                                                width: `${pct}%`,
+                                                background: barColor,
+                                                opacity: 0.85,
+                                                borderRadius: "0 9999px 9999px 0",
+                                            }}
+                                        />
+                                    )}
+                                </div>
+
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none">
+                                    <span
+                                        className="rounded-md px-2 py-0.5 text-xs font-medium shadow-sm"
+                                        style={{
+                                            background: "var(--ah-card)",
+                                            color: "var(--ah-text-muted)",
+                                            border: "1px solid var(--ah-border)",
+                                        }}
+                                    >
+                                        {Math.round(item.actualWeight)}% → {Math.round(item.targetWeight)}%
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="w-20 shrink-0 flex justify-end">
+                                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums ${badgeClass}`}>
+                                    {badgeLabel}
+                                </span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 /* ── Formatters ──────────────────────────────────────────────────────────*/
 const krwFmt = (n: number) =>
     new Intl.NumberFormat("ko-KR", { style: "currency", currency: "KRW", maximumFractionDigits: 0 }).format(n);
+
+/** 상단 요약 카드 금액용 — ₩8.90M · ₩890k */
+function krwFmtKm(absKrw: number): string {
+    const abs = Math.abs(absKrw);
+    if (!Number.isFinite(abs)) return "—";
+    if (abs >= 1_000_000) {
+        const m = abs / 1_000_000;
+        return `₩${m >= 10 ? m.toFixed(1) : m.toFixed(2)}M`;
+    }
+    if (abs >= 1_000) {
+        const k = abs / 1_000;
+        return `₩${k >= 100 ? k.toFixed(0) : k.toFixed(1)}k`;
+    }
+    return `₩${Math.round(abs).toLocaleString("ko-KR")}`;
+}
+
+function krwFmtKmSigned(n: number): string {
+    const sign = n >= 0 ? "+" : "-";
+    return `${sign}${krwFmtKm(Math.abs(n))}`;
+}
 
 const krwShort = (n: number) => {
     const abs = Math.abs(n);
@@ -55,6 +224,429 @@ const krwShort = (n: number) => {
     if (abs >= 10_000) return `${(n / 10_000).toFixed(0)}만`;
     return String(n);
 };
+
+/** 투자/수익금 ComposedChart·LineChart 공통 툴팁 */
+function CustomBarTooltip({
+    active,
+    payload,
+    label,
+}: {
+    active?: boolean;
+    payload?: Array<{
+        name?: string;
+        value?: unknown;
+        color?: string;
+        dataKey?: string | number;
+    }>;
+    label?: string;
+}) {
+    if (!active || !payload?.length) return null;
+    const seen = new Set<string | number>();
+    const rows = payload.filter((p) => {
+        const k = p.dataKey ?? p.name ?? "";
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+    });
+    return (
+        <div
+            className="rounded-xl px-3 py-2 shadow-lg"
+            style={{
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor: "var(--ah-border)",
+                background: "var(--ah-card)",
+            }}
+        >
+            {label != null && label !== "" && (
+                <p className="mb-1.5 text-xs" style={{ color: "var(--ah-text-muted)" }}>
+                    기준 분기 ·{" "}
+                    <span className="font-medium" style={{ color: "var(--ah-text-pri)" }}>
+                        {String(label)}
+                    </span>
+                </p>
+            )}
+            <div className="space-y-1">
+                {rows.map((p, i) => {
+                    const v = p.value;
+                    const num = typeof v === "number" ? v : Number(v);
+                    const display = Number.isNaN(num) ? "—" : krwFmt(num);
+                    return (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                            <span
+                                className="h-2 w-2 shrink-0 rounded-sm"
+                                style={{ background: p.color ?? "var(--neutral-state)" }}
+                            />
+                            <span style={{ color: "var(--ah-text-muted)" }}>{p.name}</span>
+                            <span
+                                className="ml-auto font-medium tabular-nums"
+                                style={{ color: "var(--ah-text-pri)" }}
+                            >
+                                {display}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+interface AssetTrendChartProps {
+    series: QuarterlyDashboardSeriesPoint[];
+    isMobileLayout: boolean;
+}
+
+function AssetTrendChart({ series, isMobileLayout }: AssetTrendChartProps) {
+    const [chartTab, setChartTab] = useState<"value" | "profit" | "return">("value");
+    const [isDark, setIsDark] = useState(false);
+    const sparkUid = useId().replace(/:/g, "");
+    const sparkFillGradId = `assetTrendSpark-fill-${sparkUid}`;
+
+
+    useEffect(() => {
+        const update = () => setIsDark(document.documentElement.classList.contains("dark"));
+        update();
+        const observer = new MutationObserver(update);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+        return () => observer.disconnect();
+    }, []);
+
+    const tabs = [
+        { key: "value" as const, label: "자산 추이", description: "투자금 vs 평가금" },
+        { key: "profit" as const, label: "누적 수익금", description: "각 분기 말 시점 누적" },
+        { key: "return" as const, label: "누적 수익률", description: "각 분기 말 시점 누적" },
+    ];
+
+    const barData = useMemo(
+        () =>
+            series.map((row) => ({
+                period: row.periodLabel,
+                "총 투자금": row.totalInvested,
+                "총 평가금": row.totalCurrent,
+                totalInvested: row.totalInvested,
+                totalCurrent: row.totalCurrent,
+                수익금: row.profit,
+            })),
+        [series],
+    );
+
+    const returnData = useMemo(
+        () =>
+            series.map((row) => ({
+                period: row.periodLabel,
+                "수익률(%)": row.returnRate,
+            })),
+        [series],
+    );
+
+    /**
+     * 자산 추이: 마지막 분기 기준 총 평가금 vs 총 투자금 → 초록/주황
+     * (`--dashboard-spark-success` / `--dashboard-spark-negative`, 상단 요약 카드 스파크와 동일)
+     * 수익/수익률 탭: 각각 누적 수익금·수익률 부호 기준
+     */
+    const sparkPositive = useMemo(() => {
+        const last = series[series.length - 1];
+        if (!last) return true;
+        if (chartTab === "value") {
+            return last.totalCurrent >= last.totalInvested;
+        }
+        if (chartTab === "return") return last.returnRate >= 0;
+        return last.profit >= 0;
+    }, [series, chartTab]);
+
+    const currentTab = tabs.find((t) => t.key === chartTab) ?? tabs[0];
+    const chartBottom = isMobileLayout ? 36 : 0;
+
+    const gridStroke = isDark ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.06)";
+    const tickFill = "var(--text-tertiary)";
+
+    const sparkStrokeWrapper = cn(
+        sparkPositive ? "[--spark-stroke:var(--dashboard-spark-success)]" : "[--spark-stroke:var(--dashboard-spark-negative)]",
+    );
+
+    return (
+        <div className="rounded-2xl border border-[var(--ah-border)] bg-[var(--ah-card)] p-5 shadow-sm transition-all duration-300 hover:shadow-md md:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h3 className="text-base font-bold" style={{ color: "var(--ah-text-pri)" }}>
+                        {currentTab.label}
+                    </h3>
+                    <p className="mt-0.5 text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+                        {currentTab.description}
+                    </p>
+                </div>
+
+                <div
+                    className="relative inline-flex w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:w-auto md:overflow-visible"
+                    role="tablist"
+                    aria-label="차트 유형"
+                >
+                    {tabs.map((t) => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={chartTab === t.key}
+                            onClick={() => setChartTab(t.key)}
+                            className={[
+                                "relative z-10 flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-300",
+                                chartTab === t.key
+                                    ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
+                                    : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",
+                            ].join(" ")}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className={cn("h-64 w-full md:h-72", sparkStrokeWrapper)}>
+                {chartTab === "value" && (
+                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                        <ComposedChart
+                            data={barData}
+                            margin={{ top: 8, right: 8, left: 0, bottom: chartBottom }}
+                        >
+                            <defs>
+                                <linearGradient id={sparkFillGradId} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="var(--spark-stroke)" stopOpacity={0.42} />
+                                    <stop offset="100%" stopColor="var(--spark-stroke)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                            <XAxis
+                                dataKey="period"
+                                tick={{ fontSize: isMobileLayout ? 9 : 11, fill: tickFill }}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <YAxis
+                                tickFormatter={krwShort}
+                                tick={{ fontSize: isMobileLayout ? 9 : 11, fill: tickFill }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={isMobileLayout ? 44 : 52}
+                            />
+                            <Tooltip
+                                content={<CustomBarTooltip />}
+                                cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                            />
+                            <Bar
+                                dataKey="totalInvested"
+                                name="총 투자금"
+                                fill="var(--primary)"
+                                fillOpacity={0.88}
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={32}
+                            />
+                            <Area
+                                type="natural"
+                                dataKey="totalCurrent"
+                                name="총 평가금"
+                                stroke="var(--spark-stroke)"
+                                strokeWidth={3}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                fill={`url(#${sparkFillGradId})`}
+                                dot={{ fill: "var(--spark-stroke)", strokeWidth: 0, r: 3 }}
+                                activeDot={{ r: 4 }}
+                            />
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                )}
+
+                {chartTab === "profit" && (
+                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                        <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: chartBottom }}>
+                            <defs>
+                                <linearGradient id={sparkFillGradId} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="var(--spark-stroke)" stopOpacity={0.4} />
+                                    <stop offset="100%" stopColor="var(--spark-stroke)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                            <XAxis
+                                dataKey="period"
+                                tick={{ fontSize: isMobileLayout ? 9 : 11, fill: tickFill }}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <YAxis
+                                tickFormatter={krwShort}
+                                tick={{ fontSize: isMobileLayout ? 9 : 11, fill: tickFill }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={isMobileLayout ? 44 : 52}
+                            />
+                            <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
+                            <Area
+                                type="natural"
+                                dataKey="수익금"
+                                stroke="none"
+                                fill={`url(#${sparkFillGradId})`}
+                            />
+                            <Line
+                                type="natural"
+                                dataKey="수익금"
+                                stroke="var(--spark-stroke)"
+                                strokeWidth={3}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                dot={{ fill: "var(--spark-stroke)", strokeWidth: 0, r: 3 }}
+                                activeDot={{ r: 4 }}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                )}
+
+                {chartTab === "return" && (
+                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                        <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: chartBottom }}>
+                            <defs>
+                                <linearGradient id={sparkFillGradId} x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="var(--spark-stroke)" stopOpacity={0.4} />
+                                    <stop offset="100%" stopColor="var(--spark-stroke)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridStroke} vertical={false} />
+                            <XAxis
+                                dataKey="period"
+                                tick={{ fontSize: isMobileLayout ? 9 : 11, fill: tickFill }}
+                                axisLine={false}
+                                tickLine={false}
+                            />
+                            <YAxis
+                                tickFormatter={(v) => String(Math.round(Number(v)))}
+                                tick={{ fontSize: isMobileLayout ? 9 : 11, fill: tickFill }}
+                                axisLine={false}
+                                tickLine={false}
+                                width={40}
+                                unit="%"
+                            />
+                            <Tooltip
+                                formatter={(v: unknown) => [`${Math.round(v as number)}%`, "누적 수익률"]}
+                                contentStyle={{
+                                    borderRadius: 12,
+                                    fontSize: 12,
+                                    border: "1px solid var(--ah-border)",
+                                    background: "var(--ah-card)",
+                                    color: "var(--ah-text-pri)",
+                                }}
+                                cursor={{ fill: "rgba(0,0,0,0.04)" }}
+                            />
+                            <Area
+                                type="natural"
+                                dataKey="수익률(%)"
+                                stroke="none"
+                                fill={`url(#${sparkFillGradId})`}
+                            />
+                            <Line
+                                type="natural"
+                                dataKey="수익률(%)"
+                                stroke="var(--spark-stroke)"
+                                strokeWidth={3}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                dot={{ fill: "var(--spark-stroke)", strokeWidth: 0, r: 3 }}
+                                activeDot={{ r: 4 }}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/** 선택한 계좌 필터 범위 — 표시명 기준 합산 비중 도넛 */
+function PortfolioWeightDonut({
+    segments,
+    group,
+}: {
+    segments: { name: string; weight: number }[];
+    group: DashboardAccountGroupFilter;
+}) {
+    const data = segments
+        .filter((s) => s.weight > 0)
+        .map((s, i) => ({
+            ...s,
+            fill: `var(--donut-${(i % 8) + 1})`,
+        }));
+
+    return (
+        <div className="h-full rounded-2xl border border-[var(--ah-border)] bg-[var(--ah-card)] p-5 shadow-sm transition-all duration-300 hover:shadow-md">
+            <div className="flex items-baseline justify-between">
+                <p className="text-sm font-semibold" style={{ color: "var(--ah-text-pri)" }}>
+                    포트폴리오 비중
+                </p>
+                <p className="text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+                    {PORTFOLIO_DONUT_SCOPE_SUBTITLE[group]}
+                </p>
+            </div>
+
+            {data.length === 0 ? (
+                <p className="mt-8 py-10 text-center text-sm" style={{ color: "var(--ah-text-muted)" }}>
+                    표시할 보유 종목이 없습니다
+                </p>
+            ) : (
+                <>
+                    <div className="mt-4 h-44 w-full">
+                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                            <PieChart>
+                                <Pie
+                                    data={data}
+                                    dataKey="weight"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={45}
+                                    outerRadius={75}
+                                    paddingAngle={2}
+                                    cornerRadius={6}
+                                    strokeWidth={0}
+                                    isAnimationActive
+                                    animationDuration={700}
+                                >
+                                    {data.map((d, i) => (
+                                        <Cell key={`${d.name}-${i}`} fill={d.fill} />
+                                    ))}
+                                </Pie>
+                                <Tooltip content={<DonutWeightTooltip />} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="mt-4 max-h-40 space-y-2 overflow-y-auto pr-1">
+                        {data.map((d) => (
+                            <div key={d.name} className="flex items-center justify-between">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <span
+                                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                        style={{ background: d.fill }}
+                                    />
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        style={{ color: "var(--ah-text-pri)" }}
+                                    >
+                                        {d.name}
+                                    </span>
+                                </div>
+                                <span
+                                    className="shrink-0 text-sm font-semibold tabular-nums"
+                                    style={{ color: "var(--ah-text-pri)" }}
+                                >
+                                    {Math.round(d.weight)}%
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
 
 function parseGroupParam(raw: string | null): DashboardAccountGroupFilter {
     if (!raw || raw === "전체") return "all";
@@ -69,25 +661,13 @@ const GROUP_QUERY_VALUE: Record<DashboardAccountGroupFilter, string | null> = {
     연금저축: "연금저축",
 };
 
-function cashSliceLabelForItem(
-    item: PortfolioItem,
-    group: DashboardAccountGroupFilter
-): string {
-    const cur = item.originalCurrency as Currency;
-    if (group === "ISA" || group === "연금저축") return "KRW 현금";
-    if (group === "직투") {
-        if (cur === "USD") return "USD 현금";
-        if (cur === "JPY") return "JPY 현금";
-        return "KRW 현금";
-    }
-    if (group === "all") {
-        if (isIsaCashHint(item) || isPensionCashHint(item)) return "KRW 현금";
-        if (cur === "USD") return "USD 현금";
-        if (cur === "JPY") return "JPY 현금";
-        return "KRW 현금";
-    }
-    return "현금";
-}
+/** 포트폴리오 비중 도넛 — 계좌 필터 부제 */
+const PORTFOLIO_DONUT_SCOPE_SUBTITLE: Record<DashboardAccountGroupFilter, string> = {
+    all: "전 계좌 · 현재 자산 기준",
+    직투: "직투 · 현재 자산 기준",
+    ISA: "ISA · 현재 자산 기준",
+    연금저축: "연금저축 · 현재 자산 기준",
+};
 
 /* ── Empty State ─────────────────────────────────────────────────────────*/
 function EmptyState() {
@@ -104,7 +684,7 @@ function EmptyState() {
             </div>
             <Link
                 href="/reports/new"
-                className="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700 active:scale-95"
+                className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-95"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -129,7 +709,7 @@ function QuarterlyEmptyState() {
             </div>
             <Link
                 href="/reports/new/quarterly"
-                className="mt-2 inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-blue-700 active:scale-95"
+                className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-95"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -140,418 +720,260 @@ function QuarterlyEmptyState() {
     );
 }
 
-/* ── Summary Card ────────────────────────────────────────────────────────*/
-interface SummaryCardProps {
-    label: string;
-    value: string;
-    sub?: string;
-    colorClass?: string;
-    icon: React.ReactNode;
-    gradient: string;
-}
-
-function SummaryCard({ label, value, sub, colorClass, icon, gradient }: SummaryCardProps) {
-    return (
-        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md dark:bg-neutral-900 dark:border-neutral-800">
-            <div className={`absolute inset-x-0 top-0 h-[3px] ${gradient}`} />
-            <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-neutral-50 dark:bg-neutral-800">
-                {icon}
-            </div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-widest text-neutral-400 dark:text-neutral-500">{label}</p>
-            <p className={`text-xl font-bold tracking-tight md:text-2xl ${colorClass ?? "text-neutral-900 dark:text-neutral-50"}`}>{value}</p>
-            {sub && <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">{sub}</p>}
-        </div>
-    );
-}
-
-/* ── Custom Tooltip ──────────────────────────────────────────────────────*/
-function CustomBarTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
-            <p className="mb-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400">{label}</p>
-            {payload.map((p) => (
-                <div key={p.name} className="flex items-center gap-2 text-xs">
-                    <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
-                    <span className="text-neutral-600 dark:text-neutral-300">{p.name}</span>
-                    <span className="ml-auto font-semibold text-neutral-900 dark:text-neutral-100">{krwShort(p.value)}</span>
-                </div>
-            ))}
-        </div>
-    );
-}
-
-type NewInvBarRow = { period: string; "신규 투자금(합계)": number };
-
-function NewInvestmentAccordion({
-    latestPeriodLabel,
-    latestAmount,
-    ytdAmount,
-    yearLabel,
-    chartData,
+/* ── 포트폴리오·섹터 도넛 공통 툴팁 (종목/섹터명 + 비중 %) ───────────────*/
+function DonutWeightTooltip({
+    active,
+    payload,
 }: {
-    latestPeriodLabel: string;
-    latestAmount: number;
-    ytdAmount: number;
-    yearLabel: number;
-    chartData: NewInvBarRow[];
-}) {
-    const [open, setOpen] = useState(false);
-
-    return (
-        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-            <button
-                type="button"
-                aria-expanded={open}
-                onClick={() => setOpen((v) => !v)}
-                className="flex w-full items-start gap-3 rounded-2xl p-4 text-left transition-colors hover:bg-neutral-50/80 dark:hover:bg-neutral-800/40 md:p-6"
-            >
-                <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                        신규 납입
-                    </p>
-                    <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-                        <div>
-                            <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">최근 달 ({latestPeriodLabel})</p>
-                            <p className="mt-1 text-lg font-bold tabular-nums tracking-tight text-neutral-900 dark:text-neutral-50 md:text-2xl">
-                                {krwFmt(latestAmount)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">{yearLabel}년 누적</p>
-                            <p className="mt-1 text-lg font-bold tabular-nums tracking-tight text-neutral-900 dark:text-neutral-50 md:text-2xl">
-                                {krwFmt(ytdAmount)}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
-                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">{open ? "접기" : "추이 보기"}</span>
-                    <ChevronDown
-                        className={[
-                            "h-5 w-5 text-neutral-400 transition-transform duration-200 dark:text-neutral-500",
-                            open ? "rotate-180" : "",
-                        ].join(" ")}
-                        aria-hidden
-                    />
-                </div>
-            </button>
-            {open && (
-                <div className="border-t border-neutral-100 px-4 pb-4 pt-3 dark:border-neutral-800 md:px-6 md:pb-6">
-                    <p className="mb-3 text-[11px] text-neutral-400 dark:text-neutral-500">
-                        각 월별 리포트에 기록된 신규 납입액 합계입니다.
-                    </p>
-                    <div className="h-52 min-w-0 md:h-56">
-                        <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                            <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                <Bar name="신규 납입" dataKey="신규 투자금(합계)" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={44} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-/* ── Donut Tooltip ───────────────────────────────────────────────────────*/
-function DonutTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { color: string } }> }) {
-    if (!active || !payload?.length) return null;
-    const item = payload[0];
-    return (
-        <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
-            <div className="flex items-center gap-2 text-xs">
-                <span className="h-2 w-2 rounded-full" style={{ background: item.payload.color }} />
-                <span className="font-semibold text-neutral-800 dark:text-neutral-100">{item.name}</span>
-            </div>
-            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{krwFmt(item.value)}</p>
-        </div>
-    );
-}
-
-/* ── Sector Tooltip (shows holding labels in sector) ─────────────────────*/
-function SectorTooltip({ active, payload }: {
     active?: boolean;
-    payload?: Array<{ name: string; value: number; payload: { color: string; holdingLabels: string[] } }>;
+    payload?: Array<{ name?: string; value?: number }>;
 }) {
     if (!active || !payload?.length) return null;
     const item = payload[0];
+    const label = item.name ?? "";
+    const pct = typeof item.value === "number" ? item.value : 0;
     return (
-        <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
-            <div className="flex items-center gap-2 text-xs">
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: item.payload.color }} />
-                <span className="font-semibold text-neutral-800 dark:text-neutral-100">{item.name}</span>
-            </div>
-            <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">{krwFmt(item.value)}</p>
-            {item.payload.holdingLabels.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                    {item.payload.holdingLabels.map((t, i) => (
-                        <span key={`${t}-${i}`} className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
-                            {t}
-                        </span>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
-/* ── Ticker Donut ────────────────────────────────────────────────────────*/
-function TickerCashToggle({ includeCash, setIncludeCash }: { includeCash: boolean; setIncludeCash: (v: boolean) => void }) {
-    return (
-        <button
-            type="button"
-            role="switch"
-            aria-checked={includeCash}
-            aria-label={includeCash ? "현금이 차트에 포함됨" : "현금이 차트에서 제외됨"}
-            onClick={() => setIncludeCash(!includeCash)}
-            className={[
-                "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors",
-                includeCash ? "bg-indigo-600" : "bg-neutral-200 dark:bg-neutral-700",
-            ].join(" ")}
+        <div
+            className="rounded-lg px-3 py-2 shadow-lg"
+            style={{
+                borderWidth: 1,
+                borderStyle: "solid",
+                borderColor: "var(--ah-border)",
+                background: "var(--ah-card)",
+            }}
         >
-            <span
-                className={[
-                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform",
-                    includeCash ? "translate-x-4" : "translate-x-0.5",
-                ].join(" ")}
-            />
-        </button>
+            <p className="text-xs font-medium" style={{ color: "var(--ah-text-pri)" }}>
+                {label}
+            </p>
+            <p className="text-xs tabular-nums" style={{ color: "var(--ah-text-muted)" }}>
+                {Math.round(pct)}%
+            </p>
+        </div>
     );
 }
 
-function TickerDonut({
-    items,
-    includeCash,
-    group,
-    compactChart,
+function DistributionAnalysisCard({
+    roleData,
+    sectorData,
 }: {
-    items: PortfolioItem[];
-    includeCash: boolean;
-    group: DashboardAccountGroupFilter;
-    compactChart?: boolean;
+    roleData: { role: string; weight: number }[];
+    sectorData: { name: string; weight: number }[];
 }) {
-    const types = accountTypesForDashboardGroup(group);
+    const [activeTab, setActiveTab] = useState<"role" | "sector">("role");
 
-    /** 토글 OFF: accountType CASH인 행만 제외 (종목만). ON 시 동일 행을 비중에 포함 */
-    const nonCashItems = items.filter(
-        (i) =>
-            types.includes(i.accountType) &&
-            i.krwAmount > 0 &&
-            i.accountType !== "CASH",
-    );
+    const ROLE_COLORS: Record<string, string> = {
+        코어: "var(--role-alloc-core)",
+        성장: "var(--role-alloc-growth)",
+        방어: "var(--role-alloc-defensive)",
+        부스터: "var(--role-alloc-booster)",
+        지수: "var(--role-alloc-index)",
+        채권: "var(--role-alloc-bond)",
+        미지정: "var(--role-alloc-unassigned)",
+        기타: "var(--neutral-state)",
+    };
 
-    const nonCashData = nonCashItems.map((item, idx) => ({
-        name: getPortfolioItemDisplayLabel({
-            ticker: item.ticker,
-            displayName: item.displayName,
-        }),
-        value: item.krwAmount,
-        color: getTickerColor(item.ticker, idx),
-    }));
+    const SECTOR_COLORS = [
+        "var(--donut-1)",
+        "var(--donut-2)",
+        "var(--donut-3)",
+        "var(--donut-4)",
+        "var(--donut-5)",
+        "var(--ah-text-subtle)",
+    ];
 
-    const cashRowsForGroup = items.filter(
-        (i) =>
-            i.krwAmount > 0 &&
-            i.accountType === "CASH" &&
-            cashBelongsToDashboardGroup(i, group),
-    );
-
-    const cashByLabel = new Map<string, { value: number; color: string }>();
-    if (includeCash) {
-        for (const row of cashRowsForGroup) {
-            const label = cashSliceLabelForItem(row, group);
-            const prev = cashByLabel.get(label);
-            const nextVal = (prev?.value ?? 0) + row.krwAmount;
-            cashByLabel.set(label, { value: nextVal, color: hexForCashSliceLabel(label) });
-        }
-    }
-
-    const cashData = includeCash
-        ? [...cashByLabel.entries()].map(([name, { value, color }]) => ({
-            name,
-            value,
-            color,
-        }))
-        : [];
-
-    const data = [...nonCashData, ...cashData];
-    const displayTotal = data.reduce((s, d) => s + d.value, 0);
-
-    if (!data.length) {
-        return (
-            <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
-                <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트에 종목을 추가하면</p>
-                <p className="text-sm text-neutral-400 dark:text-neutral-500">차트가 표시됩니다</p>
-            </div>
-        );
-    }
-
-    const ir = compactChart ? 52 : 60;
-    const or = compactChart ? 76 : 88;
+    const activeData =
+        activeTab === "role"
+            ? roleData.map((d) => ({
+                  name: d.role,
+                  value: d.weight,
+                  color: ROLE_COLORS[d.role] ?? "var(--ah-text-subtle)",
+              }))
+            : sectorData.map((d, i) => ({
+                  name: d.name,
+                  value: d.weight,
+                  color: SECTOR_COLORS[i % SECTOR_COLORS.length],
+              }));
 
     return (
-        <div className="flex w-full min-w-0 flex-col items-center gap-4">
-            <div className={`relative w-full min-w-0 ${compactChart ? "h-44" : "h-52"}`}>
+        <div
+            className="flex h-full flex-col rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
+            style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
+        >
+            <div className="mb-5 flex items-center justify-between">
+                <h3 className="text-sm font-bold" style={{ color: "var(--ah-text-pri)" }}>
+                    {activeTab === "role" ? "역할별 분산" : "섹터별 분산"}
+                </h3>
+
+                <div
+                    className="relative inline-flex w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:w-auto md:overflow-visible"
+                    role="tablist"
+                    aria-label="역할·섹터 보기"
+                >
+                    {(["role", "sector"] as const).map((tab) => {
+                        const selected = activeTab === tab;
+                        return (
+                            <button
+                                key={tab}
+                                type="button"
+                                role="tab"
+                                aria-selected={selected}
+                                onClick={() => setActiveTab(tab)}
+                                className={[
+                                    "relative z-10 flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-300",
+                                    selected
+                                        ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
+                                        : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",
+                                ].join(" ")}
+                            >
+                                {tab === "role" ? "역할" : "섹터"}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            <div className="relative mx-auto h-44 w-44">
                 <ResponsiveContainer width="100%" height="100%" debounce={50}>
                     <PieChart>
                         <Pie
-                            data={data}
+                            key={activeTab}
+                            data={activeData}
+                            dataKey="value"
+                            nameKey="name"
                             cx="50%"
                             cy="50%"
-                            innerRadius={ir}
-                            outerRadius={or}
-                            paddingAngle={2}
-                            dataKey="value"
+                            innerRadius={48}
+                            outerRadius={78}
+                            paddingAngle={3}
+                            cornerRadius={6}
                             strokeWidth={0}
                             isAnimationActive
+                            animationDuration={500}
+                            animationBegin={0}
                         >
-                            {data.map((entry, i) => (
-                                <Cell key={`${entry.name}-${i}`} fill={entry.color} />
+                            {activeData.map((d, i) => (
+                                <Cell key={`${d.name}-${i}`} fill={d.color} />
                             ))}
                         </Pie>
-                        <Tooltip content={<DonutTooltip />} />
+                        <Tooltip
+                            content={({ active, payload }) => {
+                                if (!active || !payload?.length) return null;
+                                const d = payload[0];
+                                return (
+                                    <div
+                                        className="rounded-lg px-3 py-2 text-xs shadow-lg"
+                                        style={{
+                                            background: "var(--ah-card)",
+                                            border: "1px solid var(--ah-border)",
+                                            color: "var(--ah-text-pri)",
+                                        }}
+                                    >
+                                        <p className="font-semibold">{d.name}</p>
+                                        <p style={{ color: "var(--ah-text-muted)" }}>
+                                            {Math.round(d.value as number)}%
+                                        </p>
+                                    </div>
+                                );
+                            }}
+                        />
                     </PieChart>
                 </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <p className={`font-medium uppercase tracking-widest text-neutral-400 ${compactChart ? "text-[9px]" : "text-[10px]"}`}>평가금액</p>
-                    <p className={`mt-0.5 font-bold tracking-tight text-neutral-900 dark:text-white ${compactChart ? "text-sm" : "text-base"}`}>
-                        {krwShort(displayTotal)}
-                    </p>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                        <p className="text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+                            {activeData.length}개
+                        </p>
+                        <p className="text-sm font-bold" style={{ color: "var(--ah-text-pri)" }}>
+                            {activeTab === "role" ? "역할" : "섹터"}
+                        </p>
+                    </div>
                 </div>
             </div>
-            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1.5">
-                {data.map((d) => {
-                    const pct = displayTotal > 0 ? ((d.value / displayTotal) * 100).toFixed(1) : "0";
-                    return (
-                        <div key={d.name} className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
-                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                            <span>{d.name}</span>
-                            <span className="text-neutral-400 dark:text-neutral-500">{pct}%</span>
+
+            <div className="mt-5 flex-1 space-y-2">
+                {activeData.map((d, i) => (
+                    <div
+                        key={`${d.name}-${i}`}
+                        className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors duration-150"
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "var(--ah-card-soft)";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                        }}
+                    >
+                        <div className="flex items-center gap-2.5">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.color }} />
+                            <span className="text-sm" style={{ color: "var(--ah-text-pri)" }}>
+                                {d.name}
+                            </span>
                         </div>
-                    );
-                })}
+                        <div className="flex items-center gap-3">
+                            <div className="h-1 w-16 overflow-hidden rounded-full" style={{ background: "var(--ah-card-soft)" }}>
+                                <div
+                                    className="h-full rounded-full transition-all duration-700"
+                                    style={{
+                                        width: `${Math.min(d.value, 100)}%`,
+                                        background: d.color,
+                                        opacity: 0.8,
+                                    }}
+                                />
+                            </div>
+                            <span
+                                className="w-10 text-right text-sm font-semibold tabular-nums"
+                                style={{ color: "var(--ah-text-pri)" }}
+                            >
+                                {Math.round(d.value)}%
+                            </span>
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
 }
 
-/* ── Sector Donut ────────────────────────────────────────────────────────*/
-const SECTOR_COLORS: Record<string, string> = {
-    "Technology": "#6366F1",
-    "Financials": "#2563EB",
-    "Consumer Discretionary": "#F59E0B",
-    "Consumer Staples": "#059669",
-    "Healthcare": "#EC4899",
-    "Industrials": "#0D9488",
-    "Energy": "#DC2626",
-    "Materials": "#65A30D",
-    "Real Estate": "#7C3AED",
-    "Utilities": "#0891B2",
-    "Communication Services": "#EA580C",
-    "ETF / Index": "#6B7280",
-    "기타": "#9CA3AF",
-};
-
-/** 현금 제외하여 섹터별 비중 계산 (CASH는 섹터 분류 없음) */
-function SectorDonut({
-    items,
+function UnifiedPortfolioCard({
     group,
-    compactChart,
+    latestQuarterly,
+    roleAllocationData,
 }: {
-    items: PortfolioItem[];
     group: DashboardAccountGroupFilter;
-    compactChart?: boolean;
+    latestQuarterly: ReportWithItems | undefined;
+    roleAllocationData: RoleAllocationItem[];
 }) {
-    const types = accountTypesForDashboardGroup(group);
-    const scoped = items.filter((i) => types.includes(i.accountType));
-    const sectorMap = new Map<string, { value: number; holdingLabels: string[] }>();
-    const nonCashItems = scoped.filter(
-        (i) =>
-            i.accountType !== "CASH" &&
-            i.krwAmount > 0 &&
-            !isCashLikePortfolioItem(i),
-    );
-    const totalExCash = nonCashItems.reduce((s, i) => s + i.krwAmount, 0);
-
-    nonCashItems.forEach((item) => {
-            const sector = (item.sector as string | null) || "기타";
-            const existing = sectorMap.get(sector) ?? { value: 0, holdingLabels: [] };
-            const label = getPortfolioItemDisplayLabel({
-                ticker: item.ticker,
-                displayName: item.displayName,
-            });
-            sectorMap.set(sector, {
-                value: existing.value + item.krwAmount,
-                holdingLabels: [...existing.holdingLabels, label],
-            });
-        });
-
-    const data = Array.from(sectorMap.entries()).map(([name, { value, holdingLabels }], idx) => ({
-        name,
-        value,
-        holdingLabels,
-        color: SECTOR_COLORS[name] ?? FALLBACK_COLORS[idx % FALLBACK_COLORS.length],
-    }));
-
-    if (!data.length) {
-        return (
-            <div className="flex h-full flex-col items-center justify-center gap-2 py-8 text-center">
-                <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트에 섹터 정보를 입력하면</p>
-                <p className="text-sm text-neutral-400 dark:text-neutral-500">차트가 표시됩니다</p>
-            </div>
-        );
-    }
-
-    const ir = compactChart ? 52 : 60;
-    const or = compactChart ? 76 : 88;
-
     return (
-        <div className="flex w-full min-w-0 flex-col items-center gap-4">
-            <div className={`relative w-full min-w-0 ${compactChart ? "h-44" : "h-52"}`}>
-                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                    <PieChart>
-                        <Pie
-                            data={data}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={ir}
-                            outerRadius={or}
-                            paddingAngle={2}
-                            dataKey="value"
-                            strokeWidth={0}
-                            isAnimationActive
-                        >
-                            {data.map((entry, i) => (
-                                <Cell key={i} fill={entry.color} />
-                            ))}
-                        </Pie>
-                        <Tooltip content={<SectorTooltip />} />
-                    </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                    <p className={`font-medium uppercase tracking-widest text-neutral-400 ${compactChart ? "text-[9px]" : "text-[10px]"}`}>섹터 분산</p>
-                    <p className={`mt-0.5 font-bold tracking-tight text-neutral-900 dark:text-white ${compactChart ? "text-sm" : "text-base"}`}>
-                        {data.length}개 섹터
-                    </p>
-                </div>
-            </div>
-            <div className="flex flex-wrap justify-center gap-x-3 gap-y-1.5">
-                {data.map((d) => {
-                    const pct = totalExCash > 0 ? ((d.value / totalExCash) * 100).toFixed(1) : "0";
-                    return (
-                        <div key={d.name} className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
-                            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-                            <span>{d.name}</span>
-                            <span className="text-neutral-400 dark:text-neutral-500">{pct}%</span>
-                        </div>
+        <div className="flex h-full min-h-0 flex-col rounded-2xl border border-[var(--ah-border)] bg-[var(--ah-card)] p-5 shadow-sm transition-all duration-300 hover:shadow-md">
+            <DistributionAnalysisCard
+                roleData={roleAllocationData.map((d) => ({
+                    role: d.label ?? String(d.role ?? ""),
+                    weight: d.actualWeight,
+                }))}
+                sectorData={(() => {
+                    if (!latestQuarterly) return [];
+                    const types = accountTypesForDashboardGroup(group);
+                    const scoped = latestQuarterly.portfolioItems.filter(
+                        (i) =>
+                            types.includes(i.accountType) &&
+                            i.accountType !== "CASH" &&
+                            i.krwAmount > 0 &&
+                            !isCashLikePortfolioItem(i),
                     );
-                })}
-            </div>
+                    const totalExCash = scoped.reduce((s, i) => s + i.krwAmount, 0);
+                    const sectorMap = new Map<string, number>();
+                    scoped.forEach((item) => {
+                        const sector = (item.sector as string | null) || "기타";
+                        sectorMap.set(sector, (sectorMap.get(sector) ?? 0) + item.krwAmount);
+                    });
+                    return Array.from(sectorMap.entries())
+                        .map(([name, value]) => ({
+                            name,
+                            weight: totalExCash > 0 ? (value / totalExCash) * 100 : 0,
+                        }))
+                        .sort((a, b) => b.weight - a.weight)
+                        .slice(0, 6);
+                })()}
+            />
         </div>
     );
 }
@@ -569,9 +991,11 @@ export function DashboardPageClient() {
     const [reports, setReports] = useState<ReportWithItems[]>([]);
     const [strategies, setStrategies] = useState<PortfolioStrategy[]>([]);
     const [loading, setLoading] = useState(true);
-    const [includeCash, setIncludeCash] = useState(false);
     const [metricsLoading, setMetricsLoading] = useState(true);
     const [metrics, setMetrics] = useState<Awaited<ReturnType<typeof getDashboardQuarterlyMetrics>> | null>(null);
+    const [investmentNewFlows, setInvestmentNewFlows] = useState<
+        Awaited<ReturnType<typeof getDashboardInvestmentNewInflows>> | null
+    >(null);
 
     const group = useMemo(
         () => parseGroupParam(searchParams.get("group")),
@@ -589,6 +1013,70 @@ export function DashboardPageClient() {
         },
         [pathname, router, searchParams],
     );
+
+    const monthlyNewInvBarData = useMemo(() => {
+        const bars = investmentNewFlows?.monthlyBars ?? [];
+        return bars.map((m) => ({
+            period: m.periodLabel,
+            "신규 투자금(합계)": m.amountKrw,
+        }));
+    }, [investmentNewFlows]);
+
+    const quarterlyReports = useMemo(
+        () => [...reports].filter((r) => r.type === "QUARTERLY").reverse(),
+        [reports],
+    );
+    const latestQuarterly =
+        quarterlyReports.length > 0 ? quarterlyReports[quarterlyReports.length - 1] : undefined;
+
+    /** 선택 계좌 필터에 포함된 종목만 표시명 기준 합산 (현금 행 제외) */
+    const consolidatedHoldings = useMemo(() => {
+        if (!latestQuarterly) return [];
+        const scoped = portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group).filter(
+            (i) => i.accountType !== "CASH" && i.krwAmount > 0,
+        );
+        const byName = new Map<string, number>();
+        for (const i of scoped) {
+            const name = getPortfolioItemDisplayLabel({ ticker: i.ticker, displayName: i.displayName });
+            byName.set(name, (byName.get(name) ?? 0) + i.krwAmount);
+        }
+        const totalKrw = [...byName.values()].reduce((s, v) => s + v, 0);
+        return [...byName.entries()]
+            .map(([name, krw]) => ({
+                name,
+                krw,
+                weight: totalKrw > 0 ? (krw / totalKrw) * 100 : 0,
+            }))
+            .sort((a, b) => b.krw - a.krw);
+    }, [latestQuarterly, group]);
+
+    const visibleDeviationGroups = useMemo((): AccountGroupKey[] => {
+        if (group === "all") return DEVIATION_GROUP_ORDER;
+        return [group];
+    }, [group]);
+
+    const deviationByGroup = useMemo(() => {
+        const itemsForDeviation =
+            latestQuarterly == null
+                ? null
+                : group === "all"
+                  ? latestQuarterly.portfolioItems
+                  : portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group);
+        if (itemsForDeviation == null || strategies.length === 0) return null;
+        return computeTickerDeviationsByAccountGroups(itemsForDeviation, strategies);
+    }, [latestQuarterly, strategies, group]);
+
+    const allDeviations = useMemo(() => {
+        if (!deviationByGroup) return [];
+        return visibleDeviationGroups.flatMap((k) => deviationByGroup[k] ?? []);
+    }, [deviationByGroup, visibleDeviationGroups]);
+
+    const { normalCount, overCount, underCount } = useMemo(() => {
+        const normal = allDeviations.filter((d) => Math.abs(d.diff) < 5).length;
+        const over = allDeviations.filter((d) => d.diff >= 5).length;
+        const under = allDeviations.filter((d) => d.diff <= -5).length;
+        return { normalCount: normal, overCount: over, underCount: under };
+    }, [allDeviations]);
 
     useEffect(() => {
         const currentProfile = getCurrentProfile();
@@ -619,6 +1107,17 @@ export function DashboardPageClient() {
             .finally(() => setMetricsLoading(false));
     }, [profileId, group]);
 
+    useEffect(() => {
+        if (!profileId) return;
+        const profileLabel = getProfileLabel(profileId as "alpha-ceo" | "partner");
+        const calendarYear = new Date().getFullYear();
+        void getDashboardInvestmentNewInflows(
+            profileLabel,
+            calendarYear,
+            group === "all" ? undefined : accountTypesForDashboardGroup(group),
+        ).then(setInvestmentNewFlows);
+    }, [profileId, group]);
+
     if (loading) {
         return (
             <div className="p-0">
@@ -626,9 +1125,16 @@ export function DashboardPageClient() {
                     <div className="h-7 w-48 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
                     <div className="mt-2 h-4 w-72 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-700" />
                 </div>
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    {[...Array(4)].map((_, i) => (
-                        <div key={i} className="h-36 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
+                    {[...Array(2)].map((_, col) => (
+                        <div key={col} className="flex flex-col gap-2 md:gap-3">
+                            {[...Array(2)].map((_, row) => (
+                                <div
+                                    key={`${col}-${row}`}
+                                    className="h-40 animate-pulse rounded-3xl bg-neutral-100 dark:bg-neutral-800"
+                                />
+                            ))}
+                        </div>
                     ))}
                 </div>
             </div>
@@ -637,7 +1143,6 @@ export function DashboardPageClient() {
 
     if (reports.length === 0) return <EmptyState />;
 
-    const quarterlyReports = [...reports].filter((r) => r.type === "QUARTERLY").reverse();
     if (quarterlyReports.length === 0) return <QuarterlyEmptyState />;
 
     const summary = metrics?.summary;
@@ -647,78 +1152,56 @@ export function DashboardPageClient() {
     const profit = summary != null ? summary.profit : 0;
     const returnRate = summary != null ? summary.returnRate : 0;
     const isPositive = profit >= 0;
-    const profitColor = isPositive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400";
     const profitSign = isPositive ? "+" : "";
 
-    const cards: SummaryCardProps[] = [
-        {
-            label: "총 투자금",
-            value: hasSummaryTotals ? krwFmt(invested) : metricsLoading ? "…" : "—",
-            sub:
-                hasSummaryTotals && summary
-                    ? `기준 리포트: ${summary.periodLabel}`
-                    : metricsLoading
-                      ? "불러오는 중…"
-                      : "분기별 리포트를 확인할 수 없습니다.",
-            gradient: "bg-gradient-to-r from-blue-400 to-indigo-500",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" /></svg>,
-        },
-        {
-            label: "현재 총 평가금",
-            value: hasSummaryTotals ? krwFmt(current) : metricsLoading ? "…" : "—",
-            gradient: "bg-gradient-to-r from-violet-400 to-purple-500",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" /></svg>,
-        },
-        {
-            label: "누적 수익금",
-            value: hasSummaryTotals ? `${profitSign}${krwFmt(profit)}` : metricsLoading ? "…" : "—",
-            colorClass: profitColor,
-            sub: hasSummaryTotals ? `원금 대비 ${profitSign}${krwFmt(profit)}` : undefined,
-            gradient: isPositive ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isPositive ? "text-emerald-500" : "text-red-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>{isPositive ? <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />}</svg>,
-        },
-        {
-            label: "누적 수익률",
-            value: hasSummaryTotals ? `${profitSign}${returnRate.toFixed(2)}%` : metricsLoading ? "…" : "—",
-            colorClass: profitColor,
-            sub: hasSummaryTotals ? (isPositive ? "수익 중 🎉" : "손실 중") : undefined,
-            gradient: isPositive ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-gradient-to-r from-slate-400 to-gray-500",
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${isPositive ? "text-amber-500" : "text-slate-400"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
-        },
-    ];
-
     const series = metrics?.series ?? [];
-    const barData = series.map((row) => ({
-        period: row.periodLabel,
-        "총 투자금": row.totalInvested,
-        "총 평가금": row.totalCurrent,
-        "수익금": row.profit,
-    }));
 
-    const monthlyAscForNewInv = [...reports]
-        .filter((r) => r.type === "MONTHLY")
-        .sort((a, b) => a.periodLabel.localeCompare(b.periodLabel));
+    const investedHist = series.map((r) => r.totalInvested);
+    const currentHist = series.map((r) => r.totalCurrent);
+    const profitHist = series.map((r) => r.profit);
+    const returnHist = series.map((r) => r.returnRate);
+
+    let deltaInvested = 0;
+    let deltaCurrent = 0;
+    let deltaProfit = 0;
+    let deltaReturnPoints = 0;
+    if (series.length >= 2) {
+        const last = series[series.length - 1];
+        const prev = series[series.length - 2];
+        deltaInvested =
+            prev.totalInvested !== 0
+                ? ((last.totalInvested - prev.totalInvested) / prev.totalInvested) * 100
+                : last.totalInvested !== 0
+                  ? 100
+                  : 0;
+        deltaCurrent =
+            prev.totalCurrent !== 0
+                ? ((last.totalCurrent - prev.totalCurrent) / prev.totalCurrent) * 100
+                : last.totalCurrent !== 0
+                  ? 100
+                  : 0;
+        const absPrevProfit = Math.abs(prev.profit);
+        deltaProfit =
+            absPrevProfit > 1e-9
+                ? ((last.profit - prev.profit) / absPrevProfit) * 100
+                : last.profit !== prev.profit
+                  ? last.profit > prev.profit
+                      ? 100
+                      : -100
+                  : 0;
+        deltaReturnPoints = last.returnRate - prev.returnRate;
+    }
+
+    const summaryPeriodCaption =
+        hasSummaryTotals && summary
+            ? `기준: ${summary.periodLabel}`
+            : metricsLoading
+              ? "불러오는 중…"
+              : "분기별 리포트 없음";
     const calendarYear = new Date().getFullYear();
-    const ytdNewInvestmentKrw = monthlyAscForNewInv
-        .filter((r) => r.periodLabel.startsWith(`${calendarYear}-`))
-        .reduce(
-            (sum, r) => sum + (r.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0),
-            0,
-        );
-    const latestMonthlyForNewInv =
-        monthlyAscForNewInv.length > 0 ? monthlyAscForNewInv[monthlyAscForNewInv.length - 1] : null;
-    const monthlyNewInvBarData: NewInvBarRow[] = monthlyAscForNewInv.map((r) => ({
-        period: r.periodLabel,
-        "신규 투자금(합계)": (r.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0),
-    }));
-
-    const returnData = series.map((row) => ({
-        period: row.periodLabel,
-        "수익률(%)": parseFloat(row.returnRate.toFixed(2)),
-    }));
-
-    // ── 최신 분기별 리포트 (포트폴리오 도넛 차트용) ──────────────────
-    const latestQuarterly = quarterlyReports[quarterlyReports.length - 1];
+    const flowBars = investmentNewFlows?.monthlyBars ?? [];
+    const latestFlowBar =
+        flowBars.length > 0 ? flowBars[flowBars.length - 1] : null;
 
     const itemsScopedForRole = latestQuarterly
         ? portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group)
@@ -727,18 +1210,6 @@ export function DashboardPageClient() {
     const roleAllocationData = latestQuarterly
         ? computeRoleAllocation(itemsScopedForRole)
         : [];
-
-    const itemsForDeviation =
-        latestQuarterly == null
-            ? null
-            : group === "all"
-              ? latestQuarterly.portfolioItems
-              : portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group);
-
-    const deviationByGroup =
-        itemsForDeviation != null && strategies.length > 0
-            ? computeTickerDeviationsByAccountGroups(itemsForDeviation, strategies)
-            : null;
 
     const groupHasHoldings = (key: AccountGroupKey) => {
         if (!latestQuarterly) return false;
@@ -751,31 +1222,27 @@ export function DashboardPageClient() {
         );
     };
 
-    const GROUP_DEVIATION_TITLES: Record<AccountGroupKey, string> = {
-        직투: "직투",
-        ISA: "ISA",
-        연금저축: "연금저축",
-    };
+    /** ISA·연금저축: 역할/섹터 분산 카드 생략, 비중 도넛은 아래 '포트폴리오 구성' 좌측으로 이동, 추이 차트는 전폭 */
+    const portfolioDonutBesideTrendChart = group !== "ISA" && group !== "연금저축";
+    const portfolioDonutSegments = consolidatedHoldings.map(({ name, weight }) => ({ name, weight }));
 
-    const DEVIATION_GROUP_ORDER: AccountGroupKey[] = ["직투", "ISA", "연금저축"];
-    const visibleDeviationGroups: AccountGroupKey[] =
-        group === "all" ? DEVIATION_GROUP_ORDER : [group];
+    const qoqDeltaBadge = series.length >= 2;
 
     return (
-        <div className="w-full max-w-[100vw] space-y-8 overflow-hidden p-0 md:space-y-10">
+        <div className="w-full max-w-[100vw] space-y-8 overflow-hidden bg-[var(--ah-bg)] p-0">
             {/* Header */}
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <PageMainTitle icon={Home}>Dashboard</PageMainTitle>
                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${profileId === "alpha-ceo"
-                        ? "bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-                        : "bg-yellow-50 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400"
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-muted text-muted-foreground"
                         }`}>
                         {getProfileLabel(profileId as "alpha-ceo" | "partner")}
                     </span>
                 </div>
                 <div
-                    className="grid w-full min-w-0 grid-cols-4 gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800 md:flex md:w-auto md:flex-nowrap"
+                    className="relative inline-flex w-full md:w-auto flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:overflow-visible"
                     role="tablist"
                     aria-label="계좌 필터"
                 >
@@ -795,13 +1262,14 @@ export function DashboardPageClient() {
                                 type="button"
                                 role="tab"
                                 aria-selected={selected}
-                                onClick={() => setGroup(key === "all" ? "all" : (key as AccountGroupKey))}
+                                onClick={() =>
+                                    setGroup(key === "all" ? "all" : (key as AccountGroupKey))
+                                }
                                 className={[
-                                    "min-w-0 rounded-md px-1.5 py-1.5 text-center text-xs font-medium transition",
-                                    "w-full md:w-auto md:px-3",
+                                    "relative z-10 flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-300",
                                     selected
-                                        ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-900 dark:text-neutral-100"
-                                        : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-100",
+                                        ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
+                                        : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",
                                 ].join(" ")}
                             >
                                 {label}
@@ -811,11 +1279,50 @@ export function DashboardPageClient() {
                 </div>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {cards.map((card) => (
-                    <SummaryCard key={card.label} {...card} />
-                ))}
+            {/* Summary — 좌: 투자금·평가금 / 우: 수익금·수익률 (기준 분기는 상단 한 줄만) */}
+            <div className="space-y-1.5">
+                <p className="text-end text-[11px] leading-snug text-[var(--ah-text-muted)]">
+                    {summaryPeriodCaption}
+                </p>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2 md:gap-3">
+                    <div className="flex flex-col gap-2 md:min-h-0 md:gap-3">
+                        <DashboardSummaryStatCard
+                            title="총 투자금"
+                            value={hasSummaryTotals ? krwFmtKm(invested) : metricsLoading ? "…" : "—"}
+                            delta={deltaInvested}
+                            showDeltaBadge={qoqDeltaBadge}
+                            trendData={investedHist}
+                            isPositive={deltaInvested >= 0}
+                        />
+                        <DashboardSummaryStatCard
+                            title="현재 총 평가금"
+                            value={hasSummaryTotals ? krwFmtKm(current) : metricsLoading ? "…" : "—"}
+                            delta={deltaCurrent}
+                            showDeltaBadge={qoqDeltaBadge}
+                            trendData={currentHist}
+                            isPositive={deltaCurrent >= 0}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-2 md:min-h-0 md:gap-3">
+                        <DashboardSummaryStatCard
+                            title="누적 수익금"
+                            value={hasSummaryTotals ? krwFmtKmSigned(profit) : metricsLoading ? "…" : "—"}
+                            delta={deltaProfit}
+                            showDeltaBadge={qoqDeltaBadge}
+                            trendData={profitHist}
+                            isPositive={profit >= 0}
+                        />
+                        <DashboardSummaryStatCard
+                            title="누적 수익률"
+                            value={hasSummaryTotals ? `${profitSign}${Math.round(returnRate)}%` : metricsLoading ? "…" : "—"}
+                            delta={deltaReturnPoints}
+                            deltaUnit="points"
+                            showDeltaBadge={qoqDeltaBadge}
+                            trendData={returnHist}
+                            isPositive={returnRate >= 0}
+                        />
+                    </div>
+                </div>
             </div>
 
             {/* AI 브리핑 배너 */}
@@ -823,16 +1330,12 @@ export function DashboardPageClient() {
 
             {/* 기간별 투자 추이 — 분기별 리포트 기준 */}
             <div className="space-y-4 md:space-y-6">
-                <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">기간별 투자 추이</h2>
+                <h2 className="text-sm font-semibold" style={{ color: "var(--ah-text-pri)" }}>
+                    기간별 투자 추이
+                </h2>
 
                 {metricsLoading ? (
-                    <div className="space-y-4">
-                        <div className="h-52 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800 md:h-64" />
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div className="h-48 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800 md:h-52" />
-                            <div className="h-48 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800 md:h-52" />
-                        </div>
-                    </div>
+                    <div className="h-[min(22rem,85vw)] animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
                 ) : series.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/80 px-6 py-14 text-center dark:border-neutral-700 dark:bg-neutral-900/40">
                         <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
@@ -843,115 +1346,30 @@ export function DashboardPageClient() {
                         </p>
                     </div>
                 ) : (
-                    <>
-                        <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                            <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                총 투자금 · 총 평가금
-                            </p>
-                                <div className="h-52 min-w-0 md:h-64">
-                                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                    <ComposedChart
-                                        data={barData}
-                                        margin={{
-                                            top: 8,
-                                            right: 8,
-                                            left: 0,
-                                            bottom: isMobileLayout ? 36 : 0,
-                                        }}
-                                    >
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                        <XAxis dataKey="period" tick={{ fontSize: isMobileLayout ? 9 : 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                        <YAxis tickFormatter={krwShort} tick={{ fontSize: isMobileLayout ? 9 : 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={isMobileLayout ? 44 : 52} />
-                                        <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                        <Legend
-                                            wrapperStyle={{ fontSize: isMobileLayout ? 10 : 11, color: "#9CA3AF" }}
-                                            {...(isMobileLayout
-                                                ? { verticalAlign: "bottom" as const, align: "center" as const }
-                                                : {})}
-                                        />
-                                        <Bar dataKey="총 투자금" fill="#6366F1" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                                        <Line type="monotone" dataKey="총 평가금" stroke="#10B981" strokeWidth={3} dot={{ fill: "#10B981", strokeWidth: 0 }} />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                        <div className={portfolioDonutBesideTrendChart ? "lg:col-span-2" : "lg:col-span-3"}>
+                            <AssetTrendChart series={series} isMobileLayout={isMobileLayout} />
                         </div>
-
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                            <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                    누적 수익금
-                                </p>
-                                <div className="h-48 min-w-0 md:h-52">
-                                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                        <LineChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                            <defs>
-                                                <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.4} />
-                                                    <stop offset="100%" stopColor="#F59E0B" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                            <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                            <YAxis tickFormatter={krwShort} tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52} />
-                                            <Tooltip content={<CustomBarTooltip />} cursor={{ fill: "rgba(0,0,0,0.04)" }} />
-                                            <Area type="monotone" dataKey="수익금" fill="url(#profitGradient)" stroke="none" hide />
-                                            <Line type="monotone" dataKey="수익금" stroke="#F59E0B" strokeWidth={2} dot={{ fill: "#F59E0B", strokeWidth: 0 }} />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
+                        {portfolioDonutBesideTrendChart && (
+                            <div className="lg:col-span-1">
+                                <PortfolioWeightDonut group={group} segments={portfolioDonutSegments} />
                             </div>
-
-                            <div className="min-w-0 rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                                <p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                    누적 수익률 (%)
-                                </p>
-                                <div className="h-48 min-w-0 md:h-52">
-                                    <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                                        <LineChart data={returnData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                                            <defs>
-                                                <linearGradient id="returnGradient" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="0%" stopColor="#8B5CF6" stopOpacity={0.4} />
-                                                    <stop offset="100%" stopColor="#8B5CF6" stopOpacity={0} />
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-                                            <XAxis dataKey="period" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={40} unit="%" />
-                                            <Tooltip
-                                                formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "누적 수익률"]}
-                                                contentStyle={{ borderRadius: 12, border: "1px solid #e5e7eb", fontSize: 12 }}
-                                                cursor={{ fill: "rgba(0,0,0,0.04)" }}
-                                            />
-                                            <Area type="monotone" dataKey="수익률(%)" fill="url(#returnGradient)" stroke="none" hide />
-                                            <Line type="monotone" dataKey="수익률(%)" stroke="#8B5CF6" strokeWidth={2} dot={{ fill: "#8B5CF6", strokeWidth: 0 }} />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-                        </div>
-                    </>
+                        )}
+                    </div>
                 )}
             </div>
-
-            {latestMonthlyForNewInv && (
-                <NewInvestmentAccordion
-                    latestPeriodLabel={latestMonthlyForNewInv.periodLabel}
-                    latestAmount={(latestMonthlyForNewInv.newInvestments || []).reduce((s, i) => s + i.krwAmount, 0)}
-                    ytdAmount={ytdNewInvestmentKrw}
-                    yearLabel={calendarYear}
-                    chartData={monthlyNewInvBarData}
-                />
-            )}
 
             {/* Portfolio Composition — based on latest quarterly report */}
             <div className="space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-200">포트폴리오 구성</h2>
-                        <p className="mt-0.5 break-words text-xs text-neutral-400 dark:text-neutral-500">
+                        <h2 className="text-sm font-semibold" style={{ color: "var(--ah-text-pri)" }}>
+                            포트폴리오 구성
+                        </h2>
+                        <p className="mt-0.5 break-words text-xs" style={{ color: "var(--ah-text-muted)" }}>
                             최신 분기별 리포트 기준
                             {latestQuarterly && (
-                                <span className="ml-1 font-medium text-neutral-600 dark:text-neutral-300">
+                                <span className="ml-1 font-medium" style={{ color: "var(--ah-text-pri)" }}>
                                     ({latestQuarterly.periodLabel})
                                 </span>
                             )}
@@ -960,159 +1378,171 @@ export function DashboardPageClient() {
                     {latestQuarterly && (
                         <Link
                             href={`/reports/${latestQuarterly.id}`}
-                            className="shrink-0 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition"
+                            className="shrink-0 text-xs text-[var(--ah-text-subtle)] transition-colors hover:text-[var(--ah-text-pri)]"
                         >
                             리포트 보기 →
                         </Link>
                     )}
                 </div>
-                {/* 2x2 그리드: [1,1]종목별 [1,2]목표대비괴리율 [2,1]역할별 [2,2]섹터별 */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-                    {/* [1행 1열 - 좌상단] 종목별 비중 (Ticker Allocation) */}
-                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4 flex shrink-0 items-start justify-between">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                    종목별 비중
-                                </p>
-                                <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                                    Ticker Allocation
+                    {portfolioDonutBesideTrendChart ? (
+                        <UnifiedPortfolioCard
+                            group={group}
+                            latestQuarterly={latestQuarterly}
+                            roleAllocationData={roleAllocationData}
+                        />
+                    ) : (
+                        <PortfolioWeightDonut group={group} segments={portfolioDonutSegments} />
+                    )}
+
+                    {/* 자산 요약과 동일 높이(stretch)·패딩 */}
+                    <div className="flex h-full min-h-0 flex-col">
+                        {!latestQuarterly ? (
+                            <div
+                                className="flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border px-5 py-10 text-center md:px-6"
+                                style={{ background: "var(--ah-card)", borderColor: "var(--ah-border)", borderWidth: 1 }}
+                            >
+                                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                                    분기별 리포트가 없습니다
                                 </p>
                             </div>
-                            {latestQuarterly && (() => {
-                                const hasCash = latestQuarterly.portfolioItems.some(
-                                    (i) =>
-                                        i.accountType === "CASH" &&
-                                        i.krwAmount > 0 &&
-                                        cashBelongsToDashboardGroup(i, group),
-                                );
-                                return hasCash ? (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
-                                            현금 포함
-                                        </span>
-                                        <TickerCashToggle
-                                            includeCash={includeCash}
-                                            setIncludeCash={setIncludeCash}
-                                        />
-                                    </div>
-                                ) : null;
-                            })()}
-                        </div>
-                        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center">
-                            {latestQuarterly ? (
-                                <TickerDonut
-                                    items={latestQuarterly.portfolioItems}
-                                    includeCash={includeCash}
-                                    group={group}
-                                    compactChart={isMobileLayout}
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                                    <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트가 없습니다</p>
-                                    <Link
-                                        href="/reports/new/quarterly"
-                                        className="mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition"
-                                    >
-                                        분기별 리포트 작성 →
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* [1행 2열 - 우상단] 목표 대비 괴리율 (Target vs Actual) */}
-                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4 shrink-0">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                목표 대비 괴리율
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                                Target vs Actual · ±5% 초과 시 리밸런싱 힌트
-                            </p>
-                        </div>
-                        <div className="min-h-0 flex-1 overflow-auto">
-                            {!latestQuarterly ? (
-                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                                    <p className="text-sm text-neutral-400 dark:text-neutral-500">
-                                        분기별 리포트가 없습니다
-                                    </p>
-                                </div>
-                            ) : strategies.length === 0 ? (
-                                <TargetVsActualBar data={[]} />
-                            ) : !visibleDeviationGroups.some((k) => groupHasHoldings(k)) ? (
-                                <p className="py-8 text-center text-sm text-neutral-400 dark:text-neutral-500">
+                        ) : strategies.length === 0 ? (
+                            <div
+                                className="flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border px-5 py-10 text-center md:px-6"
+                                style={{ background: "var(--ah-card)", borderColor: "var(--ah-border)", borderWidth: 1 }}
+                            >
+                                <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                                    포트폴리오 전략이 없어 목표 대비 괴리를 표시하지 않습니다.
+                                </p>
+                            </div>
+                        ) : !visibleDeviationGroups.some((k) => groupHasHoldings(k)) ? (
+                            <div
+                                className="flex flex-1 flex-col items-center justify-center rounded-2xl border px-5 py-10 text-center md:px-6"
+                                style={{ background: "var(--ah-card)", borderColor: "var(--ah-border)", borderWidth: 1 }}
+                            >
+                                <p className="text-xs text-neutral-400 dark:text-neutral-500">
                                     계좌 그룹별 보유 종목이 없어 괴리율을 표시하지 않습니다.
                                 </p>
-                            ) : (
-                                <div className="flex flex-col gap-8 pr-1">
+                            </div>
+                        ) : (
+                            <div
+                                className="rounded-2xl p-5 md:p-6 transition-all duration-300 hover:shadow-md flex min-h-0 flex-1 flex-col overflow-y-auto"
+                                style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
+                            >
+                                <div className="mb-6 flex flex-wrap items-start justify-between gap-3 shrink-0">
+                                    <div>
+                                        <h3 className="text-base font-bold" style={{ color: "var(--ah-text-pri)" }}>
+                                            리밸런싱 인사이트
+                                        </h3>
+                                        <p className="mt-0.5 text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+                                            링 = 실제/목표 달성률 · 넘침 = 초과 · 호버 시 상세
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-4 text-xs">
+                                        {[
+                                            { label: "정상", count: normalCount, color: "var(--ah-text-muted)" },
+                                            { label: "초과", count: overCount, color: "var(--dashboard-spark-success)" },
+                                            { label: "부족", count: underCount, color: "var(--dashboard-spark-negative)" },
+                                        ].map(({ label, count, color }) => (
+                                            <div key={label} className="flex items-center gap-1.5">
+                                                <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                                                <span style={{ color: "var(--ah-text-muted)" }}>
+                                                    {label}{" "}
+                                                    <span className="font-semibold" style={{ color: "var(--ah-text-pri)" }}>
+                                                        {count}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="mb-5 h-px shrink-0" style={{ background: "var(--ah-border)" }} />
+
+                                <div className="space-y-6 min-h-0">
                                     {visibleDeviationGroups.map((key) => {
                                         if (!groupHasHoldings(key)) return null;
                                         const data = deviationByGroup?.[key] ?? [];
+                                        if (!data.length) return null;
                                         return (
-                                            <div key={key}>
-                                                <p className="mb-3 text-xs font-semibold text-neutral-800 dark:text-neutral-100">
-                                                    {GROUP_DEVIATION_TITLES[key]}
-                                                </p>
-                                                <TargetVsActualBar
-                                                    data={data}
-                                                    showAccountBadges={key === "직투"}
-                                                />
-                                            </div>
+                                            <DeviationDivergingBar
+                                                key={key}
+                                                data={data}
+                                                groupTitle={GROUP_DEVIATION_TITLES[key]}
+                                            />
                                         );
                                     })}
                                 </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* [2행 1열 - 좌하단] 역할별 비중 (Role Allocation) */}
-                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4 shrink-0">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                역할별 비중
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                                Role Allocation · 설정에서 역할 지정 가능
-                            </p>
-                        </div>
-                        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center">
-                            <RoleAllocationChart data={roleAllocationData} compactChart={isMobileLayout} />
-                        </div>
-                    </div>
-
-                    {/* [2행 2열 - 우하단] 섹터별 비중 (Sector Allocation) */}
-                    <div className="flex min-h-[380px] min-w-0 flex-col rounded-2xl border border-neutral-100 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 md:p-6">
-                        <div className="mb-4 shrink-0">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
-                                섹터별 비중
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
-                                Sector Allocation · 호버 시 보유 종목 표시
-                            </p>
-                        </div>
-                        <div className="flex min-h-0 min-w-0 flex-1 flex-col items-stretch justify-center">
-                            {latestQuarterly ? (
-                                <SectorDonut
-                                    items={latestQuarterly.portfolioItems}
-                                    group={group}
-                                    compactChart={isMobileLayout}
-                                />
-                            ) : (
-                                <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                                    <p className="text-sm text-neutral-400 dark:text-neutral-500">분기별 리포트가 없습니다</p>
-                                    <Link
-                                        href="/reports/new/quarterly"
-                                        className="mt-1 text-xs font-medium text-indigo-500 hover:text-indigo-600 transition"
-                                    >
-                                        분기별 리포트 작성 →
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
+
+            {investmentNewFlows !== null && (
+                <div className="rounded-2xl border border-[var(--ah-border)] bg-[var(--ah-card)] p-5 shadow-sm transition-all duration-300 hover:shadow-md md:p-6">
+                    <div>
+                        <p
+                            className="text-xs font-semibold uppercase tracking-widest"
+                            style={{ color: "var(--ah-text-subtle)" }}
+                        >
+                            신규 납입
+                        </p>
+                        <p className="mt-1 text-xs" style={{ color: "var(--ah-text-muted)" }}>
+                            최근 납입액과 {calendarYear}년 연간 누적
+                        </p>
+                    </div>
+
+                    {/* 데스크톱: 그리드 2행·2열로 좌 카드 높이(행1+간격+행2)와 우 막대 카드 높이를 픽셀 단위 동일하게 */}
+                    <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)] lg:grid-rows-[auto_auto] lg:gap-x-6 lg:gap-y-3">
+                        <div className="flex flex-col gap-3 lg:contents">
+                            <div
+                                className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--ah-border)] px-4 py-4 text-left lg:col-start-1 lg:row-start-1"
+                                style={{ background: "var(--ah-card-soft)" }}
+                            >
+                                <span className="text-xs leading-tight" style={{ color: "var(--ah-text-muted)" }}>
+                                    최근 ({latestFlowBar?.periodLabel ?? "—"})
+                                </span>
+                                <p
+                                    className="mt-1 text-xl font-bold tabular-nums sm:text-2xl"
+                                    style={{ color: "var(--ah-text-pri)" }}
+                                >
+                                    {krwFmt(latestFlowBar?.amountKrw ?? 0)}
+                                </p>
+                            </div>
+                            <div
+                                className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--ah-border)] px-4 py-4 text-left lg:col-start-1 lg:row-start-2"
+                                style={{ background: "var(--ah-card-soft)" }}
+                            >
+                                <span className="text-xs leading-tight" style={{ color: "var(--ah-text-muted)" }}>
+                                    {calendarYear}년 누적
+                                </span>
+                                <p
+                                    className="mt-1 text-xl font-bold tabular-nums sm:text-2xl"
+                                    style={{ color: "var(--ah-text-pri)" }}
+                                >
+                                    {krwFmt(investmentNewFlows.ytdSumKrw ?? 0)}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex min-h-0 min-w-0 flex-col lg:col-start-2 lg:row-span-2 lg:row-start-1">
+                            <MiniChart
+                                alignToFlowCards
+                                className="min-h-0 flex-1"
+                                data={monthlyNewInvBarData.map((m) => ({
+                                    label: m.period,
+                                    value: m["신규 투자금(합계)"],
+                                }))}
+                                valueFormatter={krwShort}
+                                suffix={false}
+                                title="월별 납입"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

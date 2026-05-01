@@ -4,12 +4,18 @@ import { prisma } from "@/lib/prisma";
 import type { PrismaClient } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import type { AssetRole, ReportType, ReportStatus } from "@/generated/prisma";
-import { monthPeriodLabelsInQuarter } from "@/lib/report-period";
 import {
   INITIAL_CAPITAL_ACCOUNT_TYPES,
   type InitialCapitalAccountType,
   type PrismaTransaction,
 } from "@/lib/initial-capital";
+import { deriveQuarterlyIntervalPerformance } from "@/lib/report-performance";
+import { parseReportPeriodEndDate } from "@/lib/report-period";
+import {
+  buildInvestmentSumByQuarterKey,
+  parseQuarterlyPeriodYearQuarter,
+  quarterInclusiveDateBounds,
+} from "@/lib/investment-aggregates";
 
 async function resolveProfileIdFromLabel(
   db: Pick<PrismaClient, "profile">,
@@ -21,6 +27,43 @@ async function resolveProfileIdFromLabel(
     update: {},
   });
   return p.id;
+}
+
+/** 리포트에 연결된 NewInvestment 행과 동일한 내용을 Investment에 반영 (집계 원천) */
+async function syncInvestmentsForReportTx(
+  tx: PrismaTransaction,
+  profileLabel: string,
+  reportId: number,
+  periodLabel: string,
+  rows: NonNullable<CreateReportPayload["newInvestments"]>,
+): Promise<void> {
+  await tx.profileInvestment.deleteMany({ where: { sourceReportId: reportId } });
+  if (!rows?.length) return;
+  const profileId = await resolveProfileIdFromLabel(tx, profileLabel);
+  const date = parseReportPeriodEndDate(periodLabel);
+  await tx.profileInvestment.createMany({
+    data: rows.map((row) => ({
+      profileId,
+      sourceReportId: reportId,
+      accountType: row.accountType,
+      amountKrw: Math.round(row.krwAmount),
+      date,
+      note: null,
+    })),
+  });
+}
+
+async function sumInvestmentForProfileQuarterKrw(
+  profileId: string,
+  year: number,
+  quarter: number,
+): Promise<number> {
+  const { start, end } = quarterInclusiveDateBounds(year, quarter);
+  const agg = await prisma.profileInvestment.aggregate({
+    where: { profileId, date: { gte: start, lte: end } },
+    _sum: { amountKrw: true },
+  });
+  return agg._sum.amountKrw ?? 0;
 }
 
 /**
@@ -71,28 +114,22 @@ export async function getQuarterlyInitialCapitalSectionStateForEdit(
   return { showInitialCapitalSection: true as const, initialCapitalByAccount };
 }
 
-/** 폼 표시용 누적 원금: AccountInitialCapital 합 + PUBLISHED 월별 리포트의 NewInvestment 합 */
+/** 폼 표시용 누적 원금: AccountInitialCapital 합 + Investment(신규 납입) 합 */
 export async function getProfileCumulativePrincipalKrw(profileLabel: string): Promise<number> {
   const profileId = await resolveProfileIdFromLabel(prisma, profileLabel);
   const [initials, invAgg] = await Promise.all([
     prisma.accountInitialCapital.findMany({ where: { profileId } }),
-    prisma.newInvestment.aggregate({
-      where: {
-        report: {
-          profile: profileLabel,
-          type: "MONTHLY",
-          status: "PUBLISHED",
-        },
-      },
-      _sum: { krwAmount: true },
+    prisma.profileInvestment.aggregate({
+      where: { profileId },
+      _sum: { amountKrw: true },
     }),
   ]);
   const initialSum = initials.reduce((s, row) => s + row.krwAmount, 0);
-  const invSum = invAgg._sum.krwAmount ?? 0;
+  const invSum = invAgg._sum.amountKrw ?? 0;
   return initialSum + invSum;
 }
 
-/** 분기 리포트 상세: 총 투자금·전분기 대비 수익 (표시용) */
+/** 분기 리포트 상세: 누적 투입·평가, 구간 수익/수익률(목록 카드 deriveQuarterlyIntervalPerformance와 동일 공식) */
 export type QuarterlyReportFinancialSummary = {
   totalInvestedKrw: number;
   currentTotalValueKrw: number;
@@ -105,7 +142,7 @@ export async function getQuarterlyReportFinancialSummary(
 ): Promise<QuarterlyReportFinancialSummary | null> {
   const report = await prisma.report.findUnique({
     where: { id: reportId },
-    include: { portfolioItems: true },
+    include: { portfolioItems: true, newInvestments: true },
   });
   if (!report || report.type !== "QUARTERLY") return null;
 
@@ -117,19 +154,19 @@ export async function getQuarterlyReportFinancialSummary(
       where: { profileId },
       _sum: { krwAmount: true },
     }),
-    prisma.newInvestment.aggregate({
-      where: { report: { profile: profileLabel } },
-      _sum: { krwAmount: true },
+    prisma.profileInvestment.aggregate({
+      where: { profileId },
+      _sum: { amountKrw: true },
     }),
   ]);
 
   const totalInvestedKrw =
-    (initialAgg._sum.krwAmount ?? 0) + (invAgg._sum.krwAmount ?? 0);
+    (initialAgg._sum.krwAmount ?? 0) + (invAgg._sum.amountKrw ?? 0);
 
-  const currentTotalValueKrw = report.portfolioItems.reduce(
-    (s, i) => s + i.krwAmount,
-    0
-  );
+  const currentTotalValueKrw =
+    report.portfolioItems.reduce((s, i) => s + i.krwAmount, 0) ||
+    report.totalCurrentKrw ||
+    0;
 
   const previousQuarterly = await prisma.report.findFirst({
     where: {
@@ -142,14 +179,25 @@ export async function getQuarterlyReportFinancialSummary(
     include: { portfolioItems: true },
   });
 
-  const prevEval = previousQuarterly
-    ? previousQuarterly.portfolioItems.reduce((s, i) => s + i.krwAmount, 0)
-    : null;
-
-  const baseValue = prevEval != null ? prevEval : totalInvestedKrw;
-  const quarterlyProfitKrw = currentTotalValueKrw - baseValue;
-  const quarterlyProfitRatePercent =
-    baseValue > 0 ? (quarterlyProfitKrw / baseValue) * 100 : 0;
+  const pqLabel = parseQuarterlyPeriodYearQuarter(report.periodLabel);
+  let quarterlyProfitKrw: number;
+  let quarterlyProfitRatePercent: number;
+  if (previousQuarterly == null) {
+    quarterlyProfitKrw = 0;
+    quarterlyProfitRatePercent = 0;
+  } else {
+    const prevEval =
+      previousQuarterly.portfolioItems.reduce((s, i) => s + i.krwAmount, 0) ||
+      previousQuarterly.totalCurrentKrw ||
+      0;
+    const periodNewInflowKrw =
+      pqLabel != null
+        ? await sumInvestmentForProfileQuarterKrw(profileId, pqLabel.year, pqLabel.quarter)
+        : 0;
+    const basis = prevEval + periodNewInflowKrw;
+    quarterlyProfitKrw = currentTotalValueKrw - basis;
+    quarterlyProfitRatePercent = basis > 0 ? (quarterlyProfitKrw / basis) * 100 : 0;
+  }
 
   return {
     totalInvestedKrw,
@@ -278,7 +326,7 @@ function validateReportPayload(
   payload: CreateReportPayload,
   status: ReportStatusInput
 ): { ok: boolean; error?: string } {
-  const { type, periodLabel, totalInvestedKrw, totalCurrentKrw, portfolioItems, newInvestments = [], summary, journal, strategy, earningsReview } = payload;
+  const { type, periodLabel, totalCurrentKrw, portfolioItems, newInvestments = [], summary, journal, strategy, earningsReview } = payload;
 
   // 공통: periodLabel 필수
   if (!periodLabel?.trim()) {
@@ -483,25 +531,22 @@ export async function createReport(payload: CreateReportPayload) {
 
   const include = { portfolioItems: true as const, newInvestments: true as const };
 
-  const report =
-    payload.type === "QUARTERLY"
-      ? await prisma.$transaction(async (tx) => {
-          const created = await tx.report.create({
-            data: createData,
-            include,
-          });
-          await upsertAccountInitialCapitalsIfApplicable(
-            tx,
-            profileValue,
-            created.id,
-            initialCapitalByAccount,
-          );
-          return created;
-        })
-      : await prisma.report.create({
-          data: createData,
-          include,
-        });
+  const report = await prisma.$transaction(async (tx) => {
+    const created = await tx.report.create({
+      data: createData,
+      include,
+    });
+    if (payload.type === "QUARTERLY") {
+      await upsertAccountInitialCapitalsIfApplicable(
+        tx,
+        profileValue,
+        created.id,
+        initialCapitalByAccount,
+      );
+    }
+    await syncInvestmentsForReportTx(tx, profileValue, created.id, rest.periodLabel, newInvestments);
+    return created;
+  });
 
   revalidatePath("/");
   revalidatePath("/monthly");
@@ -584,6 +629,8 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
       );
     }
 
+    await syncInvestmentsForReportTx(tx, profileValue, id, payload.periodLabel, newInvestments);
+
     return updatedReport;
   });
 
@@ -605,18 +652,46 @@ export async function deleteReport(id: number) {
 
 // ── 기간 헬퍼 (월별·분기 연동) — 순수 함수는 @/lib/report-period 참고 ──
 
-/** 해당 분기에 속한 월별 리포트들의 신규 투입 합계(원화) */
+/** 해당 분기의 Investment 합계(원화) — 월별 납입이 반영된 집계 */
 export async function sumMonthlyNewInvestmentsInQuarterKrw(profile: string, year: number, quarter: number) {
-  const labels = monthPeriodLabelsInQuarter(year, quarter);
+  const profileId = await resolveProfileIdFromLabel(prisma, profile);
+  return sumInvestmentForProfileQuarterKrw(profileId, year, quarter);
+}
+
+/** 분기 목록 카드·상세와 동일한 구간 수익(Investment 기준 당기 납입) */
+export async function getQuarterlyArchiveWithIntervals(profileLabel: string) {
   const reports = await prisma.report.findMany({
-    where: { profile, type: "MONTHLY", periodLabel: { in: labels } },
-    include: { newInvestments: true },
+    where: { profile: profileLabel, type: "QUARTERLY" },
+    include: { portfolioItems: true, newInvestments: true },
   });
-  let sum = 0;
-  for (const r of reports) {
-    for (const inv of r.newInvestments) {
-      sum += inv.krwAmount;
-    }
-  }
-  return sum;
+  reports.sort(
+    (a, b) => parsePeriodLabel(a.periodLabel).getTime() - parsePeriodLabel(b.periodLabel).getTime(),
+  );
+
+  const profileId = await resolveProfileIdFromLabel(prisma, profileLabel);
+  const invRows = await prisma.profileInvestment.findMany({
+    where: { profileId },
+    select: { date: true, amountKrw: true },
+  });
+  const byQuarter = buildInvestmentSumByQuarterKey(invRows);
+
+  const slices = reports.map((r) => {
+    const pq = parseQuarterlyPeriodYearQuarter(r.periodLabel);
+    const periodNewInflowKrw = pq ? byQuarter.get(`${pq.year}-Q${pq.quarter}`) ?? 0 : 0;
+    const totalCurrentKrw =
+      r.portfolioItems.reduce((s, i) => s + i.krwAmount, 0) ||
+      r.totalCurrentKrw ||
+      0;
+    return { totalCurrentKrw, periodNewInflowKrw };
+  });
+
+  const intervalRows = slices.map((_, index) =>
+    deriveQuarterlyIntervalPerformance(slices, index),
+  );
+
+  return reports.map((report, index) => ({
+    report,
+    intervalGainKrw: intervalRows[index].intervalGainKrw,
+    intervalReturnRatePercent: intervalRows[index].intervalReturnRatePercent,
+  }));
 }

@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
         hostname: "unavatar.io",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "financialmodelingprep.com",
+        pathname: "/image-stock/**",
+      },
     ],
   },
   ...(serverActionAllowedOrigins && {
@@ -40,4 +45,6 @@ export default withPWA({
   disable: process.env.NODE_ENV === "development",
   register: true,
   skipWaiting: true,
-})(nextConfig);
+  // next-pwa가 의존하는 next 타입과 프로젝트 next 타입이 달라 단언 필요
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+})(nextConfig as any);

@@ -32,13 +32,13 @@ const REPORT_SECTION_INNER = "space-y-3";
 function riskAccentBarClass(severity: "낮음" | "중간" | "높음"): string {
     switch (severity) {
         case "높음":
-            return "bg-red-500 dark:bg-[#f87171]";
+            return "bg-destructive";
         case "중간":
-            return "bg-amber-400 dark:bg-[#facc15]";
+            return "bg-[var(--neutral-state)]";
         case "낮음":
-            return "bg-emerald-500 dark:bg-[#4ade80]";
+            return "bg-[var(--positive)]";
         default:
-            return "bg-neutral-500";
+            return "bg-muted-foreground";
     }
 }
 
@@ -53,25 +53,25 @@ const getAnalysisReportBySlug = cache(async (slug: string) => {
 });
 
 const RATING_GAUGE_COLOR: Record<AnalysisOutput["rating"], string> = {
-    "Strong Buy": "#22c55e",
-    Buy: "#86efac",
-    Hold: "#facc15",
-    Sell: "#f97316",
-    "Strong Sell": "#ef4444",
+    "Strong Buy": "var(--positive)",
+    Buy: "color-mix(in oklab, var(--positive) 65%, white)",
+    Hold: "var(--neutral-state)",
+    Sell: "var(--negative)",
+    "Strong Sell": "color-mix(in oklab, var(--negative) 85%, #991b1b)",
 };
 
 function ratingBadgeClass(rating: AnalysisOutput["rating"]): string {
     switch (rating) {
         case "Strong Buy":
-            return "bg-[#22c55e] text-neutral-950";
+            return "bg-[var(--positive)] text-white";
         case "Buy":
-            return "bg-[#86efac] text-neutral-950";
+            return "bg-[var(--positive-soft)] text-[var(--positive)] border border-[var(--positive)]/25";
         case "Hold":
-            return "bg-[#facc15] text-neutral-950";
+            return "bg-muted text-muted-foreground border border-border";
         case "Sell":
-            return "bg-[#f97316] text-white";
+            return "bg-[var(--negative-soft)] text-[var(--negative)] border border-[var(--negative)]/25";
         case "Strong Sell":
-            return "bg-[#ef4444] text-white";
+            return "bg-destructive text-destructive-foreground";
         default:
             return "bg-muted text-muted-foreground";
     }
@@ -80,11 +80,11 @@ function ratingBadgeClass(rating: AnalysisOutput["rating"]): string {
 function severityBadgeClass(severity: "낮음" | "중간" | "높음"): string {
     switch (severity) {
         case "높음":
-            return "border-red-300 bg-red-100 text-red-900 dark:border-red-800/60 dark:bg-red-950/50 dark:text-red-100";
+            return "border-destructive/40 bg-destructive/10 text-destructive dark:border-destructive/50 dark:bg-destructive/20 dark:text-destructive";
         case "중간":
-            return "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/50 dark:text-amber-100";
+            return "border-border bg-muted text-muted-foreground";
         case "낮음":
-            return "border-emerald-300 bg-emerald-100 text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/50 dark:text-emerald-100";
+            return "border-[var(--positive)]/30 bg-[var(--positive-soft)] text-[var(--positive)]";
         default:
             return "border-border bg-muted text-muted-foreground";
     }
@@ -378,7 +378,7 @@ export default async function AnalysisReportViewerPage(props: {
                                 </div>
                                 <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
                                     <div
-                                        className="absolute inset-y-0 left-0 rounded-full bg-[#3b82f6]/80"
+                                        className="absolute inset-y-0 left-0 rounded-full bg-primary/90"
                                         style={{
                                             width: `${Math.min(
                                                 100,
@@ -398,9 +398,9 @@ export default async function AnalysisReportViewerPage(props: {
                                         className={cn(
                                             "text-lg font-semibold tabular-nums",
                                             data.overlayTotal > 0
-                                                ? "text-emerald-600 dark:text-emerald-400"
+                                                ? "text-[var(--positive)]"
                                                 : data.overlayTotal < 0
-                                                  ? "text-red-600 dark:text-red-400"
+                                                  ? "text-[var(--negative)]"
                                                   : "text-muted-foreground"
                                         )}
                                     >
@@ -568,7 +568,7 @@ export default async function AnalysisReportViewerPage(props: {
                             <li key={i}>
                                 <div className="flex overflow-hidden rounded-xl border border-border bg-card dark:border-[#1f1f1f] dark:bg-[#111111]">
                                     <div
-                                        className="w-[2px] shrink-0 bg-sky-500 dark:bg-[#60a5fa]"
+                                        className="w-[2px] shrink-0 bg-primary"
                                         aria-hidden
                                     />
                                     <div className="min-w-0 flex-1 px-4 py-3">
@@ -691,7 +691,7 @@ export default async function AnalysisReportViewerPage(props: {
                                 )}
                             >
                                 {up >= 0 ? "▲" : "▼"}{" "}
-                                {Math.abs(up).toFixed(1)}%
+                                {Math.round(Math.abs(up))}%
                             </span>
                         </div>
                     </div>

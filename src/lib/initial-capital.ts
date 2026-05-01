@@ -19,5 +19,5 @@ export const INITIAL_CAPITAL_ACCOUNT_TYPES: InitialCapitalAccountType[] = [
 /** Prisma `$transaction` 콜백 등 — 초기 원금 upsert 시 사용 */
 export type PrismaTransaction = Pick<
   PrismaClient,
-  "profile" | "report" | "accountInitialCapital"
+  "profile" | "report" | "accountInitialCapital" | "profileInvestment"
 >;

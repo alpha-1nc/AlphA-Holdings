@@ -3,8 +3,8 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "dev:turbo": "next dev",
+    "dev": "prisma generate && next dev --webpack",
+    "dev:turbo": "prisma generate && next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
@@ -12,7 +12,10 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
+    "db:migrate-new-investment": "tsx scripts/migrate-new-investment-to-investment.ts",
+    "verify:investment-metrics": "tsx scripts/verify-investment-metrics.ts",
     "db:clear-monthly-legacy": "tsx scripts/clear-monthly-legacy-financial-fields.ts",
+    "db:seed-dev-quarterly": "tsx scripts/seed-dev-quarterly.ts",
     "git:hooks": "git config core.hooksPath .githooks && chmod +x .githooks/pre-commit"
   },
   "dependencies": {

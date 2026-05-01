@@ -566,6 +566,7 @@ function PortfolioRowItem({
                         displayName={row.displayName}
                         logoUrl={row.logoUrl}
                         size={24}
+                        autoFmpLogo
                         editable
                         onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
                     />
@@ -603,7 +604,7 @@ function PortfolioRowItem({
                     </>
                 )}
                 {row.sector && (
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                         {row.sector}
                     </span>
                 )}
@@ -622,14 +623,14 @@ function NewInvestmentRowItem({
     onDelete: () => void;
 }) {
     const flowBtn =
-        "rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400";
+        "rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring";
     const flowInactive =
-        "text-neutral-500 hover:bg-blue-100/80 dark:text-neutral-400 dark:hover:bg-blue-900/40";
-    const flowActiveIn = "bg-white text-blue-700 shadow-sm ring-1 ring-blue-200/80 dark:bg-neutral-800 dark:text-blue-300 dark:ring-blue-600";
-    const flowActiveOut = "bg-white text-rose-700 shadow-sm ring-1 ring-rose-200/80 dark:bg-neutral-800 dark:text-rose-300 dark:ring-rose-700";
+        "text-muted-foreground hover:bg-accent/80";
+    const flowActiveIn = "bg-card text-primary shadow-sm ring-1 ring-primary/25";
+    const flowActiveOut = "bg-card text-[var(--negative)] shadow-sm ring-1 ring-[var(--negative)]/30";
 
     return (
-        <div className="group relative overflow-hidden rounded-2xl bg-white ring-1 ring-blue-200/80 transition hover:ring-blue-300 dark:bg-neutral-900 dark:ring-blue-800 dark:hover:ring-blue-700">
+        <div className="group relative overflow-hidden rounded-2xl bg-card ring-1 ring-border transition hover:ring-primary/20">
             <div className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-stretch">
                 <select
                     value={row.accountType}
@@ -637,7 +638,7 @@ function NewInvestmentRowItem({
                         const newType = e.target.value as StockAccountType;
                         onChange({ accountType: newType });
                     }}
-                    className="w-full shrink-0 rounded-xl bg-blue-50 px-3 py-2.5 text-xs font-medium text-neutral-700 ring-1 ring-blue-200/80 outline-none transition focus:ring-2 focus:ring-blue-400 sm:w-[150px] dark:bg-blue-900/30 dark:text-neutral-200 dark:ring-blue-700"
+                    className="w-full shrink-0 rounded-xl bg-muted px-3 py-2.5 text-xs font-medium text-foreground ring-1 ring-border outline-none transition focus:ring-2 focus:ring-ring sm:w-[150px]"
                 >
                     {(Object.keys(MONTHLY_ACCOUNT_LABELS) as StockAccountType[]).map((k) => (
                         <option key={k} value={k}>{MONTHLY_ACCOUNT_LABELS[k]}</option>
@@ -646,7 +647,7 @@ function NewInvestmentRowItem({
 
                 <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
                     <div
-                        className="inline-flex shrink-0 self-start rounded-xl bg-blue-50/80 p-0.5 ring-1 ring-blue-200/80 dark:bg-blue-900/25 dark:ring-blue-700"
+                        className="inline-flex shrink-0 self-start rounded-xl bg-muted/80 p-0.5 ring-1 ring-border"
                         role="group"
                         aria-label="입금 또는 출금"
                     >
@@ -672,7 +673,7 @@ function NewInvestmentRowItem({
                             value={row.amount}
                             onChange={(e) => onChange({ amount: e.target.value })}
                             placeholder="금액 (원화)"
-                            className="no-spinner w-full min-w-0 rounded-xl bg-blue-50 px-3 py-2.5 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-blue-200/80 outline-none transition focus:ring-2 focus:ring-blue-400 dark:bg-blue-900/30 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-blue-700"
+                            className="no-spinner w-full min-w-0 rounded-xl bg-muted px-3 py-2.5 text-right text-sm text-foreground placeholder:text-muted-foreground ring-1 ring-border outline-none transition focus:ring-2 focus:ring-ring"
                         />
                         <span className="shrink-0 text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
                             KRW
@@ -690,9 +691,9 @@ function NewInvestmentRowItem({
                     </svg>
                 </button>
             </div>
-            <p className="border-t border-blue-100/80 px-4 py-2 text-[11px] text-neutral-500 dark:border-blue-900/50 dark:text-neutral-400">
+            <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
                 반영 금액:{" "}
-                <span className="font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
+                <span className="font-semibold tabular-nums text-foreground">
                     {signedKrw === 0 ? "—" : formatKRW(signedKrw)}
                 </span>
             </p>
@@ -1443,7 +1444,7 @@ export default function EditReportPage() {
                             ? "bg-neutral-400 cursor-not-allowed"
                             : isMonthly
                                 ? "bg-neutral-900 hover:bg-neutral-700 active:scale-[0.98] dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
-                                : "bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] dark:bg-indigo-500 dark:hover:bg-indigo-400",
+                                : "bg-primary hover:bg-primary/90 active:scale-[0.98]",
                     ].join(" ")}
                 >
                     {isSubmitting ? (

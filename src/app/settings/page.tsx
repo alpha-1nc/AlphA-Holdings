@@ -65,8 +65,8 @@ export default function SettingsPage() {
                             className={clsx(
                                 "relative z-10 flex min-h-[38px] flex-1 select-none items-center justify-center gap-2 rounded-full px-2 py-1.5 text-center text-[13px] font-semibold transition-colors active:opacity-90 md:min-h-[44px] md:px-4 md:text-sm",
                                 theme === "light"
-                                    ? "text-amber-400 dark:text-amber-300"
-                                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200",
+                                    ? "text-primary"
+                                    : "text-muted-foreground hover:text-foreground",
                             )}
                             aria-pressed={theme === "light"}
                         >
@@ -83,8 +83,8 @@ export default function SettingsPage() {
                             className={clsx(
                                 "relative z-10 flex min-h-[38px] flex-1 select-none items-center justify-center gap-2 rounded-full px-2 py-1.5 text-center text-[13px] font-semibold transition-colors active:opacity-90 md:min-h-[44px] md:px-4 md:text-sm",
                                 theme === "dark"
-                                    ? "text-violet-600 dark:text-violet-400"
-                                    : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200",
+                                    ? "text-primary"
+                                    : "text-muted-foreground hover:text-foreground",
                             )}
                             aria-pressed={theme === "dark"}
                         >

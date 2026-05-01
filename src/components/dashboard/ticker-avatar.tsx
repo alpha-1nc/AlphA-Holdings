@@ -16,6 +16,7 @@ import {
   normalizeHttpUrl,
   resizeImageToDataUrl,
 } from "@/lib/image-paste";
+import { getFmpLogoUrl } from "@/lib/ticker-logo";
 
 interface TickerAvatarProps {
   ticker: string;
@@ -25,6 +26,11 @@ interface TickerAvatarProps {
   size?: number;
   /** 둥근 사각형 (기업 분석 리포트 스타일) — 기본은 원형 */
   roundedSquare?: boolean;
+  /**
+   * true이면 저장된 logoUrl이 없거나 로드 실패 시 FMP 티커 이미지 URL을 시도합니다.
+   * (와치리스트·분기 스냅샷과 동일한 원형·스케일 스타일)
+   */
+  autoFmpLogo?: boolean;
   /** 편집 가능 시 클릭하여 이미지 붙여넣기 창 */
   editable?: boolean;
   onLogoChange?: (url: string | null) => void;
@@ -38,21 +44,36 @@ export function TickerAvatar({
   logoUrl,
   size = 28,
   roundedSquare = false,
+  autoFmpLogo = false,
   editable = false,
   onLogoChange,
   isSaving = false,
 }: TickerAvatarProps) {
   void _displayNameProp;
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+  const [failedFmpUrl, setFailedFmpUrl] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogPasteRef = useRef<HTMLTextAreaElement>(null);
 
   const t = ticker.trim();
-  const initial = t ? t[0].toUpperCase() : "?";
+  const initial =
+    (t.replace(/[^A-Za-z0-9가-힣]/g, "").slice(0, 2) || t[0] || "?").toUpperCase();
 
   const trimmedLogo = logoUrl?.trim() ?? "";
-  const hasValidLogo =
-    Boolean(trimmedLogo) && failedLogoUrl !== trimmedLogo;
+  const fmpUrl = autoFmpLogo && t ? getFmpLogoUrl(t) : null;
+
+  const customFailed = Boolean(trimmedLogo && failedLogoUrl === trimmedLogo);
+  const customOk = Boolean(trimmedLogo && !customFailed);
+  const fmpFailed = Boolean(fmpUrl && failedFmpUrl === fmpUrl);
+  const fmpOk = Boolean(fmpUrl && !fmpFailed);
+
+  const displayUrl = customOk ? trimmedLogo : fmpOk && fmpUrl ? fmpUrl : null;
+  const hasValidLogo = displayUrl !== null;
+
+  useEffect(() => {
+    setFailedLogoUrl(null);
+    setFailedFmpUrl(null);
+  }, [trimmedLogo, t, autoFmpLogo]);
   const sizeClass =
     size >= 40
       ? "h-10 w-10"
@@ -198,16 +219,23 @@ export function TickerAvatar({
           initial
         )}
       </span>
-      {hasValidLogo && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={trimmedLogo}
-          src={trimmedLogo}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 h-full w-full object-cover"
-          onError={() => setFailedLogoUrl(trimmedLogo)}
-        />
+      {hasValidLogo && displayUrl && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] bg-white dark:bg-neutral-800">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            key={displayUrl}
+            src={displayUrl}
+            alt=""
+            aria-hidden
+            draggable={false}
+            className="block object-contain"
+            style={{ width: "76%", height: "76%" }}
+            onError={() => {
+              if (displayUrl === trimmedLogo) setFailedLogoUrl(trimmedLogo);
+              else if (fmpUrl && displayUrl === fmpUrl) setFailedFmpUrl(fmpUrl);
+            }}
+          />
+        </div>
       )}
       {pendingOverlay && hasValidLogo && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50">

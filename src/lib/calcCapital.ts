@@ -19,7 +19,7 @@ function sumNewInvestmentsForAccounts(
 export async function calcAccountCapital(
   profileId: string | null,
   accountTypes: AccountType[],
-  profileLabel: string
+  _profileLabel: string,
 ): Promise<number> {
   if (accountTypes.length === 0) return 0;
 
@@ -31,13 +31,16 @@ export async function calcAccountCapital(
     initialSum = initialCapitals.reduce((sum, c) => sum + c.krwAmount, 0);
   }
 
-  const investments = await prisma.newInvestment.findMany({
-    where: {
-      report: { profile: profileLabel, status: "PUBLISHED" },
-      accountType: { in: accountTypes },
-    },
-  });
-  const investSum = investments.reduce((sum, i) => sum + i.krwAmount, 0);
+  const investments =
+    profileId != null
+      ? await prisma.profileInvestment.findMany({
+          where: {
+            profileId,
+            accountType: { in: accountTypes },
+          },
+        })
+      : [];
+  const investSum = investments.reduce((sum, i) => sum + i.amountKrw, 0);
 
   return initialSum + investSum;
 }

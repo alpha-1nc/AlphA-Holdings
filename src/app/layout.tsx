@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { TopNavbar } from "@/components/layout/top-navbar";
@@ -12,12 +12,14 @@ const inter = Inter({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+};
+
 export const metadata: Metadata = {
   title: "AlphA Holdings — Report Archive",
   description: "스냅샷 기반 개인 투자 리포트 아카이브",
   manifest: "/manifest.json",
-  // @ts-expect-error themeColor is valid in Next.js metadata
-  themeColor: "#ffffff",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

@@ -2,19 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, TrendingUp } from "lucide-react";
-import { getReportsByProfileAndType } from "@/app/actions/reports";
+import { BarChart3, BanknoteArrowUp, TrendingUp } from "lucide-react";
+import { getQuarterlyArchiveWithIntervals } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import { getTickerColor } from "@/constants/brandColors";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
-import { deriveQuarterlyIntervalPerformance } from "@/lib/report-performance";
 import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
 import { PageMainTitle } from "@/components/layout/page-main-title";
+import {
+    withDevSampleQuarterlyArchiveIfEmpty,
+    isDevSampleReport,
+} from "@/lib/dev-sample-reports";
+import { cn } from "@/lib/utils";
 
-type ReportWithItems = Report & { 
+type ReportWithItems = Report & {
     portfolioItems: PortfolioItem[];
     newInvestments?: NewInvestment[];
+};
+
+type QuarterlyArchiveRow = {
+    report: ReportWithItems;
+    intervalGainKrw: number;
+    intervalReturnRatePercent: number;
 };
 
 const krw = (n: number) =>
@@ -25,15 +35,12 @@ const krw = (n: number) =>
     }).format(n);
 
 function ReportCard({
-    report,
-    intervalGainKrw,
-    intervalReturnRatePercent,
+    archiveRow,
 }: {
-    report: ReportWithItems;
-    intervalGainKrw: number;
-    intervalReturnRatePercent: number;
+    archiveRow: QuarterlyArchiveRow;
 }) {
-    const isPositive = intervalGainKrw >= 0;
+    const { report, intervalReturnRatePercent } = archiveRow;
+    const isPositive = intervalReturnRatePercent >= 0;
     const returnRate = intervalReturnRatePercent;
     const total = report.totalCurrentKrw ?? 0;
     const isDraft = (report as Report & { status?: string }).status === "DRAFT";
@@ -41,99 +48,121 @@ function ReportCard({
         report.portfolioItems.filter((i) => i.krwAmount > 0),
     );
 
-    return (
-        <Link href={`/reports/${report.id}`} className="group block">
-            <div className={`relative overflow-hidden rounded-2xl border bg-white shadow-none ring-1 ring-transparent transition-all duration-200 hover:-translate-y-1 hover:shadow-md dark:bg-neutral-900/80 ${
-                isDraft
-                    ? "border-amber-200/70 opacity-90 hover:opacity-100 dark:border-amber-800/50"
-                    : "border-neutral-100 hover:border-neutral-200 hover:ring-neutral-200/70 dark:border-neutral-800 dark:hover:border-neutral-700"
-            }`}>
-                <div className={`absolute inset-x-0 top-0 h-[3px] ${isPositive ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500"}`} />
+    const cardShellClass = cn(
+        "relative w-full overflow-hidden rounded-2xl border shadow-xl transition-all duration-200",
+        "border-zinc-200/90 bg-gradient-to-b from-zinc-50 to-zinc-100/90 text-zinc-900 shadow-zinc-900/[0.06]",
+        "hover:-translate-y-1 hover:shadow-2xl hover:shadow-zinc-900/10",
+        "dark:border-0 dark:from-zinc-900 dark:to-zinc-900 dark:text-white dark:shadow-black/25",
+        "dark:hover:shadow-2xl",
+        isDraft && "ring-2 ring-primary/25",
+    );
 
-                <div className="p-5 pt-6">
-                    <div className="flex items-start justify-between gap-2 mb-3">
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
-                                    {new Date(report.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })}
-                                </p>
-                                {isDraft && (
-                                    <span className="rounded-full border border-amber-300/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-600/40 dark:bg-amber-900/30 dark:text-amber-400">
-                                        임시저장
-                                    </span>
-                                )}
-                            </div>
-                            <h3 className={`mt-0.5 text-base font-semibold tracking-tight ${isDraft ? "text-neutral-600 dark:text-neutral-400" : "text-neutral-900 dark:text-white"}`}>
-                                {report.periodLabel}
-                            </h3>
-                        </div>
-                        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${isPositive
-                            ? "border-emerald-300/40 bg-emerald-50/70 text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-900/40 dark:text-emerald-400"
-                            : "border-red-300/40 bg-red-50/70 text-red-600 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-400"
-                            }`}>
-                            {isPositive ? "+" : ""}{returnRate.toFixed(2)}%
+    const cardInner = (
+        <div className={cardShellClass}>
+            {isDraft && (
+                <span className="absolute right-4 top-3 z-10 rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    임시저장
+                </span>
+            )}
+
+            <div className="flex flex-col pt-6">
+                <header className="flex items-start justify-between gap-3 px-6 pb-2">
+                    <h3 className="text-lg font-semibold tracking-tight text-zinc-500 dark:text-zinc-400">
+                        {report.periodLabel}
+                    </h3>
+                    <span
+                        className={cn(
+                            "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium",
+                            "border-zinc-200/90 bg-white/80 text-zinc-700 shadow-sm hover:bg-white",
+                            "dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-100 dark:shadow-none dark:hover:bg-zinc-700",
+                            "transition-colors [&_svg]:size-[1.0625rem]",
+                        )}
+                    >
+                        <BanknoteArrowUp aria-hidden className="shrink-0" />
+                        리포트
+                    </span>
+                </header>
+
+                <div className="space-y-5 px-6 pb-6">
+                    <div className="flex flex-wrap items-end gap-2">
+                        <span className="text-3xl font-bold tracking-tight text-zinc-900 tabular-nums dark:text-white">
+                            {krw(total)}
+                        </span>
+                        <span
+                            className={cn(
+                                "text-base font-semibold tabular-nums ms-2",
+                                isPositive ? "text-[var(--positive)]" : "text-[var(--negative)]",
+                            )}
+                        >
+                            {isPositive ? "+" : ""}
+                            {Math.round(returnRate)}%
                         </span>
                     </div>
 
-                    {report.summary && (
-                        <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-                            {report.summary}
-                        </p>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                        <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">평가금</p>
-                            <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white">{krw(total)}</p>
-                        </div>
-                        <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
-                            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">분기 수익금</p>
-                            <p className={`mt-0.5 text-sm font-semibold ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                                {isPositive ? "+" : ""}{krw(intervalGainKrw)}
-                            </p>
-                        </div>
-                    </div>
-
                     {barItems.length > 0 && total > 0 && (
-                        <div>
-                            <div className="flex h-1.5 w-full overflow-hidden rounded-full">
-                                {barItems.map((item, idx) => (
+                        <>
+                            <div className="border-b border-zinc-200/90 dark:border-zinc-700" />
+                            <div className="flex w-full items-start gap-1.5">
+                                {barItems.map((item, idx) => {
+                                    const pct = (item.krwAmount / total) * 100;
+                                    const label = getPortfolioItemDisplayLabel({
+                                        ticker: item.ticker,
+                                        displayName: item.displayName,
+                                    });
+                                    return (
                                         <div
                                             key={item.id}
-                                            style={{
-                                                width: `${(item.krwAmount / total) * 100}%`,
-                                                background: getTickerColor(item.ticker, idx),
-                                            }}
-                                        />
-                                    ))}
+                                            className="min-w-0 space-y-2.5"
+                                            style={{ width: `${pct}%` }}
+                                        >
+                                            <div
+                                                className="h-2.5 w-full overflow-hidden rounded-sm"
+                                                style={{
+                                                    background: getTickerColor(item.ticker, idx),
+                                                }}
+                                            />
+                                            <div className="flex flex-col items-start">
+                                                <span className="w-full truncate text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                                                    {label}
+                                                </span>
+                                                <span className="text-base font-semibold tabular-nums text-zinc-900 dark:text-white">
+                                                    {Math.round(pct)}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-                                {barItems
-                                    .slice(0, 5)
-                                    .map((item, idx) => (
-                                        <span key={item.id} className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-400">
-                                            <span className="h-1.5 w-1.5 rounded-full" style={{ background: getTickerColor(item.ticker, idx) }} />
-                                            {getPortfolioItemDisplayLabel({
-                                                ticker: item.ticker,
-                                                displayName: item.displayName,
-                                            })}
-                                        </span>
-                                    ))}
-                                {barItems.length > 5 && (
-                                    <span className="text-[10px] text-neutral-400">+{barItems.length - 5}</span>
-                                )}
-                            </div>
-                        </div>
+                        </>
                     )}
                 </div>
             </div>
+        </div>
+    );
+
+    if (isDevSampleReport(report)) {
+        return (
+            <div className="group block">
+                <div className="relative">
+                    <span className="absolute right-3 top-3 z-10 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        예시 · 개발
+                    </span>
+                    <div>{cardInner}</div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <Link href={`/reports/${report.id}`} className="group block">
+            {cardInner}
         </Link>
     );
 }
 
 export default function QuarterlyReportPage() {
     const [profileId, setProfileId] = useState<string>("alpha-ceo");
-    const [reports, setReports] = useState<ReportWithItems[]>([]);
+    const [archive, setArchive] = useState<QuarterlyArchiveRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
 
@@ -147,8 +176,10 @@ export default function QuarterlyReportPage() {
         if (!mounted || !profileId) return;
         setLoading(true);
         const profileLabel = getProfileLabel(profileId as "alpha-ceo" | "partner");
-        getReportsByProfileAndType(profileLabel, "QUARTERLY")
-            .then((data) => setReports(data as ReportWithItems[]))
+        getQuarterlyArchiveWithIntervals(profileLabel)
+            .then((data) =>
+                setArchive(withDevSampleQuarterlyArchiveIfEmpty(data, profileLabel)),
+            )
             .finally(() => setLoading(false));
     }, [mounted, profileId]);
 
@@ -179,33 +210,21 @@ export default function QuarterlyReportPage() {
                 </Link>
             </div>
 
-            {reports.length > 0 ? (
+            {archive.length > 0 ? (
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400">
-                            QUARTERLY TIMELINE
-                        </p>
+                    <div className="flex justify-end">
                         <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-                            총 {reports.length}개 리포트
+                            총 {archive.length}개 리포트
                         </span>
                     </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {reports.map((report, index) => {
-                            const { intervalGainKrw, intervalReturnRatePercent } =
-                                deriveQuarterlyIntervalPerformance(reports, index);
-                            return (
-                                <ReportCard
-                                    key={report.id}
-                                    report={report}
-                                    intervalGainKrw={intervalGainKrw}
-                                    intervalReturnRatePercent={intervalReturnRatePercent}
-                                />
-                            );
-                        })}
+                        {archive.map((row) => (
+                            <ReportCard key={row.report.id} archiveRow={row} />
+                        ))}
                     </div>
                 </div>
             ) : (
-                <div className="rounded-2xl border border-dashed border-neutral-200 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/60">
+                <div className="rounded-2xl border border-dashed border-neutral-200 bg-white/80 shadow-none dark:border-zinc-800 dark:bg-zinc-900/60">
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
                             <BarChart3 className="h-7 w-7 text-neutral-400" />

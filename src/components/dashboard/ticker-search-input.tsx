@@ -44,19 +44,22 @@ export function TickerLogo({
 
     const initials = symbol.replace(/[^A-Z0-9]/gi, "").slice(0, 2).toUpperCase();
     const bgCls =
-        region === "KR" ? "bg-red-50 text-red-500 dark:bg-red-950/60 dark:text-red-400" :
-        region === "JP" ? "bg-rose-50 text-rose-500 dark:bg-rose-950/60 dark:text-rose-400" :
-        "bg-blue-50 text-blue-500 dark:bg-blue-950/60 dark:text-blue-400";
+        region === "KR" ? "bg-muted text-secondary" :
+        region === "JP" ? "bg-muted text-muted-foreground" :
+        "bg-muted text-secondary";
 
     // domain 없거나 이미지 에러 → <img> 마운트하지 않음
     const mountImg = Boolean(src && !imgError);
 
     return (
         <span
-            className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10 ${bgCls}`}
+            className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-black/10 dark:ring-white/10 ${imgOk ? "bg-white dark:bg-neutral-800" : bgCls}`}
             style={{ width: size, height: size, fontSize: Math.floor(size * 0.3) }}
         >
-            <span className="absolute inset-0 flex items-center justify-center font-bold select-none">
+            <span
+                className="absolute inset-0 flex items-center justify-center font-bold select-none"
+                style={{ opacity: imgOk ? 0 : 1 }}
+            >
                 {initials}
             </span>
             {mountImg && (
@@ -66,7 +69,15 @@ export function TickerLogo({
                     src={src!}
                     alt=""
                     aria-hidden
-                    className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${imgOk ? "opacity-100" : "opacity-0"}`}
+                    className="absolute block object-contain transition-opacity duration-150"
+                    style={{
+                        width: "76%",
+                        height: "76%",
+                        opacity: imgOk ? 1 : 0,
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
+                    }}
                     onLoad={() => { if (mountedRef.current) setImgOk(true); }}
                     onError={() => { if (mountedRef.current) setImgError(true); }}
                 />
@@ -391,7 +402,7 @@ export function TickerSearchInput({
                                                     {t.symbol}
                                                 </span>
                                                 {t.type === "etf" && (
-                                                    <span className="rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-violet-600 dark:bg-violet-900/40 dark:text-violet-400">
+                                                    <span className="rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-accent-foreground">
                                                         ETF
                                                     </span>
                                                 )}

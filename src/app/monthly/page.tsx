@@ -1,74 +1,95 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FileText, BarChart2 } from "lucide-react";
+import { BarChart2, ChevronRight, FileText } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
 import { PageMainTitle } from "@/components/layout/page-main-title";
+import { cn } from "@/lib/utils";
+import { withDevSampleReportsIfEmpty, isDevSampleReport } from "@/lib/dev-sample-reports";
 
 type ReportWithItems = Report & { 
     portfolioItems: PortfolioItem[];
     newInvestments?: NewInvestment[];
 };
 
-const krw = (n: number) =>
-    new Intl.NumberFormat("ko-KR", {
-        style: "currency",
-        currency: "KRW",
-        maximumFractionDigits: 0,
-    }).format(n);
-
-function sumNewInvestmentKrw(report: ReportWithItems): number {
-    const rows = report.newInvestments ?? [];
-    return rows.reduce((s, inv) => s + (inv.krwAmount ?? 0), 0);
+/** 예: 2025-11 → 2025년 11월 (단독 표시용) */
+function formatMonthTitle(periodLabel: string): string {
+    const m = /^(\d{4})-(\d{2})$/.exec(periodLabel.trim());
+    if (!m) return periodLabel;
+    return `${m[1]}년 ${Number(m[2])}월`;
 }
 
-function ReportCard({ report }: { report: ReportWithItems }) {
+/** 연도 섹션 아래 카드: 11월 */
+function formatMonthWithinYear(periodLabel: string): string {
+    const m = /^(\d{4})-(\d{2})$/.exec(periodLabel.trim());
+    if (!m) return formatMonthTitle(periodLabel);
+    return `${Number(m[2])}월`;
+}
+
+function yearFromPeriodStart(periodLabel: string): number | null {
+    const m = /^(\d{4})/.exec(periodLabel.trim());
+    if (!m) return null;
+    return Number(m[1]);
+}
+
+function ReportCard({
+    report,
+    title,
+}: {
+    report: ReportWithItems;
+    /** 연도 헤더와 함께 쓸 때 월만 (예: 11월) */
+    title?: string;
+}) {
     const isDraft = (report as Report & { status?: string }).status === "DRAFT";
-    const newInvSum = sumNewInvestmentKrw(report);
+
+    const cardShellClass = cn(
+        "relative w-full overflow-hidden rounded-2xl border shadow-lg transition-all duration-200",
+        "border-zinc-200/90 bg-gradient-to-b from-zinc-50 to-zinc-100/90 text-zinc-900 shadow-zinc-900/[0.05]",
+        "hover:-translate-y-0.5 hover:shadow-xl hover:shadow-zinc-900/10",
+        "dark:border-0 dark:from-zinc-900 dark:to-zinc-900 dark:text-white dark:shadow-black/25",
+        "dark:hover:shadow-xl",
+        isDraft && "ring-2 ring-primary/25",
+    );
+
+    const cardInner = (
+        <div className={cardShellClass}>
+            {isDraft && (
+                <span className="absolute right-3 top-2.5 z-10 rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    임시저장
+                </span>
+            )}
+
+            <div className="flex min-h-[4.5rem] items-center justify-between gap-3 px-5 py-4">
+                <p className="min-w-0 text-xl font-semibold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">
+                    {title ?? formatMonthTitle(report.periodLabel)}
+                </p>
+                <ChevronRight
+                    className="size-5 shrink-0 text-zinc-400 opacity-40 transition group-hover:translate-x-0.5 group-hover:opacity-100"
+                    aria-hidden
+                />
+            </div>
+        </div>
+    );
+
+    if (isDevSampleReport(report)) {
+        return (
+            <div className="group block">
+                <div className="relative">
+                    <span className="absolute right-3 top-3 z-10 rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                        예시 · 개발
+                    </span>
+                    <div>{cardInner}</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <Link href={`/reports/${report.id}`} className="group block">
-            <div className={`relative overflow-hidden rounded-2xl border bg-white shadow-none ring-1 ring-transparent transition-all duration-200 hover:-translate-y-1 hover:shadow-md dark:bg-neutral-900/80 ${
-                isDraft
-                    ? "border-amber-200/70 opacity-90 hover:opacity-100 dark:border-amber-800/50"
-                    : "border-neutral-100 hover:border-neutral-200 hover:ring-neutral-200/70 dark:border-neutral-800 dark:hover:border-neutral-700"
-            }`}>
-                <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-neutral-300 via-neutral-400 to-neutral-500 dark:from-neutral-600 dark:via-neutral-500 dark:to-neutral-600" />
-
-                <div className="p-5 pt-6">
-                    <div className="mb-3">
-                        <div className="flex items-center gap-2">
-                            <p className="text-xs font-medium text-neutral-400 dark:text-neutral-500" suppressHydrationWarning>
-                                {new Date(report.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })}
-                            </p>
-                            {isDraft && (
-                                <span className="rounded-full border border-amber-300/60 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:border-amber-600/40 dark:bg-amber-900/30 dark:text-amber-400">
-                                    임시저장
-                                </span>
-                            )}
-                        </div>
-                        <h3 className={`mt-0.5 text-base font-semibold tracking-tight ${isDraft ? "text-neutral-600 dark:text-neutral-400" : "text-neutral-900 dark:text-white"}`}>
-                            {report.periodLabel}
-                        </h3>
-                    </div>
-
-                    {report.summary && (
-                        <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
-                            {report.summary}
-                        </p>
-                    )}
-
-                    <div className="rounded-xl bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/60">
-                        <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">이번 달 신규 투자금 합계</p>
-                        <p className="mt-0.5 text-sm font-semibold text-neutral-900 dark:text-white tabular-nums">
-                            {newInvSum === 0 ? "—" : krw(newInvSum)}
-                        </p>
-                    </div>
-                </div>
-            </div>
+            {cardInner}
         </Link>
     );
 }
@@ -90,9 +111,45 @@ export default function MonthlyReportPage() {
         setLoading(true);
         const profileLabel = getProfileLabel(profileId as "alpha-ceo" | "partner");
         getReportsByProfileAndType(profileLabel, "MONTHLY")
-            .then((data) => setReports(data as ReportWithItems[]))
+            .then((data) =>
+                setReports(
+                    withDevSampleReportsIfEmpty(
+                        data as ReportWithItems[],
+                        "MONTHLY",
+                        profileLabel,
+                    ) as ReportWithItems[],
+                ),
+            )
             .finally(() => setLoading(false));
     }, [mounted, profileId]);
+
+    const yearlyGroups = useMemo(() => {
+        const buckets = new Map<number, ReportWithItems[]>();
+        const other: ReportWithItems[] = [];
+        for (const r of reports) {
+            const y = yearFromPeriodStart(r.periodLabel);
+            if (y === null) {
+                other.push(r);
+                continue;
+            }
+            const list = buckets.get(y) ?? [];
+            list.push(r);
+            buckets.set(y, list);
+        }
+        const rows: { year: number | null; items: ReportWithItems[] }[] = [...buckets.entries()]
+            .sort(([a], [b]) => a - b)
+            .map(([year, items]) => ({
+                year,
+                items: [...items].sort((a, b) => a.periodLabel.localeCompare(b.periodLabel)),
+            }));
+        if (other.length > 0) {
+            rows.push({
+                year: null,
+                items: [...other].sort((a, b) => a.periodLabel.localeCompare(b.periodLabel)),
+            });
+        }
+        return rows;
+    }, [reports]);
 
     if (!mounted || loading) {
         return (
@@ -100,7 +157,7 @@ export default function MonthlyReportPage() {
                 <div className="h-10 w-56 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                     {[...Array(3)].map((_, i) => (
-                        <div key={i} className="h-52 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
+                        <div key={i} className="h-24 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
                     ))}
                 </div>
             </div>
@@ -122,23 +179,35 @@ export default function MonthlyReportPage() {
             </div>
 
             {reports.length > 0 ? (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs font-medium uppercase tracking-[0.2em] text-neutral-400">
-                            MONTHLY TIMELINE
-                        </p>
+                <div className="space-y-8">
+                    <div className="flex justify-end">
                         <span className="rounded-full bg-neutral-100 px-2.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
                             총 {reports.length}개 리포트
                         </span>
                     </div>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {reports.map((report) => (
-                            <ReportCard key={report.id} report={report} />
-                        ))}
-                    </div>
+                    {yearlyGroups.map((group) => (
+                        <section key={group.year ?? "other"} className="space-y-3">
+                            <h2 className="text-sm font-semibold tracking-tight text-neutral-500 dark:text-neutral-400">
+                                {group.year !== null ? `${group.year}년` : "기타"}
+                            </h2>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {group.items.map((report) => (
+                                    <ReportCard
+                                        key={report.id}
+                                        report={report}
+                                        title={
+                                            group.year !== null
+                                                ? formatMonthWithinYear(report.periodLabel)
+                                                : undefined
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    ))}
                 </div>
             ) : (
-                <div className="rounded-2xl border border-dashed border-neutral-200 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/60">
+                <div className="rounded-2xl border border-dashed border-neutral-200 bg-white/80 shadow-none dark:border-zinc-800 dark:bg-zinc-900/60">
                     <div className="flex flex-col items-center justify-center py-16 text-center">
                         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100 dark:bg-neutral-800">
                             <FileText className="h-7 w-7 text-neutral-400" />

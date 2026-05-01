@@ -35,17 +35,19 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   BOOSTER: "부스터",
   DEFENSIVE: "방어",
   INDEX: "지수",
+  BOND: "채권",
   UNASSIGNED: "미지정",
 };
 
-/** 역할별 고유 색상 - 서로 명확히 구별되도록 선정 */
+/** 역할별 색상 — globals.css --role-alloc-* (티 톤 + 중립, 라이트/다크 동기화) */
 export const ROLE_COLORS: Record<RoleKey, string> = {
-  CORE: "#2563EB",      // blue - 중심/안정
-  GROWTH: "#059669",    // emerald - 성장
-  BOOSTER: "#D97706",   // amber - 부스터
-  DEFENSIVE: "#0891B2", // cyan - 방어
-  INDEX: "#EC4899",     // pink - 지수
-  UNASSIGNED: "#6B7280", // gray - 미지정
+  CORE: "var(--role-alloc-core)",
+  GROWTH: "var(--role-alloc-growth)",
+  DEFENSIVE: "var(--role-alloc-defensive)",
+  BOOSTER: "var(--role-alloc-booster)",
+  INDEX: "var(--role-alloc-index)",
+  BOND: "var(--role-alloc-bond)",
+  UNASSIGNED: "var(--role-alloc-unassigned)",
 };
 
 const CASH_TICKER_PATTERNS = /^(KRW|USD|JPY|EUR|GBP|CNY|CASH|현금)$/i;
@@ -65,7 +67,8 @@ export function isCashLikePortfolioItem(item: PortfolioItem): boolean {
   );
 }
 
-function strategyCompositeKey(ticker: string, accountType: AccountType): string {
+/** Strategy 행 · 괴리율 · 도넛 색 매칭 공통키 */
+export function portfolioTickerAccountKey(ticker: string, accountType: AccountType): string {
   return `${ticker.trim().toUpperCase()}|${accountType}`;
 }
 
@@ -104,6 +107,7 @@ export function computeRoleAllocation(items: PortfolioItem[]): RoleAllocationIte
     "BOOSTER",
     "DEFENSIVE",
     "INDEX",
+    "BOND",
     "UNASSIGNED",
   ];
 
@@ -138,7 +142,7 @@ export function computeTickerDeviationsByAccountGroups(
   const strategyMap = new Map<string, PortfolioStrategy>();
   for (const s of strategies) {
     strategyMap.set(
-      strategyCompositeKey(s.ticker, s.accountType),
+      portfolioTickerAccountKey(s.ticker, s.accountType),
       s,
     );
   }
@@ -165,7 +169,7 @@ export function computeTickerDeviationsByAccountGroups(
       { ticker: string; accountType: AccountType; krwAmount: number; displayName: string | null | undefined }
     >();
     for (const i of rawItems) {
-      const k = strategyCompositeKey(i.ticker, i.accountType);
+      const k = portfolioTickerAccountKey(i.ticker, i.accountType);
       const prev = merged.get(k);
       const displayName = (i as { displayName?: string | null }).displayName;
       merged.set(k, {
@@ -181,7 +185,7 @@ export function computeTickerDeviationsByAccountGroups(
     const mergedSorted = [...merged.values()].sort((a, b) => b.krwAmount - a.krwAmount);
     const rows: TickerDeviationItem[] = [];
     for (const row of mergedSorted) {
-      const sk = strategyCompositeKey(row.ticker, row.accountType);
+      const sk = portfolioTickerAccountKey(row.ticker, row.accountType);
       const strat = strategyMap.get(sk);
       const targetWeight = strat?.targetWeight ?? 0;
       const actualWeight =

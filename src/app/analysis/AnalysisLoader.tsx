@@ -134,7 +134,7 @@ function AnalysisLoaderDark({ ticker }: { ticker: string }) {
           sinkDurationSec={2.85}
           delayStepSec={0.32}
           sinkKeyframes="analysis-flux-sink-outer"
-          particleClass="bg-emerald-400/55 shadow-[0_0_14px_rgba(52,211,153,0.35)]"
+          particleClass="bg-[color-mix(in_oklab,var(--accent-400)_55%,transparent)] shadow-[0_0_14px_color-mix(in_oklab,var(--accent-500)_35%,transparent)]"
         />
         <FluxParticles
           ringRadius={56}
@@ -144,7 +144,7 @@ function AnalysisLoaderDark({ ticker }: { ticker: string }) {
           delayStepSec={0.28}
           reverse
           sinkKeyframes="analysis-flux-sink-inner"
-          particleClass="bg-emerald-300/45 shadow-[0_0_10px_rgba(110,231,183,0.32)]"
+          particleClass="bg-[color-mix(in_oklab,var(--accent-300)_45%,transparent)] shadow-[0_0_10px_color-mix(in_oklab,var(--accent-400)_32%,transparent)]"
         />
 
         <div className="relative z-10 flex h-[120px] w-[120px] items-center justify-center sm:h-[132px] sm:w-[132px]">
@@ -231,7 +231,7 @@ function AnalysisLoaderLight({ ticker }: { ticker: string }) {
           sinkDurationSec={2.85}
           delayStepSec={0.32}
           sinkKeyframes="analysis-flux-sink-outer"
-          particleClass="bg-emerald-600/40 shadow-[0_0_12px_rgba(5,150,105,0.28)]"
+          particleClass="bg-[color-mix(in_oklab,var(--accent-600)_42%,transparent)] shadow-[0_0_12px_color-mix(in_oklab,var(--accent-500)_28%,transparent)]"
         />
         <FluxParticles
           ringRadius={56}
@@ -241,7 +241,7 @@ function AnalysisLoaderLight({ ticker }: { ticker: string }) {
           delayStepSec={0.28}
           reverse
           sinkKeyframes="analysis-flux-sink-inner"
-          particleClass="bg-emerald-500/35 shadow-[0_0_10px_rgba(16,185,129,0.25)]"
+          particleClass="bg-[color-mix(in_oklab,var(--accent-500)_38%,transparent)] shadow-[0_0_10px_color-mix(in_oklab,var(--accent-400)_25%,transparent)]"
         />
 
         <div className="relative z-10 flex h-[120px] w-[120px] items-center justify-center sm:h-[132px] sm:w-[132px]">

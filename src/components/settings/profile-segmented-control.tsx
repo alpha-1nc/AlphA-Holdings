@@ -47,7 +47,7 @@ export function ProfileSegmentedControl({
                             className={
                                 "relative z-10 flex min-h-[38px] flex-1 items-center justify-center rounded-full px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition-colors md:min-h-[44px] md:px-6 md:py-3 md:text-sm md:leading-snug " +
                                 (isActive
-                                    ? "text-neutral-900 dark:text-neutral-50"
+                                    ? "text-primary dark:text-primary"
                                     : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200")
                             }
                         >

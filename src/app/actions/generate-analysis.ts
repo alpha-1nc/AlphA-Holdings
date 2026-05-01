@@ -216,13 +216,15 @@ function buildPrompt(
   const fmt  = (v: number | null | undefined, suffix = "") =>
     v != null ? `${v.toLocaleString()}${suffix}` : "N/A";
   const pct  = (v: number | null | undefined) =>
-    v != null ? `${(v * 100).toFixed(2)}%` : "N/A";
+    v != null ? `${Math.round(v * 100)}%` : "N/A";
   const fmtB = (v: number | null | undefined) =>
     v != null ? `$${(v / 1_000_000_000).toFixed(2)}B` : "N/A";
   const fredVal = (s: { latestValue?: number | null } | null | undefined) =>
     s?.latestValue != null ? s.latestValue.toFixed(2) : "N/A";
+  const fredValPct = (s: { latestValue?: number | null } | null | undefined) =>
+    s?.latestValue != null ? String(Math.round(s.latestValue)) : "N/A";
   const fredChg = (s: { change?: number | null } | null | undefined) =>
-    s?.change != null ? `${s.change >= 0 ? "+" : ""}${s.change.toFixed(2)}` : "N/A";
+    s?.change != null ? `${s.change >= 0 ? "+" : ""}${Math.round(s.change)}` : "N/A";
 
   return `
 당신은 글로벌 자산운용사의 수석 주식 애널리스트입니다.
@@ -300,7 +302,7 @@ EV: ${fmtB(financial.enterpriseValue)}  |  EV/Revenue: ${fmt(financial.evToReven
 
 ▌ 수익성
 매출성장률(TTM YoY): ${pct(financial.revenueGrowth)}  |  3년 매출 CAGR: ${financial.revenueCAGR3Y != null
-  ? `${(financial.revenueCAGR3Y * 100).toFixed(2)}%${
+  ? `${Math.round(financial.revenueCAGR3Y * 100)}%${
       financial.fmpRevenueCAGR3Y != null
         ? " (FMP 기준)"
         : financial.revenueCAGR3Y === financial.revenueGrowth
@@ -311,24 +313,24 @@ EV: ${fmtB(financial.enterpriseValue)}  |  EV/Revenue: ${fmt(financial.evToReven
 매출총이익률: ${pct(financial.grossMargins)}  |  영업이익률: ${pct(financial.operatingMargins)}
 순이익률: ${pct(financial.profitMargins)}  |  ROA: ${pct(financial.returnOnAssets)}  |  ROE: ${pct(financial.returnOnEquity)}
 영업이익(TTM): ${fmtB(financial.operatingIncome)}
-영업이익 YoY 성장률: ${financial.operatingIncomeGrowth != null ? `${(financial.operatingIncomeGrowth * 100).toFixed(2)}%` : "N/A"}
+영업이익 YoY 성장률: ${financial.operatingIncomeGrowth != null ? `${Math.round(financial.operatingIncomeGrowth * 100)}%` : "N/A"}
 영업 레버리지 (영업이익성장률 ÷ 매출성장률): ${financial.operatingLeverage != null ? financial.operatingLeverage.toFixed(2) : "N/A"}배
 EBIT: ${fmtB(financial.ebit)}  |  이자비용: ${fmtB(financial.interestExpense)}
 이자보상배율 (EBIT ÷ 이자비용): ${financial.interestCoverage != null ? `${financial.interestCoverage.toFixed(1)}배` : "N/A"}
-ROIC: ${financial.roic != null ? `${(financial.roic * 100).toFixed(2)}%` : "N/A"}
+ROIC: ${financial.roic != null ? `${Math.round(financial.roic * 100)}%` : "N/A"}
 
 ▌ Model B 성장 효율 지표
 Rule of 40: ${financial.ruleOf40 != null ? `${financial.ruleOf40.toFixed(1)}점` : "N/A"} (매출성장률 + FCF마진, 40+ 효율적 성장)
-SBC/매출 비율: ${financial.sbcToRevenue != null ? `${(financial.sbcToRevenue * 100).toFixed(2)}%` : "N/A"} (10% 미만 양호, 20% 초과 주주가치 훼손)
+SBC/매출 비율: ${financial.sbcToRevenue != null ? `${Math.round(financial.sbcToRevenue * 100)}%` : "N/A"} (10% 미만 양호, 20% 초과 주주가치 훼손)
 현금 런웨이: ${financial.isCashRunwayInfinite ? "FCF 흑자 (런웨이 무한)" : financial.cashRunwayYears != null ? `${financial.cashRunwayYears.toFixed(1)}년` : "N/A"}
 EV/Gross Profit: ${financial.evToGrossProfit != null ? financial.evToGrossProfit.toFixed(1) : "N/A"}
 EV/Gross Profit 섹터 중앙값: ${financial.peersMedian?.evToGrossProfit != null ? financial.peersMedian.evToGrossProfit.toFixed(1) : "N/A"}
 EV/Sales ÷ Forward 매출성장률 (사전계산값): ${financial.evToSalesGrowthRatio != null ? financial.evToSalesGrowthRatio.toFixed(3) : "N/A"}
   ※ 위 값은 evToRevenue / (성장률% 숫자) 로 이미 계산됨. Gemini는 이 값을 그대로 사용할 것. 절대 재계산 금지.
   기준: <0.2 매력적 / 0.2~0.4 양호 / 0.4~0.6 보통 / 0.6~0.8 비쌈 / >0.8 고평가
-Forward 매출성장률 (FMP): ${financial.fmpForwardRevenueGrowth != null ? `${(financial.fmpForwardRevenueGrowth * 100).toFixed(1)}%` : "N/A"}
-분기별 매출성장률 표준편차: ${financial.revenueGrowthStdDev != null ? `${financial.revenueGrowthStdDev.toFixed(1)}%p` : "N/A"} (5%p 미만 안정, 15%p 초과 불안정)
-분기별 성장률 추이: ${financial.quarterlyRevenueGrowthRates != null && financial.quarterlyRevenueGrowthRates.length > 0 ? financial.quarterlyRevenueGrowthRates.map((r) => `${(r * 100).toFixed(1)}%`).join(" → ") : "N/A"}
+Forward 매출성장률 (FMP): ${financial.fmpForwardRevenueGrowth != null ? `${Math.round(financial.fmpForwardRevenueGrowth * 100)}%` : "N/A"}
+분기별 매출성장률 표준편차: ${financial.revenueGrowthStdDev != null ? `${Math.round(financial.revenueGrowthStdDev)}%p` : "N/A"} (5%p 미만 안정, 15%p 초과 불안정)
+분기별 성장률 추이: ${financial.quarterlyRevenueGrowthRates != null && financial.quarterlyRevenueGrowthRates.length > 0 ? financial.quarterlyRevenueGrowthRates.map((r) => `${Math.round(r * 100)}%`).join(" → ") : "N/A"}
   ※ 분기별 매출성장률 추이가 제공된 경우 표준편차를 직접 계산해서 채점할 것.
      추이 데이터가 있으면 "데이터 없음"으로 처리하지 말고 반드시 채점.
      추이도 없으면 TTM 성장률 기준으로 중간 점수(2~3점) 부여하고 "(추정)" 명시.
@@ -338,7 +340,7 @@ Forward 매출성장률 (FMP): ${financial.fmpForwardRevenueGrowth != null ? `${
 분기 현금 소진율: ${financial.quarterlyBurnRate != null ? `$${(financial.quarterlyBurnRate / 1e9).toFixed(2)}B/분기` : financial.isCashRunwayInfinite ? "흑자 (소진 없음)" : "N/A"}
 현금 런웨이: ${financial.cashRunwayQuarters != null ? `${financial.cashRunwayQuarters.toFixed(1)}분기 (${(financial.cashRunwayQuarters / 4).toFixed(1)}년)` : financial.isCashRunwayInfinite ? "FCF 흑자 (무한)" : "N/A"}
   ※ 1년 미만이면 Kill Switch 즉시 검토
-발행주식수 YoY 변화율: ${financial.sharesOutstandingYoY != null ? `${(financial.sharesOutstandingYoY * 100).toFixed(2)}% (양수=희석, 음수=소각)` : "N/A"}
+발행주식수 YoY 변화율: ${financial.sharesOutstandingYoY != null ? `${Math.round(financial.sharesOutstandingYoY * 100)}% (양수=희석, 음수=소각)` : "N/A"}
 매출 (절대값): ${financial.revenueAbsolute != null ? `$${(financial.revenueAbsolute / 1e9).toFixed(2)}B` : "N/A"}
 매출 성장률: ${pct(financial.revenueGrowth)}
 Pre-Revenue 여부: ${financial.isPreRevenue ? "예 (매출 1억달러 미만 또는 데이터 없음)" : "아니오"}
@@ -347,7 +349,7 @@ P/B: ${fmt(financial.priceToBook)}
 
 ▌ Model D 시클리컬 지표
 재고회전율 YoY 변화: ${financial.inventoryTurnoverYoY != null
-  ? `${(financial.inventoryTurnoverYoY * 100).toFixed(1)}% (양수=개선, 음수=악화)`
+  ? `${Math.round(financial.inventoryTurnoverYoY * 100)}% (양수=개선, 음수=악화)`
   : "N/A"}
 EV/EBITDA: ${financial.evToEbitda != null ? financial.evToEbitda.toFixed(1) : "N/A"}
 P/B: ${fmt(financial.priceToBook)}
@@ -371,30 +373,30 @@ P/B: ${fmt(financial.priceToBook)}
 ▌ Model E 금융주 지표
 ROE: ${pct(financial.returnOnEquity)}
 베타: ${financial.beta != null ? financial.beta.toFixed(2) : "N/A"}
-자기자본비용 (CoE): ${financial.costOfEquity != null ? `${(financial.costOfEquity * 100).toFixed(2)}%` : "N/A"}
+자기자본비용 (CoE): ${financial.costOfEquity != null ? `${Math.round(financial.costOfEquity * 100)}%` : "N/A"}
 Justified P/B: ${financial.justifiedPB != null ? financial.justifiedPB.toFixed(2) : "N/A"}
 현재 P/B: ${fmt(financial.priceToBook)}
 Justified P/B 대비 현재 P/B 괴리율: ${
   financial.justifiedPB != null && financial.priceToBook != null && financial.justifiedPB > 0
-    ? `${(((financial.priceToBook - financial.justifiedPB) / financial.justifiedPB) * 100).toFixed(1)}% (양수=할증, 음수=할인)`
+    ? `${Math.round(((financial.priceToBook - financial.justifiedPB) / financial.justifiedPB) * 100)}% (양수=할증, 음수=할인)`
     : "N/A"
 }
 배당수익률: ${pct(financial.dividendYield)}
 순이익률: ${pct(financial.profitMargins)}
-NIM 근사값 (참고용): ${financial.netInterestMarginProxy != null ? `${(financial.netInterestMarginProxy * 100).toFixed(2)}%` : "N/A"}
+NIM 근사값 (참고용): ${financial.netInterestMarginProxy != null ? `${Math.round(financial.netInterestMarginProxy * 100)}%` : "N/A"}
 부채비율 (D/E): ${fmt(financial.debtToEquity)}
 
 ▌ Model F 리츠·인프라 지표
 FFO Payout Ratio (근사): ${financial.ffoPayoutRatio != null
-  ? `${(financial.ffoPayoutRatio * 100).toFixed(1)}%`
+  ? `${Math.round(financial.ffoPayoutRatio * 100)}%`
   : "N/A"}
   ※ FFO = 순이익 + D&A 근사값. 실제 AFFO와 다를 수 있음.
 FFO 성장률 (YoY): ${financial.ffoGrowthRate != null
-  ? `${(financial.ffoGrowthRate * 100).toFixed(1)}%`
+  ? `${Math.round(financial.ffoGrowthRate * 100)}%`
   : "N/A"}
 P/FFO: ${financial.priceToFfo != null ? financial.priceToFfo.toFixed(1) : "N/A"}
 장기부채 비중: ${financial.longTermDebtRatio != null
-  ? `${(financial.longTermDebtRatio * 100).toFixed(1)}%`
+  ? `${Math.round(financial.longTermDebtRatio * 100)}%`
   : "N/A"}
 배당수익률 vs 10년 국채 스프레드: ${financial.dividendToTreasurySpread != null
   ? `${(financial.dividendToTreasurySpread * 100).toFixed(0)}bps (양수=배당이 국채보다 높음)`
@@ -414,7 +416,7 @@ P/FFO: ${financial.priceToFfo != null ? financial.priceToFfo.toFixed(1) : "N/A"}
 }
 
 ▌ Peers 섹터 중앙값 ${financial.peersMedian ? `(${financial.peersMedian.peersUsed.join(", ")})` : ""}
-매출총이익률 섹터 중앙값: ${financial.peersMedian?.grossMargin != null ? `${(financial.peersMedian.grossMargin * 100).toFixed(2)}%` : "N/A"}
+매출총이익률 섹터 중앙값: ${financial.peersMedian?.grossMargin != null ? `${Math.round(financial.peersMedian.grossMargin * 100)}%` : "N/A"}
 EV/FCF 섹터 중앙값: ${financial.peersMedian?.evToFcf != null ? financial.peersMedian.evToFcf.toFixed(1) : "N/A"}
   ※ Gemini: 위 중앙값과 비교하여 매출총이익률(D1-2)과 EV/FCF(D5-2) 항목을 채점하세요.
      중앙값이 N/A인 경우에만 정성 판단 허용.
@@ -429,7 +431,7 @@ FCF: ${fmtB(financial.freeCashflow)}  |  영업CF: ${fmtB(financial.operatingCas
 배당 연속 증가 연수: ${financial.dividendGrowthYears != null ? `${financial.dividendGrowthYears}년` : "N/A"}
 자사주 매입 (최근 연간): ${fmtB(financial.shareRepurchase)}
 주식기반보상 SBC (최근 연간): ${fmtB(financial.stockBasedCompensation)}
-순희석률 (자사주-SBC)/시총: ${financial.netDilutionRate != null ? `${(financial.netDilutionRate * 100).toFixed(2)}%` : "N/A"}
+순희석률 (자사주-SBC)/시총: ${financial.netDilutionRate != null ? `${Math.round(financial.netDilutionRate * 100)}%` : "N/A"}
   (양수=주식수 순감소 주주환원 / 음수=실질 희석)
 상세: ${financial.netDilutionDetail ?? "N/A"}
 
@@ -438,7 +440,7 @@ Trailing P/E: ${fmt(financial.trailingPE)}  |  Forward P/E: ${fmt(financial.forw
 5년 평균 Trailing P/E: ${financial.fiveYearAvgPE != null ? financial.fiveYearAvgPE.toFixed(1) : "N/A"}
 현재 Trailing P/E vs 5년 평균 괴리율: ${
   financial.peRatioVs5YearAvg != null
-    ? `${(financial.peRatioVs5YearAvg * 100).toFixed(1)}% (양수=할증, 음수=할인)`
+    ? `${Math.round(financial.peRatioVs5YearAvg * 100)}% (양수=할증, 음수=할인)`
     : "N/A"
 }
   ※ Gemini: D5-1 채점 시 반드시 Trailing P/E vs 5년 평균 Trailing P/E 괴리율 기준으로 채점.
@@ -453,7 +455,7 @@ EV/FCF: ${financial.enterpriseValue != null && financial.freeCashflow != null &&
 Trailing EPS: ${fmt(financial.trailingEps)}
 1년 후 EPS 추정: ${fmt(financial.epsEstimateNextYear)}
 Forward EPS CAGR: ${financial.forwardEpsCAGR != null
-  ? `${(financial.forwardEpsCAGR * 100).toFixed(1)}% (${
+  ? `${Math.round(financial.forwardEpsCAGR * 100)}% (${
       financial.fmpEpsCagrYears != null
         ? `FMP 컨센서스 ${financial.fmpEpsCagrYears}년 CAGR`
         : financial.forwardEpsCagrIsOneYear
@@ -471,20 +473,20 @@ Forward EPS CAGR: ${financial.forwardEpsCAGR != null
 ${financial.earningsHistory
   .map((e) =>
     `${e.period}: 실제 ${fmt(e.epsActual)} / 예상 ${fmt(e.epsEstimate)} / 서프라이즈 ${
-      e.surprisePercent != null ? `${(e.surprisePercent * 100).toFixed(1)}%` : "N/A"
+      e.surprisePercent != null ? `${Math.round(e.surprisePercent * 100)}%` : "N/A"
     }`
   )
   .join("\n")}
 
 ▌ 거시경제 (FRED)
-기준금리(Fed Funds):  ${fredVal(macro.federalFundsRate)}%  (전월비 ${fredChg(macro.federalFundsRate)}%p)
-10년물 국채금리:      ${fredVal(macro.tenYearTreasury)}%
-2년물 국채금리:       ${fredVal(macro.twoYearTreasury)}%
-CPI YoY 변화율:       ${fredVal(macro.cpiYoY)}%
+기준금리(Fed Funds):  ${fredValPct(macro.federalFundsRate)}%  (전월비 ${fredChg(macro.federalFundsRate)}%p)
+10년물 국채금리:      ${fredValPct(macro.tenYearTreasury)}%
+2년물 국채금리:       ${fredValPct(macro.twoYearTreasury)}%
+CPI YoY 변화율:       ${fredValPct(macro.cpiYoY)}%
 PCE 물가지수:         ${fredVal(macro.pce)}
-실업률:               ${fredVal(macro.unemploymentRate)}%
+실업률:               ${fredValPct(macro.unemploymentRate)}%
 비농업 고용:          ${fredVal(macro.nonfarmPayrolls)}K
-실질 GDP 성장률:      ${fredVal(macro.gdpGrowth)}%
+실질 GDP 성장률:      ${fredValPct(macro.gdpGrowth)}%
 ISM 제조업 PMI:       ${fredVal(macro.ismManufacturing)}
 달러 인덱스(DXY):     ${fredVal(macro.dxy)}
 

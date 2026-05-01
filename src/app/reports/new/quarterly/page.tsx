@@ -501,6 +501,7 @@ function PortfolioRowItem({
                         displayName={row.displayName}
                         logoUrl={row.logoUrl}
                         size={24}
+                        autoFmpLogo
                         editable
                         onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
                     />
@@ -538,7 +539,7 @@ function PortfolioRowItem({
                     </>
                 )}
                 {row.sector && (
-                    <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                         {row.sector}
                     </span>
                 )}
@@ -773,7 +774,7 @@ export default function NewQuarterlyReportPage() {
                 </div>
                 <div className="flex justify-end">
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                         {getProfileLabel(profile)}
                     </span>
                 </div>
@@ -1109,7 +1110,7 @@ export default function NewQuarterlyReportPage() {
                         "transition-all duration-200",
                         isSubmitting
                             ? "bg-neutral-400 cursor-not-allowed"
-                            : "bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] dark:bg-indigo-500 dark:hover:bg-indigo-400",
+                            : "bg-primary hover:bg-primary/90 active:scale-[0.98]",
                     ].join(" ")}
                 >
                     {isSubmitting ? (

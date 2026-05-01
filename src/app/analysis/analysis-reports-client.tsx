@@ -329,8 +329,8 @@ export default function AnalysisReportsClient({
                       href={`/analysis/${report.year}/${String(report.month).padStart(2, "0")}/${report.companyCode}`}
                       className="group block"
                     >
-                      <div className="relative overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-none ring-1 ring-transparent transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-neutral-200/70 dark:border-neutral-800 dark:bg-neutral-900/80 dark:hover:border-neutral-700">
-                        <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-blue-400 to-indigo-500" />
+                      <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-none ring-1 ring-transparent transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-border/80">
+                        <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-primary to-[var(--accent-400)]" />
                         <div className="p-5 pt-6">
                           <div className="flex items-start justify-between gap-2">
                             <div
@@ -348,10 +348,10 @@ export default function AnalysisReportsClient({
                               <span
                                 className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold ${
                                   report.verdict === "BUY"
-                                    ? "border-emerald-300/40 bg-emerald-50/70 text-emerald-600 dark:border-emerald-500/40 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                    ? "border-[var(--positive)]/35 bg-[var(--positive-soft)] text-[var(--positive)]"
                                     : report.verdict === "SELL"
-                                      ? "border-red-300/40 bg-red-50/70 text-red-600 dark:border-red-500/40 dark:bg-red-900/40 dark:text-red-400"
-                                      : "border-amber-300/40 bg-amber-50/70 text-amber-600 dark:border-amber-500/40 dark:bg-amber-900/40 dark:text-amber-400"
+                                      ? "border-[var(--negative)]/35 bg-[var(--negative-soft)] text-[var(--negative)]"
+                                      : "border-border bg-muted text-muted-foreground"
                                 }`}
                               >
                                 {report.verdict}

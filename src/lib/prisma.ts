@@ -7,21 +7,24 @@ const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined;
 };
 
+/** `schema.prisma` 가 있는 디렉터리 — Prisma CLI와 동일하게 SQLite 상대 경로 기준 */
+const PRISMA_SCHEMA_DIR = path.join(process.cwd(), "prisma");
+
 /**
  * SQLite DATABASE_URL을 항상 절대 경로로 맞춥니다.
- * - `file:./dev.db`처럼 상대 경로만 있으면 Next.js/Turbopack 실행 시 cwd에 따라 DB 위치가 달라져
- *   Error code 14 (Unable to open the database file)가 날 수 있습니다.
- * - 마이그레이션 기본 위치는 `prisma/dev.db`와 일치시키는 것이 안전합니다.
+ * - Prisma CLI(`migrate` 등)는 `file:` 상대 경로를 **프로젝트 루트가 아니라** `prisma/` 폴더 기준으로 풉니다.
+ * - 예전 .env 에 `file:./prisma/dev.db` 를 두면 CLI 쪽은 `prisma/prisma/dev.db` 가 되어 앱과 DB가 갈라지는 문제가 생깁니다.
+ * - 권장: `DATABASE_URL="file:./dev.db"` (→ `<프로젝트>/prisma/dev.db` 한 곳만 사용).
  */
 function getAbsoluteSqlitePath(): string {
     const fromEnv = process.env.DATABASE_URL?.trim();
 
     if (!fromEnv) {
-        return path.join(process.cwd(), "prisma", "dev.db");
+        return path.join(PRISMA_SCHEMA_DIR, "dev.db");
     }
 
     if (!fromEnv.startsWith("file:")) {
-        return path.join(process.cwd(), "prisma", "dev.db");
+        return path.join(PRISMA_SCHEMA_DIR, "dev.db");
     }
 
     // file:///… 형식 (절대 URL)
@@ -33,12 +36,18 @@ function getAbsoluteSqlitePath(): string {
         }
     }
 
-    const rest = fromEnv.slice("file:".length).replace(/^\/+/, "");
+    let rest = fromEnv.slice("file:".length).replace(/^\/+/, "");
     if (path.isAbsolute(rest)) {
         return rest;
     }
 
-    return path.resolve(process.cwd(), rest);
+    rest = rest.replace(/^\.\//, "");
+    // 이미 prisma/ 를 기준 디렉터리로 쓰므로, `prisma/dev.db` 는 `dev.db` 로 환원
+    if (rest.startsWith(`prisma${path.sep}`)) {
+        rest = rest.slice(`prisma${path.sep}`.length);
+    }
+
+    return path.resolve(PRISMA_SCHEMA_DIR, rest);
 }
 
 function getDatasourceUrl(): string {

@@ -1,0 +1,1 @@
+-- AssetRole 에 BOND(채권) 값 추가 — SQLite에서는 role 컬럼이 TEXT 라 DB 변경 불필요

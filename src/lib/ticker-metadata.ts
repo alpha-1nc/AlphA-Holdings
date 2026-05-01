@@ -138,20 +138,30 @@ export const TICKER_METADATA: Record<string, TickerMetadata> = {
     "현금": { name: "현금", domain: "", color: "#6B7280", sector: "Account" },
 };
 
-/** 폴백용 기본 테마 컬러 (등록되지 않은 티커용) */
+/** 폴백 — `getTickerColor`와 동일한 틸 톤 팔레트 (브랜드 레인보우 미사용) */
 export const FALLBACK_COLORS: readonly string[] = [
-    "#8B5CF6", "#10B981", "#4B5563", "#6366F1", "#EC4899",
-    "#06B6D4", "#F59E0B", "#EF4444", "#84CC16", "#F97316",
+    "var(--donut-1)",
+    "var(--donut-2)",
+    "var(--donut-3)",
+    "var(--donut-4)",
+    "var(--donut-5)",
+    "var(--donut-6)",
+    "var(--donut-7)",
+    "var(--donut-8)",
 ];
 
 /**
- * 티커 브랜드 컬러 반환. 없으면 폴백 배열에서 자동 할당
+ * 포트폴리오 UI(막대·도넛 범례 등)용 슬라이스 색 — 틸 계열 토큰만 사용(티커별 브랜드 컬러 미사용).
  */
 export function getTickerColor(ticker: string, index: number): string {
-    if (!ticker?.trim()) return FALLBACK_COLORS[0];
-    const meta = getTickerMetadata(ticker);
-    if (meta?.color) return meta.color;
-    return FALLBACK_COLORS[Math.abs(index) % FALLBACK_COLORS.length];
+    const t = (ticker ?? "").trim();
+    let h = 0;
+    const s = t || `i:${index}`;
+    for (let i = 0; i < s.length; i++) {
+        h = (h * 31 + s.charCodeAt(i)) | 0;
+    }
+    const slot = (Math.abs(h) % 8) + 1;
+    return `var(--donut-${slot})`;
 }
 
 /**

@@ -33,7 +33,7 @@ export async function GET() {
             const cur = r.totalCurrentKrw;
             const 수익률 =
                 inv != null && cur != null && inv > 0
-                    ? (((cur - inv) / inv) * 100).toFixed(2)
+                    ? String(Math.round(((cur - inv) / inv) * 100))
                     : "-";
 
             return [

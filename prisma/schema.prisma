@@ -47,6 +47,7 @@ enum AssetRole {
   BOOSTER    // 부스터
   DEFENSIVE  // 방어
   INDEX      // 지수
+  BOND       // 채권 (연금 등)
   UNASSIGNED // 미지정 (리포트 종목용)
 }
 
@@ -58,6 +59,7 @@ model Profile {
 
   portfolioStrategies PortfolioStrategy[]
   accountInitialCapitals AccountInitialCapital[]
+  profileInvestments ProfileInvestment[]
 
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -113,6 +115,8 @@ model Report {
   // 관계
   portfolioItems   PortfolioItem[]
   newInvestments   NewInvestment[]
+  /** 월·분기 리포트에서 동기화된 신규 납입 — 리포트 삭제 시 함께 제거 */
+  linkedProfileInvestments ProfileInvestment[] @relation("ReportInvestments")
   reportAiComment ReportAiComment?
   initialCapitals AccountInitialCapital[]
 
@@ -166,7 +170,7 @@ model PortfolioItem {
   displayName      String?                           // 표시명 (검색·메타 캐시)
   logoUrl          String?                           // 사용자 지정 종목 대표 이미지 URL (붙여넣기)
   sector           String?                           // 섹터 분류 (Technology, Financials, Consumer Discretionary 등)
-  role             AssetRole   @default(CORE)         // 역할군 (CORE, GROWTH, BOOSTER, DEFENSIVE, INDEX, UNASSIGNED)
+  role             AssetRole   @default(CORE)         // 역할군 (CORE, GROWTH, BOOSTER, DEFENSIVE, INDEX, BOND, UNASSIGNED)
   accountType      AccountType                       // US_DIRECT / KR_DIRECT / ISA / JP_DIRECT / PENSION / CASH
   originalCurrency Currency                          // 원래 통화: USD / KRW / JPY
   originalAmount   Float                             // 원래 통화 기준 평가금액
@@ -208,6 +212,28 @@ model NewInvestment {
   createdAt        DateTime     @default(now())
 }
 
+// ── 프로필 단위 신규 납입 (리포트와 분리된 집계 원천). DB 테이블명 Investment 유지 ──
+model ProfileInvestment {
+  id             String      @id @default(cuid())
+  profileId      String
+  profile        Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  accountType    AccountType
+  amountKrw      Int
+  date           DateTime
+  note           String?
+
+  /** 동기화 출처 리포트(월·분기). 재저장 시 해당 리포트 행만 교체 */
+  sourceReportId Int?
+  sourceReport   Report?     @relation("ReportInvestments", fields: [sourceReportId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime    @default(now())
+
+  @@index([profileId])
+  @@index([sourceReportId])
+  @@map("Investment")
+}
+
 model AnalysisReport {
   id                String   @id @default(cuid())
   ticker            String
@@ -223,4 +249,20 @@ model AnalysisReport {
   cardImageDataUrl  String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model WatchlistItem {
+  id             String   @id @default(cuid())
+  profileId      String   @map("profile_id")
+  ticker         String
+  companyName    String   @map("company_name")
+  logoUrl        String?  @map("logo_url")
+  interestReason String?  @map("interest_reason")
+  riskNotes      String?  @map("risk_notes")
+  tag            String   @default("관심")
+  addedAt        DateTime @default(now()) @map("added_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([profileId, ticker])
+  @@map("watchlist_item")
 }

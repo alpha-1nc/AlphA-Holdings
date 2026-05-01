@@ -7,7 +7,13 @@ import {
     sumMonthlyNewInvestmentsInQuarterKrw,
 } from "@/app/actions/reports";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
 import { PortfolioItemLogoAvatar } from "@/components/reports/portfolio-item-logo-avatar";
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
@@ -86,39 +92,55 @@ export default async function ReportDetailPage(props: {
 
         const totalNewInvestment = newInvestments.reduce((sum, inv) => sum + inv.krwAmount, 0);
 
-        const posStyle = (gain: number) => {
-            const isPositive = gain >= 0;
-            return {
-                isPositive,
-                color: isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400",
-                barGain: isPositive ? "bg-gradient-to-r from-emerald-400 to-teal-500" : "bg-gradient-to-r from-red-400 to-rose-500",
-                barRate: isPositive ? "bg-gradient-to-r from-amber-400 to-orange-500" : "bg-gradient-to-r from-slate-400 to-gray-500",
-            } as const;
-        };
+        /** 상단 3px 띠: 투자/평가 카드용 브랜드 틸 */
+        const stripTeal =
+            "bg-gradient-to-r from-[var(--accent-800)] to-[var(--accent-400)]";
+
+        function stripForSigned(n: number): string {
+            if (n > 0) return "bg-gradient-to-r from-emerald-600 to-green-400";
+            if (n < 0) return "bg-gradient-to-r from-orange-500 to-orange-400";
+            return stripTeal;
+        }
+
+        function colorForSigned(n: number): string {
+            if (n > 0) return "text-[var(--positive)] dark:text-[var(--positive)]";
+            if (n < 0) return "text-[var(--negative)] dark:text-[var(--negative)]";
+            return "text-primary dark:text-primary";
+        }
 
         let summaryCards: Array<{ label: string; value: string; color: string; bar: string }> = [];
         if (report.type === "QUARTERLY" && quarterlyFinancial) {
             const totalInvestedKrw = quarterlyFinancial.totalInvestedKrw;
             const totalCurrentKrw = quarterlyFinancial.currentTotalValueKrw;
             const baseCards = [
-                { label: "총 투자금", value: krw(totalInvestedKrw), color: "text-neutral-900 dark:text-neutral-50" as const, bar: "bg-gradient-to-r from-blue-400 to-indigo-500" },
-                { label: "총 평가금", value: krw(totalCurrentKrw), color: "text-neutral-900 dark:text-neutral-50" as const, bar: "bg-gradient-to-r from-violet-400 to-purple-500" },
+                {
+                    label: "총 투자금 (누적)",
+                    value: krw(totalInvestedKrw),
+                    color: "text-neutral-900 dark:text-neutral-50" as const,
+                    bar: stripTeal,
+                },
+                {
+                    label: "총 평가금 (분기 말)",
+                    value: krw(totalCurrentKrw),
+                    color: "text-neutral-900 dark:text-neutral-50" as const,
+                    bar: stripTeal,
+                },
             ];
             const qGain = quarterlyFinancial.quarterlyProfitKrw;
-            const s = posStyle(qGain);
+            const qRate = quarterlyFinancial.quarterlyProfitRatePercent;
             summaryCards = [
                 ...baseCards,
                 {
-                    label: "분기 수익금",
-                    value: `${s.isPositive ? "+" : ""}${krw(qGain)}`,
-                    color: s.color,
-                    bar: s.barGain,
+                    label: "이번 분기 수익금",
+                    value: qGain > 0 ? `+${krw(qGain)}` : krw(qGain),
+                    color: colorForSigned(qGain),
+                    bar: stripForSigned(qGain),
                 },
                 {
-                    label: "분기 수익률",
-                    value: `${s.isPositive ? "+" : ""}${quarterlyFinancial.quarterlyProfitRatePercent.toFixed(2)}%`,
-                    color: s.color,
-                    bar: s.barRate,
+                    label: "이번 분기 수익률",
+                    value: `${qRate > 0 ? "+" : ""}${Math.round(qRate)}%`,
+                    color: colorForSigned(qRate),
+                    bar: stripForSigned(qRate),
                 },
             ];
         }
@@ -127,11 +149,6 @@ export default async function ReportDetailPage(props: {
         report.type === "MONTHLY"
             ? `${report.periodLabel} · Monthly`
             : `${report.periodLabel} · Quarterly`;
-
-    const totalCurrentKrwForQuarterly =
-        report.type === "QUARTERLY"
-            ? (quarterlyFinancial?.currentTotalValueKrw ?? report.totalCurrentKrw ?? 0)
-            : 0;
 
     const snapshotsForChart = sortedPortfolioItems.map((item) => ({
         ticker: item.ticker,
@@ -169,7 +186,7 @@ export default async function ReportDetailPage(props: {
                 <CardContent className="space-y-6">
                     {journalEntries.map(({ title, content }) => (
                         <div key={title}>
-                            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-neutral-400">
+                            <h3 className="mb-3 border-b border-neutral-200/90 pb-2 text-base font-semibold tracking-tight text-neutral-900 dark:border-neutral-700 dark:text-neutral-100">
                                 {title}
                             </h3>
                             <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700 dark:text-neutral-200">
@@ -183,35 +200,114 @@ export default async function ReportDetailPage(props: {
             </Card>
 
             <Card className="border border-neutral-100 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/70">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold uppercase tracking-[0.16em] text-neutral-500 dark:text-neutral-400">
                         META
                     </CardTitle>
+                    <CardDescription className="text-xs leading-snug text-neutral-500 dark:text-neutral-400">
+                        이 리포트에 저장된 요약 정보입니다.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3 text-xs text-neutral-600 dark:text-neutral-300">
-                    {report.type === "QUARTERLY" && (
-                        <div className="flex justify-between">
-                            <span className="text-neutral-400">종목 수</span>
-                            <span className="font-medium">{portfolioItems.length}개</span>
+                <CardContent className="space-y-4 text-sm text-neutral-700 dark:text-neutral-200">
+                    <dl className="space-y-3">
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                기간
+                            </dt>
+                            <dd className="text-right text-sm font-semibold text-neutral-900 dark:text-neutral-100 sm:text-left">
+                                {report.periodLabel}
+                            </dd>
                         </div>
-                    )}
-                    <div className="flex justify-between">
-                        <span className="text-neutral-400">유형</span>
-                        <span className="font-medium">{report.type === "MONTHLY" ? "월별" : "분기별"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-neutral-400">프로필</span>
-                        <span className="font-medium">{report.profile}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-neutral-400">마지막 수정</span>
-                        <span className="font-medium" suppressHydrationWarning>
-                            {new Date(report.updatedAt).toLocaleDateString("ko-KR", {
-                                year: "numeric",
-                                month: "2-digit",
-                                day: "2-digit",
-                            })}
-                        </span>
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                유형
+                            </dt>
+                            <dd className="text-right font-medium sm:text-left">
+                                {report.type === "MONTHLY" ? "월별" : "분기별"}
+                            </dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                프로필
+                            </dt>
+                            <dd className="min-w-0 break-words text-right font-medium sm:text-left">
+                                {report.profile}
+                            </dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                종목 수
+                            </dt>
+                            <dd className="text-right font-medium sm:text-left">{portfolioItems.length}개</dd>
+                        </div>
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                이번 리포트 신규 투자
+                            </dt>
+                            <dd className="text-right font-medium tabular-nums sm:text-left">
+                                {krw(totalNewInvestment)}
+                            </dd>
+                        </div>
+                        {report.type === "QUARTERLY" && (report.usdRate != null || report.jpyRate != null) && (
+                            <div className="flex flex-col gap-1 rounded-lg bg-neutral-50 px-3 py-2.5 dark:bg-neutral-800/50">
+                                <dt className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                    기준 환율
+                                </dt>
+                                <dd className="space-y-1 text-xs leading-relaxed text-neutral-700 dark:text-neutral-300">
+                                    {report.usdRate != null && (
+                                        <p>USD 1달러 · {krw(report.usdRate)}</p>
+                                    )}
+                                    {report.jpyRate != null && (
+                                        <p>JPY 100엔 · {krw(report.jpyRate)}</p>
+                                    )}
+                                </dd>
+                            </div>
+                        )}
+                        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                            <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                상태
+                            </dt>
+                            <dd className="text-right sm:text-left">
+                                <span
+                                    className={[
+                                        "inline-flex rounded-md px-2 py-0.5 text-xs font-medium",
+                                        report.status === "PUBLISHED"
+                                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                                            : "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+                                    ].join(" ")}
+                                >
+                                    {report.status === "PUBLISHED" ? "작성 완료" : "임시저장"}
+                                </span>
+                            </dd>
+                        </div>
+                    </dl>
+                    <div className="border-t border-neutral-200/80 pt-4 dark:border-neutral-700/80">
+                        <dl className="space-y-3 text-sm">
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                    작성일
+                                </dt>
+                                <dd className="text-right font-medium tabular-nums sm:text-left" suppressHydrationWarning>
+                                    {new Date(report.createdAt).toLocaleDateString("ko-KR", {
+                                        year: "numeric",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                    })}
+                                </dd>
+                            </div>
+                            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-3">
+                                <dt className="shrink-0 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                    마지막 수정
+                                </dt>
+                                <dd className="text-right font-medium tabular-nums sm:text-left" suppressHydrationWarning>
+                                    {new Date(report.updatedAt).toLocaleDateString("ko-KR", {
+                                        year: "numeric",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                    })}
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
                 </CardContent>
             </Card>
@@ -276,6 +372,12 @@ export default async function ReportDetailPage(props: {
                     overview={
                         <>
                             {summaryCards.length > 0 && (
+                                <>
+                                    <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+                                        앞의 두 칸은 누적 투입·이번 분기 말 평가이고, 오른쪽 두 칸은{" "}
+                                        <span className="font-medium text-neutral-700 dark:text-neutral-300">{report.periodLabel}</span>{" "}
+                                        한 구간의 손익·수익률입니다 (전분기 말 평가 및 이번 분기 신규 납입 반영).
+                                    </p>
                                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                                     {summaryCards.map((item) => (
                                         <div
@@ -290,6 +392,7 @@ export default async function ReportDetailPage(props: {
                                         </div>
                                     ))}
                                 </div>
+                                </>
                             )}
 
                             <Card className="border border-neutral-100 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/70">
@@ -318,24 +421,21 @@ export default async function ReportDetailPage(props: {
                             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                     <Card className="border border-neutral-100 bg-white/80 shadow-none dark:border-neutral-800 dark:bg-neutral-900/70 lg:col-span-2">
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
+                            <CardTitle className="text-sm font-semibold uppercase tracking-[0.2em] text-neutral-400">
                                 PORTFOLIO SNAPSHOT
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-hidden rounded-xl border border-neutral-100 dark:border-neutral-800">
-                                <div className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] border-b border-neutral-100 bg-neutral-50 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400">
+                                <div className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] border-b border-neutral-100 bg-neutral-50 px-3 py-2.5 text-sm font-medium text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900/70 dark:text-neutral-400">
                                     <div>종목</div>
                                     <div>계좌</div>
                                     <div className="text-right">원화 평가금</div>
                                     <div className="text-right">통화</div>
                                 </div>
-                                <div className="divide-y divide-neutral-100 text-xs dark:divide-neutral-800">
+                                <div className="divide-y divide-neutral-100 text-sm dark:divide-neutral-800">
                                     {sortedPortfolioItems.length > 0 ? (
                                         sortedPortfolioItems.map((item) => {
-                                            const pct = totalCurrentKrwForQuarterly > 0
-                                                ? ((item.krwAmount / totalCurrentKrwForQuarterly) * 100).toFixed(1)
-                                                : "0";
                                             const displayLabel = getPortfolioItemDisplayLabel({
                                                 ticker: item.ticker,
                                                 displayName: item.displayName,
@@ -343,9 +443,9 @@ export default async function ReportDetailPage(props: {
                                             return (
                                                 <div
                                                     key={item.id}
-                                                    className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] items-center gap-2 px-3 py-2.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
+                                                    className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] items-center gap-2 px-3 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
                                                 >
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2.5">
                                                         <PortfolioItemLogoAvatar
                                                             portfolioItemId={item.id}
                                                             reportId={id}
@@ -354,32 +454,31 @@ export default async function ReportDetailPage(props: {
                                                             logoUrl={item.logoUrl}
                                                         />
                                                         <div>
-                                                            <p className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
+                                                            <p className="text-sm font-semibold leading-snug text-neutral-700 dark:text-neutral-200">
                                                                 {displayLabel}
                                                                 {displayLabel.trim().toUpperCase() !== item.ticker.trim().toUpperCase() && (
-                                                                    <span className="ml-1 font-mono text-[10px] font-normal uppercase text-neutral-500 dark:text-neutral-400">
+                                                                    <span className="ml-1 font-mono text-xs font-normal uppercase text-neutral-500 dark:text-neutral-400">
                                                                         ({item.ticker})
                                                                     </span>
                                                                 )}
                                                             </p>
-                                                            <p className="text-[10px] text-neutral-400 dark:text-neutral-500">{pct}%</p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-1.5 text-[11px] text-neutral-500 dark:text-neutral-400">
+                                                    <div className="flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400">
                                                         {ACCOUNT_ICONS[item.accountType]}
                                                         {ACCOUNT_LABELS[item.accountType] ?? item.accountType}
                                                     </div>
-                                                    <div className="text-right text-[11px] font-medium text-neutral-700 dark:text-neutral-200">
+                                                    <div className="text-right text-sm font-medium tabular-nums text-neutral-700 dark:text-neutral-200">
                                                         {krw(item.krwAmount)}
                                                     </div>
-                                                    <div className="text-right text-[11px] text-neutral-500 dark:text-neutral-400">
+                                                    <div className="text-right text-sm text-neutral-500 dark:text-neutral-400">
                                                         {item.originalCurrency}
                                                     </div>
                                                 </div>
                                             );
                                         })
                                     ) : (
-                                        <div className="px-3 py-6 text-center text-xs text-neutral-500 dark:text-neutral-400">
+                                        <div className="px-3 py-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
                                             저장된 종목이 없습니다.
                                         </div>
                                     )}
@@ -388,12 +487,12 @@ export default async function ReportDetailPage(props: {
 
                             {/* 환율 정보 */}
                             <div className="mt-4 flex gap-3">
-                                <div className="flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-xs dark:bg-neutral-800/50">
-                                    <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">USD/KRW</p>
+                                <div className="flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-sm dark:bg-neutral-800/50">
+                                    <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">USD/KRW</p>
                                     <p className="mt-1 font-semibold text-neutral-700 dark:text-neutral-200" suppressHydrationWarning>₩{(report.usdRate ?? 0).toLocaleString()}</p>
                                 </div>
-                                <div className="flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-xs dark:bg-neutral-800/50">
-                                    <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400">100 JPY/KRW</p>
+                                <div className="flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-sm dark:bg-neutral-800/50">
+                                    <p className="text-xs font-medium uppercase tracking-widest text-neutral-400">100 JPY/KRW</p>
                                     <p className="mt-1 font-semibold text-neutral-700 dark:text-neutral-200" suppressHydrationWarning>₩{(report.jpyRate ?? 0).toLocaleString()}</p>
                                 </div>
                             </div>
@@ -406,8 +505,11 @@ export default async function ReportDetailPage(props: {
                             <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
                                 WEIGHT BY POSITION
                             </CardTitle>
+                            <CardDescription className="text-[11px] font-normal leading-relaxed text-neutral-500 dark:text-neutral-400">
+                                분기 말 스냅샷 기준, 종목별 원화 평가금액이 차지하는 비중입니다.
+                            </CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-0">
                             <ReportDonutChart snapshots={snapshotsForChart} />
                         </CardContent>
                     </Card>

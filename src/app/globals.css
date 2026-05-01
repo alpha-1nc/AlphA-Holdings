@@ -17,6 +17,8 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-chart-7: var(--chart-7);
+  --color-chart-6: var(--chart-6);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -38,6 +40,8 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -47,73 +51,221 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* ── Design tokens: AlphA wealth / portfolio (bright mint base + saturation steps + neutrals + semantic P&L) ── */
+
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
+  --bg: #f5f7f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafb;
+  --surface-3: #eef2f5;
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
+  --text-primary: #101828;
+  --text-secondary: #475467;
+  --text-tertiary: #667085;
+
+  /* Bright mint: lifted mid-tones; soft tints / deep anchors keep the same ramp logic */
+  --accent-50: #f6fefc;
+  --accent-100: #eefcf6;
+  --accent-200: #dbf8ed;
+  --accent-300: #b8f0df;
+  --accent-400: #8ae3cb;
+  --accent-500: #5dd4b6;
+  --accent-600: #3abd96;
+  --accent-700: #2f9f7f;
+  --accent-800: #288268;
+  --accent-900: #215747;
+
+  --positive: #22c55e;
+  --positive-soft: rgba(34, 197, 94, 0.12);
+  --negative: #f97316;
+  --negative-soft: rgba(249, 115, 22, 0.12);
+  --neutral-state: #94a3b8;
+  --neutral-soft: rgba(148, 163, 184, 0.12);
+
+  /* shadcn / Tailwind semantic mapping */
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --card: var(--surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-600);
+  --primary-foreground: #fafafa;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-3);
+  --muted-foreground: var(--text-tertiary);
+  --accent: var(--accent-50);
+  --accent-foreground: var(--accent-800);
+  --destructive: #dc2626;
+  --border: rgba(15, 23, 42, 0.1);
+  --input: rgba(15, 23, 42, 0.1);
+  --ring: var(--accent-500);
+
+  /* Legacy AlphA app aliases (used across dashboard) */
+  --ah-bg: var(--bg);
+  --ah-card: var(--surface);
+  --ah-card-soft: var(--surface-2);
+  --ah-border: color-mix(in oklab, var(--text-primary) 10%, transparent);
+  --ah-text-pri: var(--text-primary);
+  --ah-text-muted: var(--text-secondary);
+  --ah-text-subtle: var(--text-tertiary);
+  --ah-accent: var(--accent-600);
+  --ah-accent-fg: #fafafa;
+  --ah-success: var(--positive);
+  --ah-danger: var(--destructive);
+  --ah-warning: #b45309;
+
+  --dashboard-spark-success: var(--positive);
+  --dashboard-spark-negative: var(--negative);
+
+  --ah-asset-chart-invested: #cbd5e1;
+  --ah-asset-chart-current: var(--accent-600);
+
+  /* Composition / allocation — bright mint ramp (no rainbow) */
+  --chart-1: #2f9f7f;
+  --chart-2: #3abd96;
+  --chart-3: #5dd4b6;
+  --chart-4: #8ae3cb;
+  --chart-5: #d4f4ea;
+  --chart-6: #94a3b8;
+  --chart-7: #64748b;
+
+  --donut-1: #2f9f7f;
+  --donut-2: #3abd96;
+  --donut-3: #5dd4b6;
+  --donut-4: #8ae3cb;
+  --donut-5: #d4f4ea;
+  --donut-6: #94a3b8;
+  --donut-7: #64748b;
+  --donut-8: #b0892c;
+
+  --ah-trend-bar: #334155;
+
+  --role-alloc-core: #2f9f7f;
+  --role-alloc-growth: #3abd96;
+  --role-alloc-defensive: #64748b;
+  --role-alloc-booster: #5dd4b6;
+  --role-alloc-index: #8ae3cb;
+  --role-alloc-bond: #a16207;
+  --role-alloc-unassigned: #78716c;
+
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-600);
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent-500);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.87 0.00 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.809 0.105 251.813);
-  --chart-2: oklch(0.623 0.214 259.815);
-  --chart-3: oklch(0.546 0.245 262.881);
-  --chart-4: oklch(0.488 0.243 264.376);
-  --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --bg: #0b0d12;
+  --surface: #11141a;
+  --surface-2: #151922;
+  --surface-3: #1a1f2b;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text-primary: #f5f7fa;
+  --text-secondary: #a7b0be;
+  --text-tertiary: #7d8796;
+
+  --accent-50: #effdf8;
+  --accent-100: #dbf9ef;
+  --accent-200: #b8f0df;
+  --accent-300: #8ee4cf;
+  --accent-400: #6adcbf;
+  --accent-500: #50ceb2;
+  --accent-600: #42b39d;
+  --accent-700: #379483;
+  --accent-800: #2f776a;
+  --accent-900: #274e46;
+
+  --positive: #22c55e;
+  --positive-soft: rgba(34, 197, 94, 0.14);
+  --negative: #f97316;
+  --negative-soft: rgba(249, 115, 22, 0.14);
+  --neutral-state: #94a3b8;
+  --neutral-soft: rgba(148, 163, 184, 0.14);
+
+  --background: var(--bg);
+  --foreground: var(--text-primary);
+  --card: var(--surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-primary);
+  --primary: var(--accent-500);
+  --primary-foreground: #fafafa;
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text-primary);
+  --muted: var(--surface-3);
+  --muted-foreground: var(--text-tertiary);
+  --accent: color-mix(in oklab, var(--accent-500) 18%, transparent);
+  --accent-foreground: var(--accent-100);
+  --destructive: #ef4444;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: var(--accent-400);
+
+  --ah-bg: var(--bg);
+  --ah-card: var(--surface);
+  --ah-card-soft: var(--surface-2);
+  --ah-border: rgba(255, 255, 255, 0.1);
+  --ah-text-pri: var(--text-primary);
+  --ah-text-muted: var(--text-secondary);
+  --ah-text-subtle: var(--text-tertiary);
+  --ah-accent: var(--accent-500);
+  --ah-accent-fg: #fafafa;
+  --ah-success: var(--positive);
+  --ah-danger: var(--destructive);
+  --ah-warning: #fbbf24;
+
+  --dashboard-spark-success: var(--positive);
+  --dashboard-spark-negative: var(--negative);
+
+  --ah-asset-chart-invested: #3f3f46;
+  --ah-asset-chart-current: var(--accent-400);
+
+  /* Charts / donuts / roles — dark: same mint as --accent-*, wider tone steps only (no new hues) */
+  --chart-1: var(--accent-800);
+  --chart-2: var(--accent-600);
+  --chart-3: var(--accent-400);
+  --chart-4: var(--accent-200);
+  --chart-5: #94a3b8;
+  --chart-6: #cbd5e1;
+  --chart-7: #64748b;
+
+  --donut-1: var(--accent-800);
+  --donut-2: var(--accent-700);
+  --donut-3: var(--accent-600);
+  --donut-4: var(--accent-500);
+  --donut-5: var(--accent-400);
+  --donut-6: var(--accent-300);
+  --donut-7: var(--accent-200);
+  --donut-8: #c4a035;
+
+  --ah-trend-bar: #e2e8f0;
+
+  --role-alloc-core: var(--accent-800);
+  --role-alloc-growth: var(--accent-600);
+  --role-alloc-defensive: #94a3b8;
+  --role-alloc-booster: var(--accent-500);
+  --role-alloc-index: var(--accent-300);
+  --role-alloc-bond: #eab308;
+  --role-alloc-unassigned: #a8a29e;
+
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text-primary);
+  --sidebar-primary: var(--accent-500);
+  --sidebar-primary-foreground: #fafafa;
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent-400);
 }
 
 @layer base {
@@ -121,7 +273,8 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--ah-bg);
+    @apply text-foreground;
   }
   html {
     @apply font-sans;

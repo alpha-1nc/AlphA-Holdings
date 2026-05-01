@@ -27,8 +27,8 @@ export function PortfolioItemLogoAvatar({
       ticker={ticker}
       displayName={displayName}
       logoUrl={logoUrl}
-      size={40}
-      roundedSquare
+      size={44}
+      autoFmpLogo
       editable
       isSaving={isPending}
       onLogoChange={(url) => {

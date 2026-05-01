@@ -12,6 +12,7 @@ export const ASSET_ROLE_LABELS: Record<AssetRole, string> = {
   BOOSTER: "부스터",
   DEFENSIVE: "방어",
   INDEX: "지수",
+  BOND: "채권",
   UNASSIGNED: "미지정",
 };
 

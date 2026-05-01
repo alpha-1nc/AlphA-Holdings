@@ -69,7 +69,7 @@ function RadarTooltipBody({
                 {p.fullLabel}
             </p>
             <p className="tabular-nums text-muted-foreground">
-                비율: {Number.isFinite(n) ? n.toFixed(1) : "—"}%
+                비율: {Number.isFinite(n) ? Math.round(n) : "—"}%
             </p>
         </div>
     );
@@ -101,12 +101,12 @@ export function DimensionRadarBlock({ rows }: { rows: RadarChartRow[] }) {
                     <Radar
                         name="점수 %"
                         dataKey="pct"
-                        stroke="#34d399"
-                        fill="#34d399"
+                        stroke="var(--primary)"
+                        fill="var(--primary)"
                         fillOpacity={0.35}
                         strokeWidth={1.5}
-                        dot={{ r: 4, fill: "#34d399", strokeWidth: 0 }}
-                        activeDot={{ r: 6, fill: "#6ee7b7", strokeWidth: 0 }}
+                        dot={{ r: 4, fill: "var(--primary)", strokeWidth: 0 }}
+                        activeDot={{ r: 6, fill: "var(--accent-400)", strokeWidth: 0 }}
                     />
                     <Tooltip content={RadarTooltipBody} />
                 </RadarChart>
@@ -142,6 +142,7 @@ export function DimensionLineBlock({ rows }: { rows: RadarChartRow[] }) {
                     />
                     <YAxis
                         domain={[0, 100]}
+                        tickFormatter={(v) => String(Math.round(Number(v)))}
                         tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
                         axisLine={{ stroke: "var(--border)" }}
                         tickLine={{ stroke: "var(--border)" }}
@@ -159,7 +160,7 @@ export function DimensionLineBlock({ rows }: { rows: RadarChartRow[] }) {
                             const n =
                                 typeof value === "number" ? value : Number(value);
                             return [
-                                `${Number.isFinite(n) ? n.toFixed(1) : "—"}%`,
+                                `${Number.isFinite(n) ? Math.round(n) : "—"}%`,
                                 "비율",
                             ];
                         }}
@@ -179,9 +180,9 @@ export function DimensionLineBlock({ rows }: { rows: RadarChartRow[] }) {
                     <Line
                         type="monotone"
                         dataKey="pct"
-                        stroke="#38bdf8"
+                        stroke="var(--primary)"
                         strokeWidth={2}
-                        dot={{ fill: "#38bdf8", strokeWidth: 0, r: 3 }}
+                        dot={{ fill: "var(--primary)", strokeWidth: 0, r: 3 }}
                         activeDot={{ r: 5 }}
                     />
                 </LineChart>

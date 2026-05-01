@@ -49,7 +49,7 @@ function deriveSequentialIntervalPerformance(
   return { intervalGainKrw, intervalReturnRatePercent };
 }
 
-/** 월별 아카이브 카드용: 당월 수익금·당월 수익률(%) */
+/** 월별 아카이브 카드용: 당월 수익금·당월 수익률(%) — 리포트에 연결된 NewInvestment 기준 */
 export function deriveMonthlyIntervalPerformance(
   reports: IntervalReportSlice[],
   index: number
@@ -57,12 +57,27 @@ export function deriveMonthlyIntervalPerformance(
   return deriveSequentialIntervalPerformance(reports, index);
 }
 
-/** 분기별 아카이브 카드용: 분기 수익금·분기 수익률(%) (당분기 리포트의 신규 투입 합계 = 분기 3개월치 합으로 가정) */
+export type QuarterlyIntervalSlice = {
+  totalCurrentKrw: number | null;
+  /** 당 분기 신규 납입 합계(Investment 또는 예시 데이터에서 채움) */
+  periodNewInflowKrw: number;
+};
+
+/** 분기별 아카이브: 구간수익금 = 당기평가 − (전기평가 + 당기신규납입합계) */
 export function deriveQuarterlyIntervalPerformance(
-  reports: IntervalReportSlice[],
+  slices: QuarterlyIntervalSlice[],
   index: number
 ): { intervalGainKrw: number; intervalReturnRatePercent: number } {
-  return deriveSequentialIntervalPerformance(reports, index);
+  if (index === 0) {
+    return { intervalGainKrw: 0, intervalReturnRatePercent: 0 };
+  }
+  const current = slices[index];
+  const prevEval = slices[index - 1].totalCurrentKrw ?? 0;
+  const periodNewInflowKrw = current.periodNewInflowKrw;
+  const basis = prevEval + periodNewInflowKrw;
+  const intervalGainKrw = (current.totalCurrentKrw ?? 0) - basis;
+  const intervalReturnRatePercent = basis > 0 ? (intervalGainKrw / basis) * 100 : 0;
+  return { intervalGainKrw, intervalReturnRatePercent };
 }
 
 /**

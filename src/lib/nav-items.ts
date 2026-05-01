@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Home, PenLine, Settings, BarChart2, TrendingUp, FileSearch } from "lucide-react";
+import { Home, BarChart2, TrendingUp, Bookmark, PenLine, Settings } from "lucide-react";
 
 /** 상단/하단 네비 공통 — href, 아이콘, 접근성 라벨, 하단 탭 짧은 레이블 */
 export const MAIN_NAV_ITEMS: {
@@ -12,7 +12,7 @@ export const MAIN_NAV_ITEMS: {
   { href: "/", icon: Home, label: "홈", shortLabel: "홈" },
   { href: "/monthly", icon: BarChart2, label: "월별 리포트", shortLabel: "월별" },
   { href: "/quarterly", icon: TrendingUp, label: "분기별 리포트", shortLabel: "분기" },
-  { href: "/analysis", icon: FileSearch, label: "투자 분석", shortLabel: "분석" },
+  { href: "/watchlist", icon: Bookmark, label: "와치리스트", shortLabel: "관심" },
   { href: "/reports/new", icon: PenLine, label: "새 리포트", shortLabel: "작성" },
   { href: "/settings", icon: Settings, label: "설정", shortLabel: "설정" },
 ];
@@ -30,7 +30,7 @@ export function getMainNavForPath(pathname: string): { icon: LucideIcon; label: 
     return { icon: PenLine, label: "리포트 편집" };
   }
   if (/^\/reports\/[^/]+$/.test(pathname)) {
-    return { icon: FileSearch, label: "리포트" };
+    return { icon: BarChart2, label: "리포트" };
   }
 
   const ordered = [...MAIN_NAV_ITEMS]

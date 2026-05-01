@@ -45,12 +45,12 @@ export function TickerLogoServer({ ticker, size = 28 }: TickerLogoProps) {
 
     return (
         <span
-            className="relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-neutral-200 dark:ring-neutral-700"
+            className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full ring-1 ring-neutral-200 dark:ring-neutral-700 ${imgReady ? "bg-white dark:bg-neutral-800" : "bg-neutral-100 dark:bg-neutral-800"}`}
             style={{ width: size, height: size }}
         >
             {/* 아바타 레이어: 항상 DOM에 존재, 이미지 로드 성공 시 opacity-0 */}
             <span
-                className="absolute inset-0 flex items-center justify-center bg-neutral-100 font-bold text-neutral-500 transition-opacity duration-150 dark:bg-neutral-800 dark:text-neutral-400"
+                className="absolute inset-0 flex items-center justify-center font-bold text-neutral-500 transition-opacity duration-150 dark:text-neutral-400"
                 style={{
                     fontSize: Math.max(8, Math.floor(size * 0.32)),
                     opacity: imgReady ? 0 : 1,
@@ -68,8 +68,13 @@ export function TickerLogoServer({ ticker, size = 28 }: TickerLogoProps) {
                     src={src!}
                     alt=""
                     aria-hidden
-                    className="absolute inset-0 h-full w-full object-cover"
+                    className="absolute block object-contain"
                     style={{
+                        width: "76%",
+                        height: "76%",
+                        top: "50%",
+                        left: "50%",
+                        transform: "translate(-50%, -50%)",
                         opacity: imgReady ? 1 : 0,
                         transition: "opacity 150ms ease",
                     }}

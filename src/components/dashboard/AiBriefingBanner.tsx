@@ -25,7 +25,7 @@ export function AiBriefingBanner({ profileId }: AiBriefingBannerProps) {
 
   if (loading) {
     return (
-      <div className="h-[72px] animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
+      <div className="h-[72px] animate-pulse rounded-2xl bg-muted" />
     );
   }
 
@@ -34,13 +34,13 @@ export function AiBriefingBanner({ profileId }: AiBriefingBannerProps) {
   const typeLabel = data.type === "MONTHLY" ? "월별" : "분기별";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-blue-100/80 bg-gradient-to-r from-blue-50/80 via-indigo-50/60 to-violet-50/40 px-5 py-4 shadow-sm dark:border-blue-900/30 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-violet-950/10">
+    <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-r from-accent/25 via-card to-card px-5 py-4 shadow-sm dark:from-accent/15">
       {/* 왼쪽 강조 선 */}
-      <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-2xl bg-gradient-to-b from-blue-400 to-violet-500" />
+      <div className="absolute inset-y-0 left-0 w-[3px] rounded-l-2xl bg-gradient-to-b from-primary to-[var(--accent-400)]" />
 
       <div className="flex items-start gap-3 pl-1">
         {/* 아이콘 */}
-        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 text-white shadow-sm">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
@@ -49,14 +49,14 @@ export function AiBriefingBanner({ profileId }: AiBriefingBannerProps) {
         {/* 텍스트 */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-500 dark:text-blue-400">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
               최신 리포트 <span className="normal-case">AlphA</span> AI 브리핑
             </span>
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+            <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
               {data.periodLabel} · {typeLabel}
             </span>
           </div>
-          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-neutral-700 dark:text-neutral-200">
+          <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-foreground/90">
             {data.comment.nextAction}
           </p>
         </div>
@@ -64,7 +64,7 @@ export function AiBriefingBanner({ profileId }: AiBriefingBannerProps) {
         {/* 링크 */}
         <Link
           href={`/reports/${data.reportId}`}
-          className="ml-auto shrink-0 self-center rounded-lg border border-blue-200/80 bg-white/70 px-3 py-1.5 text-[11px] font-medium text-blue-600 transition hover:bg-white hover:text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-400 dark:hover:bg-blue-950/60"
+          className="ml-auto shrink-0 self-center rounded-lg border border-border bg-card/90 px-3 py-1.5 text-[11px] font-medium text-primary transition hover:bg-muted"
         >
           전체 보기 →
         </Link>

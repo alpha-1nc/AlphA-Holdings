@@ -37,13 +37,42 @@ import {
 
 const ASSET_ROLES = Object.keys(ASSET_ROLE_LABELS) as AssetRole[];
 
+/** ISA 목표 종목 역할 선택 순서: 지수 → 코어 → 성장 → 방어 */
+const ISA_STRATEGY_ROLES = ["INDEX", "CORE", "GROWTH", "DEFENSIVE"] as const;
+
+function normalizeIsaStrategyRole(role: AssetRole): AssetRole {
+    return (
+        ISA_STRATEGY_ROLES as readonly AssetRole[]
+    ).includes(role)
+        ? role
+        : "INDEX";
+}
+
+/** 연금저축 목표 종목 역할: 지수 → 채권 */
+const PENSION_STRATEGY_ROLES = ["INDEX", "BOND"] as const;
+
+function normalizePensionStrategyRole(role: AssetRole): AssetRole {
+    return (
+        PENSION_STRATEGY_ROLES as readonly AssetRole[]
+    ).includes(role)
+        ? role
+        : "INDEX";
+}
+
+function strategyFormRole(activeTab: AccountGroupKey, role: AssetRole): AssetRole {
+    if (activeTab === "ISA") return normalizeIsaStrategyRole(role);
+    if (activeTab === "연금저축") return normalizePensionStrategyRole(role);
+    return role;
+}
+
 const ROLE_BADGE_STYLES: Record<AssetRole, string> = {
-    CORE:      "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-    GROWTH:    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    BOOSTER:   "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-    DEFENSIVE: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-    INDEX:     "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400",
-    UNASSIGNED: "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400",
+    CORE:       "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    GROWTH:     "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    BOOSTER:    "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    DEFENSIVE:  "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    INDEX:      "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    BOND:       "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    UNASSIGNED: "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
 };
 
 const TAB_ORDER: AccountGroupKey[] = ["직투", "ISA", "연금저축"];
@@ -99,7 +128,13 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
         setEditingAccountType(strategy.accountType);
         setTicker(strategy.ticker);
         setStrategyDisplayName(strategy.displayName ?? null);
-        setRole(strategy.role);
+        setRole(
+            strategy.accountType === "ISA"
+                ? normalizeIsaStrategyRole(strategy.role)
+                : strategy.accountType === "PENSION"
+                  ? normalizePensionStrategyRole(strategy.role)
+                  : strategy.role
+        );
         setTargetWeight(String(strategy.targetWeight));
         const at = strategy.accountType;
         if (at === "US_DIRECT" || at === "KR_DIRECT" || at === "JP_DIRECT") {
@@ -142,13 +177,17 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
         const nextTotal = othersSum + weight;
         if (nextTotal > 100 + 0.001) {
             toast.error(
-                `이 탭의 목표 비중 합계는 100%를 넘을 수 없습니다. (저장 시 합계 ${nextTotal.toFixed(1)}%)`
+                `이 탭의 목표 비중 합계는 100%를 넘을 수 없습니다. (저장 시 합계 ${Math.round(nextTotal)}%)`
             );
             return;
         }
 
         const roleForSubmit: AssetRole =
-            activeTab === "직투" ? role : editingId ? role : "CORE";
+            activeTab === "직투"
+                ? role
+                : activeTab === "ISA"
+                  ? normalizeIsaStrategyRole(role)
+                  : normalizePensionStrategyRole(role);
 
         startTransition(async () => {
             try {
@@ -316,21 +355,34 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             </div>
                         )}
 
-                        {/* 역할 선택은 직투 탭만 */}
-                        {activeTab === "직투" && (
+                        {/* 역할: 직투(전체) / ISA(지수~방어 4종) / 연금저축(지수·채권) */}
+                        {(activeTab === "직투" ||
+                            activeTab === "ISA" ||
+                            activeTab === "연금저축") && (
                             <div className="flex shrink-0 flex-col gap-1">
                                 <label className="text-xs text-neutral-400 dark:text-neutral-500">
                                     역할
                                 </label>
                                 <Select
-                                    value={role}
+                                    value={strategyFormRole(activeTab, role)}
                                     onValueChange={(v) => setRole(v as AssetRole)}
                                 >
                                     <SelectTrigger className="h-9 w-[7rem] text-sm xl:w-28">
-                                        <SelectValue>{ASSET_ROLE_LABELS[role]}</SelectValue>
+                                        <SelectValue>
+                                            {
+                                                ASSET_ROLE_LABELS[
+                                                    strategyFormRole(activeTab, role)
+                                                ]
+                                            }
+                                        </SelectValue>
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {ASSET_ROLES.map((r) => (
+                                        {(activeTab === "직투"
+                                            ? ASSET_ROLES
+                                            : activeTab === "ISA"
+                                              ? ISA_STRATEGY_ROLES
+                                              : PENSION_STRATEGY_ROLES
+                                        ).map((r) => (
                                             <SelectItem key={r} value={r}>
                                                 {ASSET_ROLE_LABELS[r]}
                                             </SelectItem>
@@ -461,7 +513,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                         {ASSET_ROLE_LABELS[s.role]}
                                     </span>
                                     <span className="min-w-0 justify-self-end text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300 md:w-14 md:text-sm">
-                                        {s.targetWeight.toFixed(1)}%
+                                        {Math.round(s.targetWeight)}%
                                     </span>
                                     <div className="flex min-w-0 shrink-0 justify-end gap-0.5 justify-self-end md:w-14 md:gap-1">
                                         <button
@@ -508,7 +560,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                             : "text-amber-500 dark:text-amber-400"
                                     }`}
                                 >
-                                    {totalWeight.toFixed(1)}%
+                                    {Math.round(totalWeight)}%
                                 </span>
                                 {weightStatus !== "exact" && (
                                     <span
@@ -519,8 +571,8 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                         }`}
                                     >
                                         {weightStatus === "over"
-                                            ? `+${weightDiff.toFixed(1)}% 초과`
-                                            : `${Math.abs(weightDiff).toFixed(1)}% 부족`}
+                                            ? `+${Math.round(weightDiff)}% 초과`
+                                            : `${Math.abs(Math.round(weightDiff))}% 부족`}
                                     </span>
                                 )}
                                 {weightStatus === "exact" && (
