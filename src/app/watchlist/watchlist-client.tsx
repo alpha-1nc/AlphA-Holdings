@@ -617,7 +617,7 @@ export function WatchlistClient() {
       {/* 검색 + 상태 필터 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div
-          className="inline-flex flex-wrap items-center gap-1 rounded-full p-1 md:p-1.5"
+          className="flex w-full flex-nowrap items-stretch gap-1 overflow-hidden rounded-full p-1 md:inline-flex md:w-auto md:flex-wrap md:items-center md:p-1.5"
           style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
         >
           {STATUS_FILTERS.map((s) => (
@@ -625,7 +625,7 @@ export function WatchlistClient() {
               key={s}
               type="button"
               onClick={() => setActiveStatus(s)}
-              className="rounded-full px-3 py-1.5 text-[0.75rem] font-medium md:px-[0.9rem] md:py-[0.45rem] md:text-[0.8125rem] transition-all duration-200"
+              className="flex min-w-0 flex-1 items-center justify-center gap-0 text-center rounded-full px-1.5 py-1.5 text-[0.7rem] font-medium transition-all duration-200 md:flex-initial md:px-[0.9rem] md:py-[0.45rem] md:text-[0.8125rem]"
               style={{
                 background: activeStatus === s ? "var(--ah-accent)" : "transparent",
                 color: activeStatus === s ? "var(--ah-accent-fg)" : "var(--ah-text-muted)",

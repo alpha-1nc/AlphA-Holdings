@@ -66,16 +66,23 @@ function strategyFormRole(activeTab: AccountGroupKey, role: AssetRole): AssetRol
 }
 
 const ROLE_BADGE_STYLES: Record<AssetRole, string> = {
-    CORE:       "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-    GROWTH:     "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-    BOOSTER:    "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-    DEFENSIVE:  "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-    INDEX:      "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-    BOND:       "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
-    UNASSIGNED: "rounded-md border border-border bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground",
+    CORE:       "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+    GROWTH:     "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+    BOOSTER:    "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+    DEFENSIVE:  "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+    INDEX:      "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+    BOND:       "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
+    UNASSIGNED: "rounded-md border border-border bg-muted px-2 py-0.5 font-medium text-muted-foreground",
 };
 
 const TAB_ORDER: AccountGroupKey[] = ["직투", "ISA", "연금저축"];
+
+/** md 미만: iOS 등에서 시스템 피커 사용. md 이상: Base UI 커스텀 셀렉트 */
+const nativeSelectTriggerClass = cn(
+    "rounded-lg border border-input bg-transparent py-2 text-base whitespace-nowrap",
+    "outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+    "dark:bg-input/30",
+);
 
 interface Props {
     workspaceProfile: WorkspaceProfile;
@@ -250,12 +257,12 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
     /** 모바일: 액션 열에 44px×2 버튼이 들어가도록 비중(3rem)·버튼 열 분리 */
     const strategyGridMobile =
         activeTab === "직투"
-            ? "grid-cols-[minmax(0,1fr)_auto_auto_3rem_minmax(5.75rem,auto)]"
-            : "grid-cols-[minmax(0,1fr)_auto_3rem_minmax(5.75rem,auto)]";
+            ? "grid-cols-[minmax(0,1fr)_auto_auto_minmax(3.25rem,3.5rem)_minmax(6rem,auto)]"
+            : "grid-cols-[minmax(0,1fr)_auto_minmax(3.25rem,3.5rem)_minmax(6rem,auto)]";
 
     return (
         <section className="mb-10">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+            <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 md:text-xs">
                 목표 포트폴리오
             </p>
 
@@ -275,7 +282,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             handleCancelEdit();
                         }}
                         className={[
-                            "flex min-h-10 items-center justify-center rounded-lg px-2 py-2 text-center text-xs font-semibold leading-tight transition sm:min-h-9 sm:px-3",
+                            "flex min-h-12 items-center justify-center rounded-lg px-3 py-2.5 text-center text-sm font-semibold leading-tight transition md:min-h-9 md:px-3 md:py-2 md:text-xs",
                             activeTab === tab
                                 ? "bg-white text-neutral-900 shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10"
                                 : "text-neutral-500 hover:bg-neutral-200/60 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-100",
@@ -288,27 +295,27 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
             <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
                 {activeTab === "연금저축" && (
-                    <div className="border-b border-neutral-100 px-6 py-3 text-xs text-neutral-600 dark:border-neutral-800 dark:text-neutral-400">
+                    <div className="border-b border-neutral-100 px-5 py-3.5 text-sm leading-snug text-neutral-600 dark:border-neutral-800 dark:text-neutral-400 md:px-6 md:py-3 md:text-xs md:leading-normal">
                         세액공제 한도: 월 50만원 (연 600만원) / 투자 대상: 지수 ETF 권장
                     </div>
                 )}
                 {/* ── 입력 폼 ──────────────────────────────────────────── */}
-                <form onSubmit={handleSubmit} className="px-6 py-5">
-                    <p className="mb-3 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                <form onSubmit={handleSubmit} className="px-5 py-6 md:px-6 md:py-5">
+                    <p className="mb-4 text-[1.0625rem] font-medium text-neutral-900 dark:text-neutral-100 md:mb-3 md:text-base">
                         {editingId ? "목표 수정" : "종목 목표 추가"}
                     </p>
 
-                    <div className="flex min-w-0 flex-wrap items-end gap-2 lg:flex-nowrap lg:gap-1.5 xl:gap-2">
+                    <div className="flex min-w-0 flex-wrap items-end gap-3 md:gap-2 lg:flex-nowrap lg:gap-1.5 xl:gap-2">
                         {/* Ticker — 남은 폭을 차지하고 min-w-0으로 한 줄 레이아웃에서 가로 스크롤 없이 축소 가능 */}
-                        <div className="flex w-full min-w-0 basis-full flex-col gap-1 lg:basis-auto lg:flex-1 lg:min-w-0">
-                            <label className="whitespace-nowrap text-xs text-neutral-400 dark:text-neutral-500">
+                        <div className="flex w-full min-w-0 basis-full flex-col gap-1.5 md:gap-1 lg:basis-auto lg:flex-1 lg:min-w-0">
+                            <label className="whitespace-nowrap text-sm text-neutral-400 dark:text-neutral-500">
                                 종목 심볼
                             </label>
                             {editingId ? (
                                 <Input
                                     value={ticker}
                                     readOnly
-                                    className="h-9 min-w-0 font-mono text-sm uppercase"
+                                    className="h-11 min-w-0 font-mono text-base uppercase md:h-10 md:text-[0.9375rem]"
                                 />
                             ) : (
                                 <TickerSearchInput
@@ -324,34 +331,59 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                     }}
                                     accountType={searchAccountType}
                                     placeholder="AAPL, 005930, 7203..."
+                                    inputClassName="h-11 text-base md:h-10 md:text-[0.9375rem] md:rounded-xl"
                                 />
                             )}
                         </div>
 
                         {activeTab === "직투" && !editingId && (
-                            <div className="flex shrink-0 flex-col gap-1">
-                                <label className="text-xs text-neutral-400 dark:text-neutral-500">
+                            <div className="flex shrink-0 flex-col gap-1.5 md:gap-1">
+                                <label className="text-sm text-neutral-400 dark:text-neutral-500">
                                     계좌
                                 </label>
-                                <Select
-                                    value={directAccountType}
-                                    onValueChange={(v) => setDirectAccountType(v as AccountType)}
-                                >
-                                    <SelectTrigger className="h-9 w-[9rem] shrink-0 text-sm lg:w-[8.25rem] xl:w-[9rem]">
-                                        <SelectValue>
-                                            {DIRECT_ACCOUNT_OPTIONS.find(
-                                                (o) => o.value === directAccountType
-                                            )?.label ?? ACCOUNT_TYPE_LABEL[directAccountType]}
-                                        </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
+                                <div className="w-[10rem] shrink-0 md:w-[9rem] lg:w-[8.25rem] xl:w-[9rem]">
+                                    <select
+                                        aria-label="계좌 유형"
+                                        value={directAccountType}
+                                        onChange={(e) =>
+                                            setDirectAccountType(e.target.value as AccountType)
+                                        }
+                                        className={cn(
+                                            nativeSelectTriggerClass,
+                                            "h-11 w-full px-3 md:hidden",
+                                        )}
+                                    >
                                         {DIRECT_ACCOUNT_OPTIONS.map((o) => (
-                                            <SelectItem key={o.value} value={o.value}>
+                                            <option key={o.value} value={o.value}>
                                                 {o.label}
-                                            </SelectItem>
+                                            </option>
                                         ))}
-                                    </SelectContent>
-                                </Select>
+                                    </select>
+                                    <div className="hidden md:block">
+                                        <Select
+                                            value={directAccountType}
+                                            onValueChange={(v) =>
+                                                setDirectAccountType(v as AccountType)
+                                            }
+                                        >
+                                            <SelectTrigger className="h-10 w-full shrink-0 text-[0.9375rem]">
+                                                <SelectValue>
+                                                    {DIRECT_ACCOUNT_OPTIONS.find(
+                                                        (o) => o.value === directAccountType
+                                                    )?.label ??
+                                                        ACCOUNT_TYPE_LABEL[directAccountType]}
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {DIRECT_ACCOUNT_OPTIONS.map((o) => (
+                                                    <SelectItem key={o.value} value={o.value}>
+                                                        {o.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -359,42 +391,66 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                         {(activeTab === "직투" ||
                             activeTab === "ISA" ||
                             activeTab === "연금저축") && (
-                            <div className="flex shrink-0 flex-col gap-1">
-                                <label className="text-xs text-neutral-400 dark:text-neutral-500">
+                            <div className="flex shrink-0 flex-col gap-1.5 md:gap-1">
+                                <label className="text-sm text-neutral-400 dark:text-neutral-500">
                                     역할
                                 </label>
-                                <Select
-                                    value={strategyFormRole(activeTab, role)}
-                                    onValueChange={(v) => setRole(v as AssetRole)}
-                                >
-                                    <SelectTrigger className="h-9 w-[7rem] text-sm xl:w-28">
-                                        <SelectValue>
-                                            {
-                                                ASSET_ROLE_LABELS[
-                                                    strategyFormRole(activeTab, role)
-                                                ]
-                                            }
-                                        </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
+                                <div className="w-[8rem] shrink-0 md:w-[7rem] xl:w-28">
+                                    <select
+                                        aria-label="역할"
+                                        value={strategyFormRole(activeTab, role)}
+                                        onChange={(e) => setRole(e.target.value as AssetRole)}
+                                        className={cn(
+                                            nativeSelectTriggerClass,
+                                            "h-11 w-full px-3 md:hidden",
+                                        )}
+                                    >
                                         {(activeTab === "직투"
                                             ? ASSET_ROLES
                                             : activeTab === "ISA"
                                               ? ISA_STRATEGY_ROLES
                                               : PENSION_STRATEGY_ROLES
                                         ).map((r) => (
-                                            <SelectItem key={r} value={r}>
+                                            <option key={r} value={r}>
                                                 {ASSET_ROLE_LABELS[r]}
-                                            </SelectItem>
+                                            </option>
                                         ))}
-                                    </SelectContent>
-                                </Select>
+                                    </select>
+                                    <div className="hidden md:block">
+                                        <Select
+                                            value={strategyFormRole(activeTab, role)}
+                                            onValueChange={(v) => setRole(v as AssetRole)}
+                                        >
+                                            <SelectTrigger className="h-10 w-full text-[0.9375rem]">
+                                                <SelectValue>
+                                                    {
+                                                        ASSET_ROLE_LABELS[
+                                                            strategyFormRole(activeTab, role)
+                                                        ]
+                                                    }
+                                                </SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {(activeTab === "직투"
+                                                    ? ASSET_ROLES
+                                                    : activeTab === "ISA"
+                                                      ? ISA_STRATEGY_ROLES
+                                                      : PENSION_STRATEGY_ROLES
+                                                ).map((r) => (
+                                                    <SelectItem key={r} value={r}>
+                                                        {ASSET_ROLE_LABELS[r]}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
                         {/* Target Weight */}
-                        <div className="flex shrink-0 flex-col gap-1">
-                            <label className="text-xs text-neutral-400 dark:text-neutral-500">
+                        <div className="flex shrink-0 flex-col gap-1.5 md:gap-1">
+                            <label className="text-sm text-neutral-400 dark:text-neutral-500">
                                 목표 비중 (%)
                             </label>
                             {/* 네이티브 input: Base UI Input(FieldControl)의 controlled 고정 ref 이슈로 편집 시 값이 갱신되지 않는 경우 방지 */}
@@ -407,29 +463,29 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                 onChange={(e) => setTargetWeight(e.target.value)}
                                 placeholder="10.00"
                                 className={cn(
-                                    "h-9 w-[4.5rem] min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm tabular-nums",
+                                    "h-11 w-[5rem] min-w-0 rounded-lg border border-input bg-transparent px-3 py-2 text-base tabular-nums",
                                     "outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
-                                    "lg:w-20 dark:bg-input/30",
+                                    "md:h-10 md:w-[4.75rem] md:px-2.5 md:py-1.5 md:text-[0.9375rem] lg:w-20 dark:bg-input/30",
                                 )}
                             />
                         </div>
 
                         {/* Submit + 취소 — 한 줄에서 버튼만 떨어지지 않도록 묶음 */}
-                        <div className="flex shrink-0 items-end gap-1.5">
+                        <div className="flex shrink-0 items-end gap-2 md:gap-1.5">
                             <Button
                                 type="submit"
                                 size="sm"
                                 disabled={isPending}
-                                className="h-9 shrink-0 gap-1.5"
+                                className="h-11 shrink-0 gap-2 px-5 text-base md:h-10 md:gap-2 md:px-4 md:text-[0.9375rem]"
                             >
                                 {editingId ? (
                                     <>
-                                        <Pencil className="size-3.5" />
+                                        <Pencil className="size-4" />
                                         수정
                                     </>
                                 ) : (
                                     <>
-                                        <Plus className="size-3.5" />
+                                        <Plus className="size-4" />
                                         추가
                                     </>
                                 )}
@@ -441,7 +497,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleCancelEdit}
-                                    className="h-9 shrink-0 text-neutral-500"
+                                    className="h-11 shrink-0 text-base text-neutral-500 md:h-10 md:text-[0.9375rem]"
                                 >
                                     취소
                                 </Button>
@@ -450,28 +506,28 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                     </div>
                 </form>
 
-                <div className="mx-6 h-px bg-neutral-100 dark:bg-neutral-800" />
+                <div className="mx-5 h-px bg-neutral-100 dark:bg-neutral-800 md:mx-6" />
 
                 {/* ── 목표 리스트 ───────────────────────────────────────── */}
-                <div className="px-6 py-4">
+                <div className="px-5 py-5 md:px-6 md:py-4">
                     {loading ? (
-                        <div className="space-y-2.5 py-1">
+                        <div className="space-y-3 py-1 md:space-y-2.5">
                             {[1, 2, 3].map((i) => (
                                 <div
                                     key={i}
-                                    className="h-9 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800"
+                                    className="h-11 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800 md:h-9"
                                 />
                             ))}
                         </div>
                     ) : strategies.length === 0 ? (
-                        <p className="py-4 text-center text-sm text-neutral-400 dark:text-neutral-500">
+                        <p className="py-6 text-center text-base text-neutral-400 dark:text-neutral-500 md:py-4 md:text-sm">
                             이 탭에 등록된 목표가 없습니다.
                         </p>
                     ) : (
                         <div className="min-w-0 space-y-1">
                             {/* Header */}
                             <div
-                                className={`grid ${strategyGridMobile} items-center gap-2 px-1 pb-1 text-[11px] md:gap-3 md:text-xs ${strategyGridMd}`}
+                                className={`grid ${strategyGridMobile} items-center gap-2 px-1 pb-1.5 text-sm md:gap-3 md:pb-1 md:text-xs ${strategyGridMd}`}
                             >
                                 <span className="font-medium text-neutral-400 dark:text-neutral-500">종목</span>
                                 {activeTab === "직투" && (
@@ -492,27 +548,27 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                 return (
                                 <div
                                     key={s.id}
-                                    className={`grid ${strategyGridMobile} items-center gap-2 rounded-lg px-1 py-2 text-[11px] transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50 md:gap-3 md:text-sm ${strategyGridMd}`}
+                                    className={`grid ${strategyGridMobile} items-center gap-2 rounded-lg px-1 py-2.5 text-xs transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50 md:gap-3 md:py-2 md:text-sm ${strategyGridMd}`}
                                 >
                                     <span className="min-w-0 font-medium text-neutral-900 dark:text-neutral-100">
                                         {rowLabel}
                                         {rowLabel.trim().toUpperCase() !== s.ticker.trim().toUpperCase() && (
-                                            <span className="ml-1 font-mono text-[10px] text-neutral-500 dark:text-neutral-400 md:text-xs">
+                                            <span className="ml-1 font-mono text-[11px] text-neutral-500 dark:text-neutral-400 md:text-xs">
                                                 ({s.ticker})
                                             </span>
                                         )}
                                     </span>
                                     {activeTab === "직투" && (
-                                        <span className="w-12 shrink-0 text-center text-[10px] font-medium text-neutral-600 dark:text-neutral-400 md:w-16 md:text-[10px]">
+                                        <span className="w-12 shrink-0 text-center text-[11px] font-medium text-neutral-600 dark:text-neutral-400 md:w-16 md:text-[10px]">
                                             {ACCOUNT_TYPE_LABEL[s.accountType]}
                                         </span>
                                     )}
                                     <span
-                                        className={`inline-flex w-14 items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-medium md:w-16 md:px-2 md:text-xs ${ROLE_BADGE_STYLES[s.role]}`}
+                                        className={`inline-flex w-14 items-center justify-center rounded-full px-2 py-1 text-[11px] font-medium md:w-16 md:px-2 md:py-0.5 md:text-xs ${ROLE_BADGE_STYLES[s.role]}`}
                                     >
                                         {ASSET_ROLE_LABELS[s.role]}
                                     </span>
-                                    <span className="min-w-0 justify-self-end text-right font-mono tabular-nums text-neutral-700 dark:text-neutral-300 md:w-14 md:text-sm">
+                                    <span className="min-w-0 justify-self-end text-right text-sm font-mono tabular-nums text-neutral-700 dark:text-neutral-300 md:w-14 md:text-sm">
                                         {Math.round(s.targetWeight)}%
                                     </span>
                                     <div className="flex min-w-0 shrink-0 justify-end gap-0.5 justify-self-end md:w-14 md:gap-1">
@@ -523,7 +579,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                             className="flex min-h-11 min-w-11 items-center justify-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200 disabled:opacity-40 md:min-h-0 md:min-w-0"
                                             aria-label="수정"
                                         >
-                                            <Pencil className="size-3.5" />
+                                            <Pencil className="size-4 md:size-3.5" />
                                         </button>
                                         <button
                                             type="button"
@@ -532,7 +588,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                             className="flex min-h-11 min-w-11 items-center justify-center rounded p-1 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-40 md:min-h-0 md:min-w-0"
                                             aria-label="삭제"
                                         >
-                                            <Trash2 className="size-3.5" />
+                                            <Trash2 className="size-4 md:size-3.5" />
                                         </button>
                                     </div>
                                 </div>
@@ -545,14 +601,14 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                 {/* ── 비중 합계 표시 ────────────────────────────────────── */}
                 {strategies.length > 0 && weightStatus !== "skip" && (
                     <>
-                        <div className="mx-6 h-px bg-neutral-100 dark:bg-neutral-800" />
-                        <div className="flex items-center justify-between px-6 py-3.5">
-                            <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                        <div className="mx-5 h-px bg-neutral-100 dark:bg-neutral-800 md:mx-6" />
+                        <div className="flex items-center justify-between px-5 py-4 md:px-6 md:py-3.5">
+                            <span className="text-sm text-neutral-400 dark:text-neutral-500 md:text-xs">
                                 목표 비중 합계 ({activeTab})
                             </span>
                             <div className="flex items-center gap-2">
                                 <span
-                                    className={`font-mono text-sm font-semibold ${
+                                    className={`font-mono text-base font-semibold md:text-sm ${
                                         weightStatus === "exact"
                                             ? "text-emerald-600 dark:text-emerald-400"
                                             : weightStatus === "over"
@@ -564,7 +620,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                 </span>
                                 {weightStatus !== "exact" && (
                                     <span
-                                        className={`text-xs ${
+                                        className={`text-sm md:text-xs ${
                                             weightStatus === "over"
                                                 ? "text-red-400 dark:text-red-500"
                                                 : "text-amber-400 dark:text-amber-500"
@@ -576,7 +632,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                     </span>
                                 )}
                                 {weightStatus === "exact" && (
-                                    <span className="text-xs text-emerald-500 dark:text-emerald-400">
+                                    <span className="text-sm text-emerald-500 dark:text-emerald-400 md:text-xs">
                                         ✓ 100%
                                     </span>
                                 )}
@@ -585,10 +641,6 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                     </>
                 )}
             </div>
-
-            <p className="mt-3 px-1 text-xs text-neutral-400 dark:text-neutral-500">
-                현재 선택된 프로필의 종목별 목표 비중을 설정합니다. 탭별로 합계 100%를 맞춰 주세요.
-            </p>
         </section>
     );
 }

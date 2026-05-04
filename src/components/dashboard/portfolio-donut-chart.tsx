@@ -110,11 +110,11 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
             <div className="w-full rounded-2xl border border-neutral-100 bg-neutral-50/90 p-5 dark:border-neutral-800/80 dark:bg-neutral-800/40">
                 <div
                     ref={chartBoxRef}
-                    className="mx-auto min-h-[220px] w-full min-w-0 max-w-[320px]"
+                    className="mx-auto h-44 w-full min-w-0"
                 >
                     <ChartContainer
                         config={reportDonutChartConfig}
-                        className="[&_.recharts-text]:fill-background mx-auto aspect-square h-full max-h-[min(288px,calc(100vw-8rem))] w-full justify-center"
+                        className="[&_.recharts-text]:fill-background aspect-auto h-full w-full min-h-0 justify-center"
                     >
                         <PieChart>
                             <Tooltip content={<CustomTooltip />} />

@@ -262,7 +262,7 @@ export default function NewMonthlyReportPage() {
                     </div>
                 </div>
                 <div>
-                    <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-[2rem]">
+                    <h1 className="hidden text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:block md:text-[2rem]">
                         월별 리포트 작성
                     </h1>
                     <p className="mt-2 text-base text-neutral-500 dark:text-neutral-400">

@@ -4,6 +4,7 @@
  */
 
 import { deriveQuarterlyIntervalPerformance } from "@/lib/report-performance";
+import { parseQuarterlyPeriodYearQuarter } from "@/lib/investment-aggregates";
 import type { NewInvestment, PortfolioItem, Report } from "@/generated/prisma";
 import {
     AccountType,
@@ -253,4 +254,43 @@ export function withDevSampleQuarterlyArchiveIfEmpty(
         intervalGainKrw: intervalRows[index].intervalGainKrw,
         intervalReturnRatePercent: intervalRows[index].intervalReturnRatePercent,
     }));
+}
+
+const DEV_PROFILE_LABELS = ["AlphA Holdings Portfolio", "MindongFolio"] as const;
+
+/** 개발 모드 전용 — 음수 id 예시 리포트 단건 조회 */
+export function findDevSampleReportById(id: number): ReportWithItems | null {
+    if (process.env.NODE_ENV !== "development" || !Number.isInteger(id) || id >= 0) {
+        return null;
+    }
+    for (const profile of DEV_PROFILE_LABELS) {
+        for (const r of quarterlyPair(profile)) {
+            if (r.id === id) return r;
+        }
+        for (const r of monthlySeries(profile)) {
+            if (r.id === id) return r;
+        }
+    }
+    return null;
+}
+
+/** 분기 상세 수익 계산용 — 예시 리포트의 직전 분기 */
+export function findPreviousDevQuarterlyReport(current: ReportWithItems): ReportWithItems | null {
+    if (
+        process.env.NODE_ENV !== "development" ||
+        current.id >= 0 ||
+        current.type !== ReportType.QUARTERLY
+    ) {
+        return null;
+    }
+    const pair = quarterlyPair(current.profile).slice().sort((a, b) => {
+        const pa = parseQuarterlyPeriodYearQuarter(a.periodLabel);
+        const pb = parseQuarterlyPeriodYearQuarter(b.periodLabel);
+        if (!pa || !pb) return a.periodLabel.localeCompare(b.periodLabel);
+        if (pa.year !== pb.year) return pa.year - pb.year;
+        return pa.quarter - pb.quarter;
+    });
+    const idx = pair.findIndex((r) => r.id === current.id);
+    if (idx <= 0) return null;
+    return pair[idx - 1] ?? null;
 }

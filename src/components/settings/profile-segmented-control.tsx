@@ -20,7 +20,7 @@ export function ProfileSegmentedControl({
     const activeIndex = Math.max(0, SEGMENTS.findIndex((s) => s.id === value));
 
     return (
-        <div className="w-full rounded-full bg-neutral-200/95 p-1 ring-1 ring-neutral-300/80 dark:bg-neutral-800/95 dark:ring-0 md:p-1.5">
+        <div className="w-full rounded-full bg-neutral-200/95 p-1.5 ring-1 ring-neutral-300/80 dark:bg-neutral-800/95 dark:ring-0 md:p-1.5">
             <div className="relative flex w-full">
                 <motion.div
                     layout
@@ -45,7 +45,7 @@ export function ProfileSegmentedControl({
                             type="button"
                             onClick={() => onChange(seg.id)}
                             className={
-                                "relative z-10 flex min-h-[38px] flex-1 items-center justify-center rounded-full px-2 py-1.5 text-center text-[11px] font-semibold leading-tight transition-colors md:min-h-[44px] md:px-6 md:py-3 md:text-sm md:leading-snug " +
+                                "relative z-10 flex min-h-11 flex-1 items-center justify-center rounded-full px-3 py-2 text-center text-xs font-semibold leading-snug transition-colors md:min-h-[44px] md:px-6 md:py-3 md:text-sm md:leading-snug " +
                                 (isActive
                                     ? "text-primary dark:text-primary"
                                     : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200")

@@ -10,6 +10,34 @@ export const PROFILE_LABELS: Record<WorkspaceProfile, string> = {
     partner: "MindongFolio",
 };
 
+/** 설정 화면 — 운용 프로필 소개 카드 문구 */
+export const WORKSPACE_PROFILE_INTRO: Record<
+    WorkspaceProfile,
+    { name: string; title: string; bio: string }
+> = {
+    "alpha-ceo": {
+        name: "AlphA Holdings",
+        title: "AlphA Holdings Portfolio",
+        bio:
+            "AlphA Inc. 산하의 자산운용본부에 속해 있으며 AlphA Inc.의 투자와 자산을 통제 하고 관리하며 포트폴리오를 운용합니다.",
+    },
+    partner: {
+        name: "MindongFolio",
+        title: "개인 포트폴리오",
+        bio: "Mindong의 개인 포트폴리오이며 AlphA Holdings에 의해 위탁 운용됩니다.",
+    },
+};
+
+/** 모바일 헤더 등 — AlphA Holdings → A, MindongFolio → M */
+export const PROFILE_MOBILE_INITIALS: Record<WorkspaceProfile, string> = {
+    "alpha-ceo": "A",
+    partner: "M",
+};
+
+export function getProfileMobileInitial(profile: WorkspaceProfile): string {
+    return PROFILE_MOBILE_INITIALS[profile];
+}
+
 // 프로필 라벨 → 프로필 ID 역매핑
 export const LABEL_TO_PROFILE: Record<string, WorkspaceProfile> = {
     "AlphA Holdings Portfolio": "alpha-ceo",

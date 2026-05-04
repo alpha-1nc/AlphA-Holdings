@@ -1069,7 +1069,7 @@ export default function EditReportPage() {
                             ← 리포트 보기
                         </Link>
                     </div>
-                    <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-[2rem]">
+                    <h1 className="hidden text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:block md:text-[2rem]">
                         {isMonthly ? "월별 리포트 수정" : "분기별 리포트 수정"}
                     </h1>
                     <p className="mt-2 text-base text-neutral-500 dark:text-neutral-400">

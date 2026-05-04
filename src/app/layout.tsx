@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Oswald } from "next/font/google";
 import "./globals.css";
 import { TopNavbar } from "@/components/layout/top-navbar";
 import { MobileBottomTabBar } from "@/components/layout/mobile-bottom-tab-bar";
@@ -9,6 +9,14 @@ import { Toaster } from "sonner";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+/** 모바일 헤더 프로필 이니셜 전용 — 좁은 고딕 display */
+const oswaldProfileMonogram = Oswald({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  variable: "--font-profile-monogram",
   display: "swap",
 });
 
@@ -48,7 +56,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className={inter.variable} suppressHydrationWarning>
+    <html
+      lang="ko"
+      className={`${inter.variable} ${oswaldProfileMonogram.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>

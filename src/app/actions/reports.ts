@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import type { PrismaClient } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
-import type { AssetRole, ReportType, ReportStatus } from "@/generated/prisma";
+import type { AssetRole, ReportType, ReportStatus, Prisma } from "@/generated/prisma";
 import {
   INITIAL_CAPITAL_ACCOUNT_TYPES,
   type InitialCapitalAccountType,
@@ -16,6 +16,10 @@ import {
   parseQuarterlyPeriodYearQuarter,
   quarterInclusiveDateBounds,
 } from "@/lib/investment-aggregates";
+import {
+  findDevSampleReportById,
+  findPreviousDevQuarterlyReport,
+} from "@/lib/dev-sample-reports";
 
 async function resolveProfileIdFromLabel(
   db: Pick<PrismaClient, "profile">,
@@ -137,14 +141,29 @@ export type QuarterlyReportFinancialSummary = {
   quarterlyProfitRatePercent: number;
 };
 
+type ReportWithPortfolioRelations = Prisma.ReportGetPayload<{
+  include: { portfolioItems: true; newInvestments: true };
+}>;
+
 export async function getQuarterlyReportFinancialSummary(
   reportId: number
 ): Promise<QuarterlyReportFinancialSummary | null> {
-  const report = await prisma.report.findUnique({
+  let report: ReportWithPortfolioRelations | null = await prisma.report.findUnique({
     where: { id: reportId },
     include: { portfolioItems: true, newInvestments: true },
   });
-  if (!report || report.type !== "QUARTERLY") return null;
+  if (!report) {
+    const dev = findDevSampleReportById(reportId);
+    if (dev && dev.type === "QUARTERLY") {
+      report = {
+        ...dev,
+        newInvestments: dev.newInvestments ?? [],
+      } as ReportWithPortfolioRelations;
+    } else {
+      return null;
+    }
+  }
+  if (report.type !== "QUARTERLY") return null;
 
   const profileLabel = report.profile;
   const profileId = await resolveProfileIdFromLabel(prisma, profileLabel);
@@ -168,16 +187,19 @@ export async function getQuarterlyReportFinancialSummary(
     report.totalCurrentKrw ||
     0;
 
-  const previousQuarterly = await prisma.report.findFirst({
-    where: {
-      type: "QUARTERLY",
-      profile: profileLabel,
-      id: { not: report.id },
-      createdAt: { lt: report.createdAt },
-    },
-    orderBy: { createdAt: "desc" },
-    include: { portfolioItems: true },
-  });
+  const previousQuarterly =
+    report.id < 0
+      ? findPreviousDevQuarterlyReport(report)
+      : await prisma.report.findFirst({
+          where: {
+            type: "QUARTERLY",
+            profile: profileLabel,
+            id: { not: report.id },
+            createdAt: { lt: report.createdAt },
+          },
+          orderBy: { createdAt: "desc" },
+          include: { portfolioItems: true },
+        });
 
   const pqLabel = parseQuarterlyPeriodYearQuarter(report.periodLabel);
   let quarterlyProfitKrw: number;
@@ -408,6 +430,8 @@ function validateReportPayload(
 
 // ── 단일 리포트 조회 ───────────────────────────────────────
 export async function getReportById(id: number) {
+  const dev = findDevSampleReportById(id);
+  if (dev) return dev;
   return prisma.report.findUnique({
     where: { id },
     include: {
@@ -415,6 +439,17 @@ export async function getReportById(id: number) {
       newInvestments: true,
     },
   });
+}
+
+/** 모바일 하단 탭 — `/reports/[id]` 경로만으로 월/분기 구분 시 사용 (최소 조회) */
+export async function getReportTypeForBottomNav(id: number): Promise<ReportType | null> {
+  const dev = findDevSampleReportById(id);
+  if (dev) return dev.type;
+  const row = await prisma.report.findUnique({
+    where: { id },
+    select: { type: true },
+  });
+  return row?.type ?? null;
 }
 
 // ── 리포트 생성 페이로드 타입 ──────────────────────────────

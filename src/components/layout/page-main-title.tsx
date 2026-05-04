@@ -19,8 +19,9 @@ export function PageMainTitle({
   return (
     <h1
       className={cn(
+        "hidden",
+        Icon ? "md:flex md:items-center md:gap-3" : "md:block",
         PAGE_MAIN_TITLE_CLASS,
-        Icon && "flex items-center gap-3",
         className,
       )}
     >

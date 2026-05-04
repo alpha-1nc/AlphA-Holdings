@@ -384,7 +384,7 @@ function AssetTrendChart({ series, isMobileLayout }: AssetTrendChartProps) {
                 </div>
 
                 <div
-                    className="relative inline-flex w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:w-auto md:overflow-visible"
+                    className="relative flex w-full flex-nowrap items-stretch gap-1 overflow-hidden rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:inline-flex md:w-auto md:items-center md:justify-start md:overflow-visible"
                     role="tablist"
                     aria-label="차트 유형"
                 >
@@ -396,7 +396,7 @@ function AssetTrendChart({ series, isMobileLayout }: AssetTrendChartProps) {
                             aria-selected={chartTab === t.key}
                             onClick={() => setChartTab(t.key)}
                             className={[
-                                "relative z-10 flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-300",
+                                "relative z-10 flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-center text-[0.68rem] font-semibold transition-all duration-300 sm:px-2.5 sm:text-xs md:flex-none md:shrink-0 md:px-3.5",
                                 chartTab === t.key
                                     ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
                                     : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",
@@ -790,13 +790,13 @@ function DistributionAnalysisCard({
             className="flex h-full flex-col rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
             style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
         >
-            <div className="mb-5 flex items-center justify-between">
-                <h3 className="text-sm font-bold" style={{ color: "var(--ah-text-pri)" }}>
+            <div className="mb-5 flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
+                <h3 className="text-sm font-bold shrink-0" style={{ color: "var(--ah-text-pri)" }}>
                     {activeTab === "role" ? "역할별 분산" : "섹터별 분산"}
                 </h3>
 
                 <div
-                    className="relative inline-flex w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:w-auto md:overflow-visible"
+                    className="relative flex min-h-[2.5rem] w-full min-w-0 flex-1 flex-nowrap items-stretch gap-1 overflow-hidden rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:inline-flex md:h-auto md:w-auto md:flex-none md:items-center md:justify-start md:overflow-visible"
                     role="tablist"
                     aria-label="역할·섹터 보기"
                 >
@@ -810,7 +810,7 @@ function DistributionAnalysisCard({
                                 aria-selected={selected}
                                 onClick={() => setActiveTab(tab)}
                                 className={[
-                                    "relative z-10 flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-300",
+                                    "relative z-10 flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-semibold transition-all duration-300 sm:text-xs md:flex-none md:shrink-0 md:px-3.5",
                                     selected
                                         ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
                                         : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",
@@ -1230,7 +1230,7 @@ export function DashboardPageClient() {
                     <PageMainTitle icon={Home}>Dashboard</PageMainTitle>
                 </div>
                 <div
-                    className="relative inline-flex w-full md:w-auto flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:overflow-visible"
+                    className="relative flex w-full flex-nowrap items-stretch gap-1 overflow-hidden rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:inline-flex md:w-auto md:items-center md:justify-start md:overflow-visible"
                     role="tablist"
                     aria-label="계좌 필터"
                 >
@@ -1254,7 +1254,7 @@ export function DashboardPageClient() {
                                     setGroup(key === "all" ? "all" : (key as AccountGroupKey))
                                 }
                                 className={[
-                                    "relative z-10 flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-300",
+                                    "relative z-10 flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-1.5 py-1.5 text-center text-[0.65rem] font-semibold transition-all duration-300 sm:px-2.5 sm:text-xs md:flex-none md:shrink-0 md:px-3.5",
                                     selected
                                         ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
                                         : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",

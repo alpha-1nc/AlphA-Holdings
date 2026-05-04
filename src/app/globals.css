@@ -376,6 +376,72 @@ body {
   animation: logo-emerge 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ── 모바일 헤더 프로필 칩: 라이트·다크 분리 + 민트 인디케이터 펄스 ── */
+
+@keyframes ah-profile-chip-pulse-light {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(15, 127, 95, 0.34),
+      0 0 12px rgba(93, 252, 179, 0.16),
+      inset 0 1px 0 rgb(255 255 255 / 0.92);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(15, 127, 95, 0.52),
+      0 0 22px rgba(93, 252, 179, 0.3),
+      inset 0 1px 0 rgb(255 255 255 / 0.92);
+  }
+}
+
+@keyframes ah-profile-chip-pulse-dark {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(93, 252, 179, 0.42),
+      0 0 10px rgba(93, 252, 179, 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.05);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(93, 252, 179, 0.82),
+      0 0 24px rgba(93, 252, 179, 0.48),
+      inset 0 1px 0 rgb(255 255 255 / 0.09);
+  }
+}
+
+.ah-profile-chip--header {
+  animation: ah-profile-chip-pulse-light 2.85s ease-in-out infinite;
+}
+
+.dark .ah-profile-chip--header {
+  animation: ah-profile-chip-pulse-dark 2.35s ease-in-out infinite;
+}
+
+.ah-profile-initial-font {
+  font-family: var(--font-profile-monogram), var(--font-inter), system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  font-synthesis: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ah-profile-chip--header {
+    animation: none;
+    box-shadow:
+      0 0 0 3px rgba(15, 127, 95, 0.4),
+      0 0 14px rgba(93, 252, 179, 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.9);
+  }
+
+  .dark .ah-profile-chip--header {
+    box-shadow:
+      0 0 0 3px rgba(93, 252, 179, 0.5),
+      0 0 12px rgba(93, 252, 179, 0.26),
+      inset 0 1px 0 rgb(255 255 255 / 0.06);
+  }
+}
+
 /* ── iPhone·iPad 안전영역 플로팅 도크 (`viewport.viewportFit=cover` 권장) ── */
 
 .ah-mm-dock-shell {
@@ -415,75 +481,156 @@ body {
     0 14px 36px -14px rgb(0 0 0 / 0.52);
 }
 
-/* ── Interactive mobile bottom menu (AlphA 포인트: --primary) ── */
+/* ── Interactive mobile bottom menu — 가로 펼침(grid) + 소프트 이징 ── */
 
 .ah-mm-nav {
   --ah-mm-accent: var(--primary);
+  --ah-mm-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ah-mm-layout-ms: 420ms;
   display: flex;
   width: 100%;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 0.0625rem;
-  padding-inline: 0.125rem;
+  align-items: center;
+  justify-content: space-evenly;
+  padding-inline: 0.25rem;
+  padding-block: 0.375rem 0.4375rem;
 }
 
+/* 도크 패널 안 오버라이드 */
 .ah-mm-dock-pane .ah-mm-nav {
-  padding-inline: 0.3125rem;
-  padding-block: 0.25rem 0.375rem;
-  gap: 0.0625rem;
+  padding-inline: 0.5rem;
+  padding-block: 0.4375rem 0.5rem;
 }
 
+/* ── 개별 탭 ── */
 .ah-mm-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+
+  gap: 0;
+  min-width: 2.65rem;
+  min-height: 3.0625rem;
+  padding-block: 0.4375rem;
+  padding-inline: 0.625rem;
+
+  border-radius: 9999px;
+  background-color: transparent;
+
   position: relative;
   color: inherit;
   touch-action: manipulation;
   user-select: none;
-  border-radius: 0.8125rem;
   -webkit-tap-highlight-color: transparent;
+
+  transition-property: gap, padding-inline, min-width, background-color, opacity, transform,
+    filter;
+  transition-duration: var(--ah-mm-layout-ms), var(--ah-mm-layout-ms),
+    calc(var(--ah-mm-layout-ms) * 1.06), calc(var(--ah-mm-layout-ms) * 0.88), 0.22s, 0.18s,
+    calc(var(--ah-mm-layout-ms) * 0.45);
+  transition-timing-function: var(--ah-mm-ease);
 }
 
+/* 탭 누름 */
 .ah-mm-item:active {
-  opacity: 0.88;
-}
-
-.ah-mm-dock-pane .ah-mm-item:active {
-  opacity: 0.86;
+  opacity: 0.9;
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .ah-mm-item:active {
     transform: scale3d(0.97, 0.97, 1);
-    transition-duration: 0ms;
-    transition-timing-function: ease-out;
-  }
-
-  .ah-mm-item:not(:active) {
-    transition:
-      opacity 0.15s ease,
-      transform 0.15s cubic-bezier(0.32, 0.72, 0, 1);
+    transition-duration: 0ms !important;
   }
 }
 
-.ah-mm-item .ah-mm-iconWrap {
+.ah-mm-item--active {
+  gap: 0.375rem;
+  padding-inline: 0.7rem;
+  opacity: 1 !important;
+  background-color: transparent;
+}
+
+/* ── 라벨 셸: 0fr → 1fr — 텍스트가 자연폭까지 부드럽게 ── */
+
+.ah-mm-labelShell {
+  display: grid;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns var(--ah-mm-layout-ms) var(--ah-mm-ease);
+  min-height: max-content;
+}
+
+.ah-mm-labelShell--open {
+  grid-template-columns: 1fr;
+}
+
+.ah-mm-labelClip {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.ah-mm-label {
+  position: relative;
+  display: inline-block;
+  font-size: 0.78125rem;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  color: var(--ah-mm-accent);
+  padding-bottom: 5px;
+
+  opacity: 0;
+  transform: translate3d(-6px, 0, 0);
+  transition:
+    opacity calc(var(--ah-mm-layout-ms) * 0.78) var(--ah-mm-ease),
+    transform calc(var(--ah-mm-layout-ms) * 0.88) var(--ah-mm-ease);
+}
+
+.ah-mm-label--visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+.ah-mm-item:not(.ah-mm-item--active) .ah-mm-label {
+  opacity: 0 !important;
+  transform: translate3d(-8px, 0, 0) !important;
+  transition-duration:
+    calc(var(--ah-mm-layout-ms) * 0.48),
+    calc(var(--ah-mm-layout-ms) * 0.44);
+}
+
+/* ── 아이콘 ── */
+
+.ah-mm-iconWrap {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
   color: var(--muted-foreground);
-  transition: color 0.2s ease;
+
+  transition:
+    color calc(var(--ah-mm-layout-ms) * 0.9) var(--ah-mm-ease),
+    transform 0.45s var(--ah-mm-ease);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ah-mm-item--active .ah-mm-iconWrap {
+    transform: scale3d(1.04, 1.04, 1);
+  }
+}
+
+.ah-mm-iconWrap .ah-mm-icon {
+  width: 22px;
+  height: 22px;
+  vertical-align: middle;
 }
 
 .ah-mm-item--active .ah-mm-iconWrap {
   color: var(--ah-mm-accent);
 }
 
-.ah-mm-label {
-  font-size: 0.6875rem;
-  position: relative;
-  padding-bottom: 4px;
-  margin-top: 1px;
-  transition:
-    color 0.18s ease,
-    opacity 0.18s ease;
-}
+/* ── 언더라인 ── */
 
-/* 활성 라인 — 텍스트 실제 너비(--ah-mm-line)에 맞춤 */
 .ah-mm-label::after {
   content: "";
   pointer-events: none;
@@ -492,39 +639,78 @@ body {
   bottom: 0;
   transform: translateX(-50%);
   height: 2px;
-  width: 0;
   border-radius: 9999px;
   background-color: var(--ah-mm-accent);
-  transition: width 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+
+  width: var(--ah-mm-line, 0px);
+  opacity: 0;
+
+  transition-property: width, opacity;
+  transition-duration: calc(var(--ah-mm-layout-ms) * 1.05), calc(var(--ah-mm-layout-ms) * 0.42);
+  transition-timing-function: var(--ah-mm-ease), ease-out;
+  transition-delay: calc(var(--ah-mm-layout-ms) * 0.11), calc(var(--ah-mm-layout-ms) * 0.06);
 }
 
-.ah-mm-item--active {
-  opacity: 1 !important;
-}
-
-.ah-mm-item--active .ah-mm-label--active {
-  color: var(--ah-mm-accent);
+.ah-mm-item--active .ah-mm-label--visible::after {
   opacity: 1;
 }
 
-.ah-mm-item--active .ah-mm-label::after {
-  width: var(--ah-mm-line, 0px);
+/* 비활성화 시 줄·폭 즉각 수축 (라벨이 접히므로 레이턴시 짧음) */
+.ah-mm-item:not(.ah-mm-item--active) .ah-mm-label::after {
+  width: 0;
+  opacity: 0;
+  transition-delay: 0ms !important;
+  transition-duration:
+    calc(var(--ah-mm-layout-ms) * 0.62),
+    0.12s;
 }
 
+/* ── 접근성 ── */
+
 @media (prefers-reduced-motion: reduce) {
-  .ah-mm-label::after {
-    transition: none;
+  .ah-mm-item {
+    transition: none !important;
   }
-  .ah-mm-item .ah-mm-iconWrap {
-    transition: none;
-  }
-  .ah-mm-label {
-    transition: none;
-  }
+
   .ah-mm-item:active {
-    transform: none;
+    transform: none !important;
   }
-  .ah-mm-item:not(:active) {
-    transition: none;
+
+  .ah-mm-labelShell {
+    transition: none !important;
+  }
+
+  .ah-mm-labelShell--open {
+    grid-template-columns: 1fr;
+  }
+
+  .ah-mm-item:not(.ah-mm-item--active) .ah-mm-labelShell {
+    grid-template-columns: 0fr;
+  }
+
+  .ah-mm-label {
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+
+  .ah-mm-item:not(.ah-mm-item--active) .ah-mm-label {
+    visibility: hidden;
+    opacity: 0 !important;
+  }
+
+  .ah-mm-item--active .ah-mm-label {
+    visibility: visible;
+    opacity: 1 !important;
+  }
+
+  .ah-mm-label::after {
+    transition: none !important;
+    transition-delay: 0ms !important;
+  }
+
+  .ah-mm-iconWrap {
+    transform: none !important;
+    transition: none !important;
   }
 }

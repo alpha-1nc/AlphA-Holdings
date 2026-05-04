@@ -59,7 +59,7 @@ export default async function ReportDetailPage(props: {
     }
     
     const id = Number(idStr);
-    if (Number.isNaN(id) || id <= 0 || !Number.isInteger(id)) {
+    if (Number.isNaN(id) || id === 0 || !Number.isInteger(id)) {
         notFound();
     }
 
@@ -329,9 +329,6 @@ export default async function ReportDetailPage(props: {
                             {report.type === "MONTHLY" ? "월별 리포트" : "분기별 리포트"}
                         </Link>
                     </div>
-                    <p className="text-xs font-medium uppercase tracking-[0.25em] text-neutral-400">
-                        INVESTMENT REPORT
-                    </p>
                     <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
                         {label}
                     </h2>
@@ -399,20 +396,12 @@ export default async function ReportDetailPage(props: {
                                     <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
                                         이 분기 신규 납입 (월별 합산)
                                     </CardTitle>
-                                    <p className="text-[11px] font-normal text-neutral-400 dark:text-neutral-500">
-                                        같은 분기 월별 리포트에 기록된 신규 납입액의 합계입니다.
-                                    </p>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-2">
                                         <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
                                             {krw(quarterNewInvFromMonthly)}
                                         </p>
-                                        {totalNewInvestment > 0 && (
-                                            <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
-                                                참고: 이전에 분기 리포트에 별도 저장된 신규 항목 {krw(totalNewInvestment)}은(는) 수익 계산에는 사용하지 않습니다.
-                                            </p>
-                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -504,9 +493,6 @@ export default async function ReportDetailPage(props: {
                             <CardTitle className="text-xs font-semibold uppercase tracking-[0.2em] text-neutral-400">
                                 WEIGHT BY POSITION
                             </CardTitle>
-                            <CardDescription className="text-[11px] font-normal leading-relaxed text-neutral-500 dark:text-neutral-400">
-                                분기 말 스냅샷 기준, 종목별 원화 평가금액이 차지하는 비중입니다.
-                            </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-0">
                             <ReportDonutChart snapshots={snapshotsForChart} />

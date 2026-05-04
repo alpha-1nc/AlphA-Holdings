@@ -7,15 +7,15 @@ export const MAIN_NAV_ITEMS: {
   href: string;
   icon: LucideIcon;
   label: string;
-  /** 모바일 하단 탭용 (한 줄) */
+  /** 모바일 하단 탭용 (한 줄, 영문) */
   shortLabel: string;
 }[] = [
-  { href: "/", icon: Home, label: "홈", shortLabel: "홈" },
-  { href: "/monthly", icon: BarChart2, label: "월별 리포트", shortLabel: "월별" },
-  { href: "/quarterly", icon: TrendingUp, label: "분기별 리포트", shortLabel: "분기" },
-  { href: "/watchlist", icon: Bookmark, label: "와치리스트", shortLabel: "관심" },
-  { href: "/reports/new", icon: PenLine, label: "새 리포트", shortLabel: "작성" },
-  { href: "/settings", icon: Settings, label: "설정", shortLabel: "설정" },
+  { href: "/", icon: Home, label: "홈", shortLabel: "Home" },
+  { href: "/monthly", icon: BarChart2, label: "월별 리포트", shortLabel: "Monthly" },
+  { href: "/quarterly", icon: TrendingUp, label: "분기별 리포트", shortLabel: "" },
+  { href: "/watchlist", icon: Bookmark, label: "와치리스트", shortLabel: "Watch" },
+  { href: "/reports/new", icon: PenLine, label: "새 리포트", shortLabel: "New" },
+  { href: "/settings", icon: Settings, label: "설정", shortLabel: "Settings" },
 ];
 
 /** pathname에 맞는 상단(모바일) 표시용 아이콘·제목 — 메인 메뉴 및 리포트 하위 경로 */
@@ -57,7 +57,8 @@ export function getBottomTabIndexForReportType(type: ReportType): number {
 
 /**
  * 모바일 하단 탭 — 가장 긴 href 프리픽스가 우선 (`/` 제외 후 정렬).
- * `/reports/[id]` 등 매칭 없으면 홈(0). (리포트 상세는 레이아웃에서 타입 기반 오버라이드)
+ * `/reports/[id]`·`/reports/[id]/edit`는 경로만으로 월/분기 구분 불가 →
+ * `MobileBottomTabBar`가 서버에서 `type` 조회 후 `getBottomTabIndexForReportType` 적용.
  */
 export function getBottomTabIndexForPath(pathname: string): number {
   if (pathname === "/") {
