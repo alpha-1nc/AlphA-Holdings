@@ -20,6 +20,7 @@ import { ReportDeleteButton } from "@/components/dashboard/report-delete-button"
 import { QuarterlyReportTabs } from "@/components/reports/QuarterlyReportTabs";
 import { getProfileFromLabel } from "@/lib/profile";
 import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
+import { bulletLinesToArray } from "@/lib/bullet-list-text";
 
 const krw = (n: number) =>
     new Intl.NumberFormat("ko-KR", {
@@ -183,18 +184,34 @@ export default async function ReportDetailPage(props: {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    {journalEntries.map(({ title, content }) => (
-                        <div key={title}>
-                            <h3 className="mb-3 border-b border-neutral-200/90 pb-2 text-base font-semibold tracking-tight text-neutral-900 dark:border-neutral-700 dark:text-neutral-100">
-                                {title}
-                            </h3>
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700 dark:text-neutral-200">
-                                {content || (
-                                    <span className="text-neutral-400 dark:text-neutral-500 italic">작성된 내용이 없습니다.</span>
+                    {journalEntries.map(({ title, content }) => {
+                        const trimmed = content?.trim() ?? "";
+                        const items = trimmed ? bulletLinesToArray(content ?? "") : [];
+                        return (
+                            <div key={title}>
+                                <h3 className="mb-3 border-b border-neutral-200/90 pb-2 text-base font-semibold tracking-tight text-neutral-900 dark:border-neutral-700 dark:text-neutral-100">
+                                    {title}
+                                </h3>
+                                {!trimmed ? (
+                                    <p className="text-sm leading-relaxed text-neutral-400 dark:text-neutral-500 italic">
+                                        작성된 내용이 없습니다.
+                                    </p>
+                                ) : items.length > 0 ? (
+                                    <ul className="list-disc space-y-1.5 pl-[1.125rem] text-sm leading-relaxed text-neutral-700 dark:text-neutral-200 marker:text-neutral-400 dark:marker:text-neutral-500">
+                                        {items.map((line, i) => (
+                                            <li key={i} className="pl-0.5">
+                                                {line}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-700 dark:text-neutral-200">
+                                        {content}
+                                    </p>
                                 )}
-                            </p>
-                        </div>
-                    ))}
+                            </div>
+                        );
+                    })}
                 </CardContent>
             </Card>
 

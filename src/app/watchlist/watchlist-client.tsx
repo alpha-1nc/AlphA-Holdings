@@ -11,6 +11,7 @@ import {
   deleteWatchlistItem,
 } from "@/app/actions/watchlist";
 import { PageMainTitle } from "@/components/layout/page-main-title";
+import { bulletLinesToArray } from "@/lib/bullet-list-text";
 import {
   TickerSearchInput,
   type TickerSearchChangeMeta,
@@ -33,14 +34,6 @@ function normalizeStatus(tag: string): (typeof STATUS_OPTIONS)[number] {
     return mapped as (typeof STATUS_OPTIONS)[number];
   }
   return "관심";
-}
-
-/** 한 줄 한 항목 · 앞쪽 글머리 기호는 제거 후 표시 */
-function bulletLinesToArray(raw: string): string[] {
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^[\s\u2022\u30FB•\-\*・]+/u, "").trim())
-    .filter(Boolean);
 }
 
 const BULLET_PLACEHOLDER = `예:\n실적 모멘텀 유지\n밸류에이션 여력`;

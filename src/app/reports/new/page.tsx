@@ -10,6 +10,10 @@ import {
     getProfileLabel,
     type WorkspaceProfile,
 } from "@/lib/profile";
+import {
+    BulletJournalFieldCompact,
+    JOURNAL_BULLET_PLACEHOLDER,
+} from "@/components/reports/bullet-journal-field";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 type AccountType = "US_DIRECT" | "KR_DIRECT" | "ISA" | "JP_DIRECT" | "PENSION" | "CASH";
@@ -115,36 +119,6 @@ function FormRow({
                 {sublabel && <p className="mt-1 text-sm text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
             </div>
             <div className="min-w-0 flex-1">{children}</div>
-        </div>
-    );
-}
-
-function JournalField({
-    id, label, sublabel, placeholder, value, onChange,
-}: {
-    id: string; label: string; sublabel: string; placeholder: string; value: string; onChange: (v: string) => void;
-}) {
-    return (
-        <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
-            <div className="flex items-baseline gap-2 border-b border-neutral-100 px-6 py-3.5 dark:border-neutral-800">
-                <label htmlFor={id} className="text-base font-medium text-neutral-700 dark:text-neutral-300">
-                    {label}
-                </label>
-                <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
-            </div>
-            <textarea
-                id={id}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                rows={7}
-                className={[
-                    "w-full resize-none px-6 py-5 text-base leading-relaxed",
-                    "text-neutral-900 placeholder:text-neutral-300",
-                    "bg-transparent outline-none",
-                    "dark:text-neutral-100 dark:placeholder:text-neutral-600",
-                ].join(" ")}
-            />
         </div>
     );
 }
@@ -349,19 +323,19 @@ export default function NewMonthlyReportPage() {
                     회고록
                 </p>
                 <div className="space-y-5">
-                    <JournalField
+                    <BulletJournalFieldCompact
                         id="journal-summary"
                         label="이번 달 증시 요약"
                         sublabel="Summary"
-                        placeholder="이번 달 시장 전반의 흐름, 주요 이벤트, 섹터 동향 등을 자유롭게 기록하세요."
+                        placeholder={JOURNAL_BULLET_PLACEHOLDER}
                         value={summary}
                         onChange={setSummary}
                     />
-                    <JournalField
+                    <BulletJournalFieldCompact
                         id="journal-feedback"
                         label="느낀 점"
                         sublabel="Feedback"
-                        placeholder="이번 달 투자를 통해 배운 점, 아쉬웠던 점, 감정적으로 느낀 것들을 솔직하게 적어보세요."
+                        placeholder={JOURNAL_BULLET_PLACEHOLDER}
                         value={feedback}
                         onChange={setFeedback}
                     />

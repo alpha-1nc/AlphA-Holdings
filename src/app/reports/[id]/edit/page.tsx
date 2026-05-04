@@ -28,6 +28,8 @@ import {
 import { TickerSearchInput, type TickerSearchChangeMeta } from "@/components/dashboard/ticker-search-input";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { PortfolioSnapshotAvatar } from "@/components/reports/portfolio-snapshot-avatar";
+import { BulletJournalField } from "@/components/reports/bullet-journal-field";
+import { normalizeJournalBulletText } from "@/lib/bullet-list-text";
 import { ASSET_ROLE_LABELS } from "@/types/portfolio-strategy";
 import type { Report, PortfolioItem, NewInvestment, AccountType, AssetRole } from "@/generated/prisma";
 
@@ -280,51 +282,6 @@ function FormRow({
                 {sublabel && <p className="mt-1 text-sm text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
             </div>
             <div className="flex-1">{children}</div>
-        </div>
-    );
-}
-
-function JournalField({
-    id, label, sublabel, placeholder, value, onChange, rows = 6,
-    errorMessage, scrollId,
-}: {
-    id: string; label: string; sublabel: string; placeholder: string;
-    value: string; onChange: (v: string) => void; rows?: number;
-    errorMessage?: string;
-    scrollId?: string;
-}) {
-    return (
-        <div
-            id={scrollId}
-            className={[
-                "overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800",
-                errorMessage ? "ring-2 ring-red-500 dark:ring-red-500" : "",
-            ].join(" ")}
-        >
-            <div className="flex items-baseline gap-2 border-b border-neutral-100 px-6 py-3.5 dark:border-neutral-800">
-                <label htmlFor={id} className="text-base font-medium text-neutral-700 dark:text-neutral-300">
-                    {label}
-                </label>
-                <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
-            </div>
-            <textarea
-                id={id}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
-                rows={rows}
-                className={[
-                    "w-full resize-none px-6 py-5 text-base leading-relaxed",
-                    "text-neutral-900 placeholder:text-neutral-300",
-                    "bg-transparent outline-none",
-                    "dark:text-neutral-100 dark:placeholder:text-neutral-600",
-                ].join(" ")}
-            />
-            {errorMessage ? (
-                <p className="border-t border-red-100 px-6 py-2.5 text-base text-red-600 dark:border-red-900/40 dark:text-red-400">
-                    {errorMessage}
-                </p>
-            ) : null}
         </div>
     );
 }
@@ -767,10 +724,14 @@ export default function EditReportPage() {
         setPeriod(report.periodLabel);
         setUsdKrw(String(report.usdRate || 0));
         setJpyKrw(String(report.jpyRate || 0));
-        setSummary(report.summary || "");
-        setFeedback(report.journal || "");
-        setStrategy(report.strategy || "");
-        setEarningsReview((report as { earningsReview?: string | null }).earningsReview || "");
+        setSummary(normalizeJournalBulletText(report.summary || ""));
+        setFeedback(normalizeJournalBulletText(report.journal || ""));
+        setStrategy(normalizeJournalBulletText(report.strategy || ""));
+        setEarningsReview(
+            normalizeJournalBulletText(
+                (report as { earningsReview?: string | null }).earningsReview || "",
+            ),
+        );
 
         if (report.type === "MONTHLY") {
             const initialNew: NewInvestmentRow[] = (report.newInvestments || []).map((inv) => {
@@ -1328,7 +1289,7 @@ export default function EditReportPage() {
                 <div className="space-y-5">
                     {isMonthly ? (
                         <>
-                            <JournalField
+                            <BulletJournalField
                                 id="journal-summary"
                                 label="이번 달 증시 요약"
                                 sublabel="Summary"
@@ -1336,7 +1297,7 @@ export default function EditReportPage() {
                                 value={summary}
                                 onChange={setSummary}
                             />
-                            <JournalField
+                            <BulletJournalField
                                 id="journal-feedback"
                                 label="느낀 점"
                                 sublabel="Feedback"
@@ -1347,7 +1308,7 @@ export default function EditReportPage() {
                         </>
                     ) : (
                         <>
-                            <JournalField
+                            <BulletJournalField
                                 id="journal-earnings"
                                 scrollId={QF.earningsReview}
                                 label="어닝 / 실적 리뷰"
@@ -1361,7 +1322,7 @@ export default function EditReportPage() {
                                 rows={8}
                                 errorMessage={quarterlyFieldErrors[QF.earningsReview]}
                             />
-                            <JournalField
+                            <BulletJournalField
                                 id="journal-summary"
                                 scrollId={QF.summary}
                                 label="분기 시장 요약"
@@ -1375,7 +1336,7 @@ export default function EditReportPage() {
                                 rows={6}
                                 errorMessage={quarterlyFieldErrors[QF.summary]}
                             />
-                            <JournalField
+                            <BulletJournalField
                                 id="journal-feedback"
                                 scrollId={QF.journal}
                                 label="느낀 점"
@@ -1389,7 +1350,7 @@ export default function EditReportPage() {
                                 rows={6}
                                 errorMessage={quarterlyFieldErrors[QF.journal]}
                             />
-                            <JournalField
+                            <BulletJournalField
                                 id="journal-strategy"
                                 scrollId={QF.strategy}
                                 label="다음 분기 전략"
