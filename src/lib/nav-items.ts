@@ -45,3 +45,23 @@ export function getMainNavForPath(pathname: string): { icon: LucideIcon; label: 
 
   return { icon: Home, label: "홈" };
 }
+
+/**
+ * 모바일 하단 탭 — 가장 긴 href 프리픽스가 우선 (`/` 제외 후 정렬).
+ * 리포트 상세처럼 목록에 없는 경로는 홈 탭 인덱스(0)로 폴백.
+ */
+export function getBottomTabIndexForPath(pathname: string): number {
+  if (pathname === "/") {
+    return 0;
+  }
+  const scored = MAIN_NAV_ITEMS.map((item, index) => ({ ...item, index })).filter(
+    (x) => x.href !== "/",
+  );
+  scored.sort((a, b) => b.href.length - a.href.length);
+  for (const item of scored) {
+    if (pathname.startsWith(item.href)) {
+      return item.index;
+    }
+  }
+  return 0;
+}

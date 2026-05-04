@@ -61,7 +61,7 @@ function signedKrwFromInvestmentRow(row: NewInvestmentRow): number {
 
 /* ── Shared style tokens ─────────────────────────────────────────────────*/
 const inputCls = [
-    "min-h-11 w-full rounded-xl bg-white px-4 py-2.5 text-sm md:min-h-0",
+    "min-h-12 w-full rounded-xl bg-white px-5 py-3 text-base md:min-h-0",
     "text-neutral-900 placeholder:text-neutral-300",
     "ring-1 ring-neutral-200/80 outline-none",
     "transition focus:ring-2 focus:ring-neutral-400",
@@ -73,8 +73,8 @@ const inputCls = [
 /* ── Sub-components ──────────────────────────────────────────────────────*/
 function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
     return (
-        <section className="mb-8">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+        <section className="mb-10">
+            <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                 {label}
             </p>
             <div className="rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
@@ -99,20 +99,20 @@ function FormRow({
 }) {
     if (variant === "stacked") {
         return (
-            <div className="flex flex-col gap-3 px-4 py-5 md:px-6">
+            <div className="flex flex-col gap-4 px-5 py-6 md:px-7">
                 <div className="w-full">
-                    <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400">{label}</label>
-                    {sublabel && <p className="mt-1 text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
+                    <label className="text-base font-medium text-neutral-600 dark:text-neutral-400">{label}</label>
+                    {sublabel && <p className="mt-1.5 text-sm leading-relaxed text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
                 </div>
                 <div className="w-full min-w-0">{children}</div>
             </div>
         );
     }
     return (
-        <div className="flex flex-col gap-2 px-4 py-5 md:flex-row md:items-start md:gap-6 md:px-6">
-            <div className="min-w-[160px] shrink-0">
-                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400">{label}</label>
-                {sublabel && <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
+        <div className="flex flex-col gap-3 px-5 py-6 md:flex-row md:items-start md:gap-8 md:px-7">
+            <div className="min-w-[180px] shrink-0">
+                <label className="text-base font-medium text-neutral-600 dark:text-neutral-400">{label}</label>
+                {sublabel && <p className="mt-1 text-sm text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
             </div>
             <div className="min-w-0 flex-1">{children}</div>
         </div>
@@ -126,20 +126,20 @@ function JournalField({
 }) {
     return (
         <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
-            <div className="flex items-baseline gap-2 border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
-                <label htmlFor={id} className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <div className="flex items-baseline gap-2 border-b border-neutral-100 px-6 py-3.5 dark:border-neutral-800">
+                <label htmlFor={id} className="text-base font-medium text-neutral-700 dark:text-neutral-300">
                     {label}
                 </label>
-                <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
+                <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
             </div>
             <textarea
                 id={id}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
-                rows={6}
+                rows={7}
                 className={[
-                    "w-full resize-none px-5 py-4 text-sm leading-relaxed",
+                    "w-full resize-none px-6 py-5 text-base leading-relaxed",
                     "text-neutral-900 placeholder:text-neutral-300",
                     "bg-transparent outline-none",
                     "dark:text-neutral-100 dark:placeholder:text-neutral-600",
@@ -243,34 +243,34 @@ export default function NewMonthlyReportPage() {
     if (!mounted) return null;
 
     return (
-        <div className="mx-auto max-w-2xl px-4 py-8 md:py-12">
-            <div className="mb-10 space-y-6">
+        <div className="mx-auto max-w-3xl px-5 py-10 md:py-14">
+            <div className="mb-12 space-y-7">
                 <div className="flex items-center justify-end">
-                    <div className="inline-flex rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+                    <div className="inline-flex rounded-lg bg-neutral-100 p-1.5 dark:bg-neutral-800">
                         <Link
                             href="/reports/new"
-                            className="rounded-md px-4 py-1.5 text-sm font-medium text-neutral-900 transition dark:text-neutral-100 bg-white shadow-sm dark:bg-neutral-900"
+                            className="rounded-md px-5 py-2 text-base font-medium text-neutral-900 transition dark:text-neutral-100 bg-white shadow-sm dark:bg-neutral-900"
                         >
                             월별
                         </Link>
                         <Link
                             href="/reports/new/quarterly"
-                            className="rounded-md px-4 py-1.5 text-sm font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                            className="rounded-md px-5 py-2 text-base font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                         >
                             분기별
                         </Link>
                     </div>
                 </div>
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">
+                    <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-[2rem]">
                         월별 리포트 작성
                     </h1>
-                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                    <p className="mt-2 text-base text-neutral-500 dark:text-neutral-400">
                         이번 달의 자금 흐름과 시장 흐름을 가볍게 기록하세요.
                     </p>
                 </div>
                 <div className="flex justify-end">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3.5 py-2 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                         {getProfileLabel(profile)}
                     </span>
@@ -288,14 +288,14 @@ export default function NewMonthlyReportPage() {
                             min="2000"
                             max="2100"
                             className={inputCls}
-                            style={{ width: "120px" }}
+                            style={{ width: "132px" }}
                         />
-                        <span className="text-sm text-neutral-400">년</span>
+                        <span className="text-base text-neutral-400">년</span>
                         <select
                             value={month}
                             onChange={(e) => setMonth(e.target.value)}
                             className={inputCls}
-                            style={{ width: "140px" }}
+                            style={{ width: "152px" }}
                         >
                             <option value="">월 선택</option>
                             {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
@@ -327,12 +327,12 @@ export default function NewMonthlyReportPage() {
                         <button
                             type="button"
                             onClick={addNewInvestmentRow}
-                            className="w-full rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-2 text-sm text-neutral-500 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                            className="w-full rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-5 py-3 text-base text-neutral-500 transition hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
                         >
                             + 현금흐름 행 추가
                         </button>
                         {newInvestmentRows.length > 0 && totalNewSigned !== 0 && (
-                            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                            <p className="text-sm text-neutral-500 dark:text-neutral-400">
                                 당월 합계:{" "}
                                 <span className="font-semibold text-neutral-700 dark:text-neutral-200">
                                     {totalNewSigned > 0 ? "+" : ""}
@@ -344,11 +344,11 @@ export default function NewMonthlyReportPage() {
                 </FormRow>
             </FormSection>
 
-            <section className="mb-10">
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+            <section className="mb-12">
+                <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                     회고록
                 </p>
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <JournalField
                         id="journal-summary"
                         label="이번 달 증시 요약"
@@ -368,14 +368,14 @@ export default function NewMonthlyReportPage() {
                 </div>
             </section>
 
-            <div className="flex flex-col-reverse gap-3 pb-8 sm:flex-row sm:justify-end md:pb-16">
+            <div className="flex flex-col-reverse gap-4 pb-10 sm:flex-row sm:justify-end md:pb-20">
                 <button
                     type="button"
                     onClick={() => handleSubmit(true)}
                     disabled={isSubmitting}
                     className={[
-                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-6 py-3.5 sm:w-auto",
-                        "text-sm font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
+                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-7 py-4 sm:w-auto",
+                        "text-base font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
                         "transition-all duration-200",
                         isSubmitting
                             ? "cursor-not-allowed bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500"
@@ -389,8 +389,8 @@ export default function NewMonthlyReportPage() {
                     onClick={() => handleSubmit(false)}
                     disabled={isSubmitting}
                     className={[
-                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 sm:w-auto",
-                        "text-sm font-semibold tracking-tight text-white shadow-lg",
+                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-9 py-4 sm:w-auto",
+                        "text-base font-semibold tracking-tight text-white shadow-lg",
                         "transition-all duration-200",
                         isSubmitting
                             ? "bg-neutral-400 cursor-not-allowed"
@@ -399,7 +399,7 @@ export default function NewMonthlyReportPage() {
                 >
                     {isSubmitting ? (
                         <>
-                            <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg className="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                             </svg>
@@ -407,7 +407,7 @@ export default function NewMonthlyReportPage() {
                         </>
                     ) : (
                         <>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
                                 <polyline points="17 21 17 13 7 13 7 21" />
                                 <polyline points="7 3 7 8 15 8" />
@@ -430,7 +430,7 @@ function NewInvestmentRowItem({
     onDelete: () => void;
 }) {
     const flowBtn =
-        "rounded-lg px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400";
+        "rounded-lg px-4 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400";
     const flowInactive =
         "text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800";
     const flowActiveIn =
@@ -440,7 +440,7 @@ function NewInvestmentRowItem({
 
     return (
         <div className="group relative w-full min-w-0 rounded-2xl bg-white ring-1 ring-neutral-200/80 transition hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700">
-            <div className="flex flex-col gap-3 px-4 py-3">
+            <div className="flex flex-col gap-4 px-5 py-4">
                 <div className="flex items-start gap-2">
                     <select
                         value={row.accountType}
@@ -448,7 +448,7 @@ function NewInvestmentRowItem({
                             const newType = e.target.value as Exclude<AccountType, "CASH">;
                             onChange({ accountType: newType });
                         }}
-                        className="min-w-0 flex-1 rounded-xl bg-neutral-50 px-3 py-2.5 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800/60 dark:text-neutral-200 dark:ring-neutral-700 dark:focus:ring-neutral-500"
+                        className="min-w-0 flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-sm font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800/60 dark:text-neutral-200 dark:ring-neutral-700 dark:focus:ring-neutral-500"
                     >
                         {(Object.keys(MONTHLY_ACCOUNT_LABELS) as Exclude<AccountType, "CASH">[]).map((k) => (
                             <option key={k} value={k}>{MONTHLY_ACCOUNT_LABELS[k]}</option>
@@ -458,9 +458,9 @@ function NewInvestmentRowItem({
                         type="button"
                         onClick={onDelete}
                         title="행 삭제"
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                     >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                         </svg>
                     </button>
@@ -474,15 +474,15 @@ function NewInvestmentRowItem({
                             value={row.amount}
                             onChange={(e) => onChange({ amount: e.target.value })}
                             placeholder="금액 (원화)"
-                            className="no-spinner min-w-0 flex-1 rounded-xl bg-neutral-50 px-3 py-2.5 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800/60 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700 dark:focus:ring-neutral-500"
+                            className="no-spinner min-w-0 flex-1 rounded-xl bg-neutral-50 px-4 py-3 text-right text-base text-neutral-900 placeholder:text-neutral-300 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800/60 dark:text-neutral-100 dark:placeholder:text-neutral-600 dark:ring-neutral-700 dark:focus:ring-neutral-500"
                             aria-label="당월 현금흐름 금액"
                         />
-                        <span className="shrink-0 text-[10px] font-medium text-neutral-400 dark:text-neutral-500">
+                        <span className="shrink-0 text-xs font-medium text-neutral-400 dark:text-neutral-500">
                             KRW
                         </span>
                     </div>
                     <div
-                        className="inline-flex w-full shrink-0 justify-stretch rounded-xl bg-neutral-100/80 p-0.5 ring-1 ring-neutral-200/80 sm:w-auto dark:bg-neutral-800/50 dark:ring-neutral-700"
+                        className="inline-flex w-full shrink-0 justify-stretch rounded-xl bg-neutral-100/80 p-1 ring-1 ring-neutral-200/80 sm:w-auto dark:bg-neutral-800/50 dark:ring-neutral-700"
                         role="group"
                         aria-label="입금(+) 또는 출금(−)"
                     >
@@ -503,7 +503,7 @@ function NewInvestmentRowItem({
                     </div>
                 </div>
             </div>
-            <p className="border-t border-neutral-100 px-4 py-2 text-[11px] text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
+            <p className="border-t border-neutral-100 px-5 py-2.5 text-sm text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
                 반영 금액:{" "}
                 <span className="font-semibold tabular-nums text-neutral-700 dark:text-neutral-200">
                     {signedKrw === 0 ? "—" : formatKRW(signedKrw)}

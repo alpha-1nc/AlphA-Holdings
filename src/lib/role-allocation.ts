@@ -39,17 +39,6 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   UNASSIGNED: "미지정",
 };
 
-/** 역할별 색상 — globals.css --role-alloc-* (티 톤 + 중립, 라이트/다크 동기화) */
-export const ROLE_COLORS: Record<RoleKey, string> = {
-  CORE: "var(--role-alloc-core)",
-  GROWTH: "var(--role-alloc-growth)",
-  DEFENSIVE: "var(--role-alloc-defensive)",
-  BOOSTER: "var(--role-alloc-booster)",
-  INDEX: "var(--role-alloc-index)",
-  BOND: "var(--role-alloc-bond)",
-  UNASSIGNED: "var(--role-alloc-unassigned)",
-};
-
 const CASH_TICKER_PATTERNS = /^(KRW|USD|JPY|EUR|GBP|CNY|CASH|현금)$/i;
 
 /** 도넛·비중 계산 등에서 현금/현금성 행 식별 */

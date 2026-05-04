@@ -1,17 +1,7 @@
 "use client";
 
-import type { RoleAllocationItem, RoleKey } from "@/lib/role-allocation";
-
-/** globals.css 의 --role-alloc-* (직투 도넛 --donut-* 과 색 충돌 없음) */
-const ROLE_BAR_FILL: Record<RoleKey, string> = {
-  CORE: "var(--role-alloc-core)",
-  GROWTH: "var(--role-alloc-growth)",
-  DEFENSIVE: "var(--role-alloc-defensive)",
-  BOOSTER: "var(--role-alloc-booster)",
-  INDEX: "var(--role-alloc-index)",
-  BOND: "var(--role-alloc-bond)",
-  UNASSIGNED: "var(--role-alloc-unassigned)",
-};
+import type { RoleAllocationItem } from "@/lib/role-allocation";
+import { fillForPortfolioOrdinalSlice } from "@/lib/rounded-donut-chart";
 
 interface RoleAllocationChartProps {
   data: RoleAllocationItem[];
@@ -42,9 +32,9 @@ export function RoleAllocationChart({
 
   return (
     <div className="flex w-full min-w-0 flex-col justify-center gap-4">
-      {activeData.map((d) => {
+      {activeData.map((d, i) => {
         const pct = totalKrw > 0 ? (d.krwAmount / totalKrw) * 100 : 0;
-        const fill = ROLE_BAR_FILL[d.role];
+        const fill = fillForPortfolioOrdinalSlice(i);
         return (
           <div key={d.role} className="min-w-0 space-y-1.5">
             <div

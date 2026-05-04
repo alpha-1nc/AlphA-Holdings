@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Globe } from "lucide-react";
 
 import { getTickerDomain } from "@/lib/ticker-metadata";
+import { cn } from "@/lib/utils";
 
 export interface TickerSearchResult {
     symbol: string;
@@ -104,6 +105,8 @@ interface TickerSearchInputProps {
     onChange: (ticker: string, meta?: TickerSearchChangeMeta) => void;
     accountType?: string;
     placeholder?: string;
+    /** 입력 칸 클래스 (와치 모달 등에서 글자·패딩 키우기) */
+    inputClassName?: string;
 }
 
 const REGION_ICONS: Record<string, React.ReactNode> = { 
@@ -117,6 +120,7 @@ export function TickerSearchInput({
     onChange,
     accountType,
     placeholder = "종목 검색...",
+    inputClassName,
 }: TickerSearchInputProps) {
     const [inputVal, setInputVal] = useState(value);
     const [results, setResults] = useState<TickerSearchResult[]>([]);
@@ -347,7 +351,10 @@ export function TickerSearchInput({
                         }
                     }}
                     onKeyDown={handleKeyDown}
-                    className="min-w-0 w-full rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none ring-1 ring-neutral-200/80 transition placeholder:text-neutral-300 focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700 dark:placeholder:text-neutral-600 dark:focus:ring-neutral-500"
+                    className={cn(
+                        "min-w-0 w-full rounded-xl bg-neutral-50 px-3 py-2 text-sm text-neutral-900 outline-none ring-1 ring-neutral-200/80 transition placeholder:text-neutral-300 focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700 dark:placeholder:text-neutral-600 dark:focus:ring-neutral-500",
+                        inputClassName,
+                    )}
                 />
             </div>
         </div>

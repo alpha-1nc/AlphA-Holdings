@@ -17,7 +17,6 @@ import {
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
 import { PortfolioItemLogoAvatar } from "@/components/reports/portfolio-item-logo-avatar";
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
-import { AiCommentSection } from "@/components/reports/AiCommentSection";
 import { QuarterlyReportTabs } from "@/components/reports/QuarterlyReportTabs";
 import { getProfileFromLabel } from "@/lib/profile";
 import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
@@ -568,13 +567,6 @@ export default async function ReportDetailPage(props: {
                     {journalMetaSection}
                 </>
             )}
-
-            {/* AlphA AI 포트폴리오 분석 */}
-            <AiCommentSection
-                reportId={report.id}
-                profileId={profileId}
-                initialComment={report.reportAiComment ?? null}
-            />
         </div>
     );
 }

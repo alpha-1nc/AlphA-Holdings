@@ -1,48 +1,22 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type MouseEvent } from "react";
-import clsx from "clsx";
+import { type MouseEvent } from "react";
 import logo from "@assets/logo.png";
 import logoDark from "@assets/logo-dark.png";
 import { getMainNavForPath } from "@/lib/nav-items";
-import {
-  getCurrentProfile,
-  PROFILE_HEADER_SHORT,
-  type WorkspaceProfile,
-} from "@/lib/profile";
 
 type MobileTopHeaderProps = {
   onLogoClick: (e: MouseEvent<HTMLButtonElement>) => void;
 };
 
 /**
- * md 미만에서만 사용 — 좌 로고 / 가운데 현재 메뉴 아이콘+제목 / 우 활성 프로필
+ * md 미만에서만 사용 — 좌 로고 · 가운데 현재 메뉴 아이콘+제목 · 우측은 로고 폭 스페이서(정렬 균형)
  */
 export function MobileTopHeader({ onLogoClick }: MobileTopHeaderProps) {
   const pathname = usePathname();
   const { icon: NavIcon, label: navLabel } = getMainNavForPath(pathname);
-
-  const [profile, setProfile] = useState<WorkspaceProfile>("alpha-ceo");
-
-  useEffect(() => {
-    function sync() {
-      setProfile(getCurrentProfile());
-    }
-    sync();
-    window.addEventListener("focus", sync);
-    window.addEventListener("storage", sync);
-    window.addEventListener("alpha-holdings-profile-change", sync);
-    return () => {
-      window.removeEventListener("focus", sync);
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("alpha-holdings-profile-change", sync);
-    };
-  }, [pathname]);
-
-  const profileShort = PROFILE_HEADER_SHORT[profile];
 
   return (
     <div className="relative flex h-[68px] w-full items-center px-1">
@@ -85,21 +59,10 @@ export function MobileTopHeader({ onLogoClick }: MobileTopHeaderProps) {
         </span>
       </div>
 
-      {/* 우측 프로필 */}
-      <div className="relative z-20 ml-auto flex min-w-0 shrink-0 justify-end pl-1">
-        <Link
-          href="/settings"
-          className={clsx(
-            "max-w-[5.5rem] truncate rounded-full px-2.5 py-1 text-center text-[11px] font-semibold leading-tight transition-opacity active:opacity-80",
-            profile === "alpha-ceo"
-              ? "bg-accent text-accent-foreground"
-              : "bg-muted text-muted-foreground",
-          )}
-          aria-label={`활성 프로필 ${profileShort}, 설정에서 변경`}
-        >
-          {profileShort}
-        </Link>
-      </div>
+      <div
+        className="relative z-20 ml-auto h-11 w-11 shrink-0"
+        aria-hidden
+      />
     </div>
   );
 }

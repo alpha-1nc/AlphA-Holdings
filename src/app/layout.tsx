@@ -13,7 +13,13 @@ const inter = Inter({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f7f9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0d12" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -50,7 +56,9 @@ export default function RootLayout({
         <ThemeProvider>
           <div className="flex min-h-screen min-w-0 flex-col">
             <TopNavbar />
-            <main className="flex-1 px-4 pb-24 pt-6 md:px-10 md:py-10 md:pb-10">
+            {/* 모바일: 플로팅 탭 + 홈 인디케이터(safe-area) — md 이상에서는 일반 패딩 */}
+            {/* 모바일: 플로팅 도크 + 홈바 여유까지 본문이 가리지 않게 */}
+            <main className="flex-1 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+8rem)] pt-6 md:px-10 md:pb-10 md:py-10">
               {children}
             </main>
             <MobileBottomTabBar />

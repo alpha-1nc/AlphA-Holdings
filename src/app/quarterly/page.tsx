@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { BarChart3, BanknoteArrowUp, TrendingUp } from "lucide-react";
+import { BarChart3, BanknoteArrowUp, Plus, TrendingUp } from "lucide-react";
 import { getQuarterlyArchiveWithIntervals } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import { getTickerColor } from "@/constants/brandColors";
@@ -14,6 +14,10 @@ import {
     withDevSampleQuarterlyArchiveIfEmpty,
     isDevSampleReport,
 } from "@/lib/dev-sample-reports";
+import {
+    collapseHoldingsForBarDisplay,
+    totalKrwPositiveHoldings,
+} from "@/lib/portfolio-small-slice-collapse";
 import { cn } from "@/lib/utils";
 
 type ReportWithItems = Report & {
@@ -44,8 +48,21 @@ function ReportCard({
     const returnRate = intervalReturnRatePercent;
     const total = report.totalCurrentKrw ?? 0;
     const isDraft = (report as Report & { status?: string }).status === "DRAFT";
-    const barItems = sortPortfolioItemsForDisplay(
+    const sortedBarHoldings = sortPortfolioItemsForDisplay(
         report.portfolioItems.filter((i) => i.krwAmount > 0),
+    );
+    /** 도넛(`ReportDonutChart`)과 동일 분모·비중 규칙 */
+    const totalForWeights = totalKrwPositiveHoldings(sortedBarHoldings);
+    const barSegments =
+        sortedBarHoldings.length > 0 && totalForWeights > 0
+            ? collapseHoldingsForBarDisplay(sortedBarHoldings, totalForWeights)
+            : [];
+
+    let colorOrdinal = 0;
+    const barSegmentsWithColorIdx = barSegments.map((segment) =>
+        segment.kind === "single"
+            ? ({ ...segment, colorIdx: colorOrdinal++ } as const)
+            : ({ ...segment, colorIdx: colorOrdinal++ } as const),
     );
 
     const cardShellClass = cn(
@@ -99,31 +116,63 @@ function ReportCard({
                         </span>
                     </div>
 
-                    {barItems.length > 0 && total > 0 && (
+                    {barSegments.length > 0 && (
                         <>
                             <div className="border-b border-zinc-200/90 dark:border-zinc-700" />
                             <div className="flex w-full items-start gap-1.5">
-                                {barItems.map((item, idx) => {
-                                    const pct = (item.krwAmount / total) * 100;
-                                    const label = getPortfolioItemDisplayLabel({
-                                        ticker: item.ticker,
-                                        displayName: item.displayName,
-                                    });
+                                {barSegmentsWithColorIdx.map((segment) => {
+                                    if (segment.kind === "single") {
+                                        const item = segment.item;
+                                        const pct = segment.pct;
+                                        const label = getPortfolioItemDisplayLabel({
+                                            ticker: item.ticker,
+                                            displayName: item.displayName,
+                                        });
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className="min-w-0 space-y-2.5"
+                                                style={{ width: `${pct}%` }}
+                                            >
+                                                <div
+                                                    className="h-2.5 w-full overflow-hidden rounded-sm"
+                                                    style={{
+                                                        background: getTickerColor(
+                                                            item.ticker,
+                                                            segment.colorIdx,
+                                                        ),
+                                                    }}
+                                                />
+                                                <div className="flex flex-col items-start">
+                                                    <span className="w-full truncate text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                                                        {label}
+                                                    </span>
+                                                    <span className="text-base font-semibold tabular-nums text-zinc-900 dark:text-white">
+                                                        {Math.round(pct)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+                                    const pct = segment.pct;
                                     return (
                                         <div
-                                            key={item.id}
+                                            key={`other:${segment.items.map((i) => i.id).join(":")}`}
                                             className="min-w-0 space-y-2.5"
                                             style={{ width: `${pct}%` }}
                                         >
                                             <div
                                                 className="h-2.5 w-full overflow-hidden rounded-sm"
                                                 style={{
-                                                    background: getTickerColor(item.ticker, idx),
+                                                    background: getTickerColor(
+                                                        "기타",
+                                                        segment.colorIdx,
+                                                    ),
                                                 }}
                                             />
                                             <div className="flex flex-col items-start">
                                                 <span className="w-full truncate text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                                                    {label}
+                                                    기타
                                                 </span>
                                                 <span className="text-base font-semibold tabular-nums text-zinc-900 dark:text-white">
                                                     {Math.round(pct)}%
@@ -204,9 +253,11 @@ export default function QuarterlyReportPage() {
                 </div>
                 <Link
                     href="/reports/new/quarterly"
-                    className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+                    className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold md:px-[1.125rem] md:text-[0.9375rem] transition-all hover:opacity-80"
+                    style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
                 >
-                    + 새리포트
+                    <Plus className="h-4 w-4 md:h-[1.125rem] md:w-[1.125rem]" />
+                    새리포트
                 </Link>
             </div>
 

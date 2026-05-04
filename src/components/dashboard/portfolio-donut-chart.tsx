@@ -1,12 +1,14 @@
 "use client";
 
+import { useLayoutEffect, useRef, useState } from "react";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
-import { hexForCurrencyCode } from "@/lib/currency-colors";
 import {
-    CHART_CYCLE_FILLS,
-    roundedDonutPieProps,
-    roundedDonutRadiiPx,
+    CANONICAL_DONUT_CHART_REFERENCE_MIN_SIDE_PX,
+    donutPieRoundedProps,
+    donutRadiiScaledToMinSidePx,
+    fillForPortfolioOrdinalSlice,
 } from "@/lib/rounded-donut-chart";
+import { collapseValueSlicesToOther } from "@/lib/portfolio-small-slice-collapse";
 import {
     ChartContainer,
     type ChartConfig,
@@ -56,23 +58,42 @@ interface ReportDonutChartProps {
 }
 
 export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
-    const total = snapshots.reduce((s, d) => s + d.value, 0);
-    const dataWithPct = snapshots
-        .filter((d) => d.value > 0)
-        .map((d, idx) => {
-            const u = d.ticker.trim().toUpperCase();
-            const color =
-                u === "USD" || u === "JPY" || u === "KRW"
-                    ? hexForCurrencyCode(u)
-                    : CHART_CYCLE_FILLS[idx % CHART_CYCLE_FILLS.length];
-            return {
-                ...d,
-                pct: total > 0 ? (d.value / total) * 100 : 0,
-                color,
-            };
-        });
+    const positives = snapshots.filter((d) => d.value > 0);
+    const total = positives.reduce((s, d) => s + d.value, 0);
+    const collapsed = collapseValueSlicesToOther(positives);
+    const dataWithPct = collapsed.map((d, idx) => ({
+        ...d,
+        pct: total > 0 ? (d.value / total) * 100 : 0,
+        color: fillForPortfolioOrdinalSlice(idx),
+    }));
 
-    if (dataWithPct.length === 0) {
+    const hasSlices = dataWithPct.length > 0;
+
+    const chartBoxRef = useRef<HTMLDivElement>(null);
+    const [radii, setRadii] = useState(() =>
+        donutRadiiScaledToMinSidePx(CANONICAL_DONUT_CHART_REFERENCE_MIN_SIDE_PX),
+    );
+
+    useLayoutEffect(() => {
+        if (!hasSlices) return;
+        const el = chartBoxRef.current;
+        if (!el) return;
+
+        function syncRadiiFromBox() {
+            const box = chartBoxRef.current;
+            if (!box) return;
+            const rect = box.getBoundingClientRect();
+            const m = Math.round(Math.min(rect.width, rect.height));
+            if (m > 0) setRadii(donutRadiiScaledToMinSidePx(m));
+        }
+
+        syncRadiiFromBox();
+        const ro = new ResizeObserver(syncRadiiFromBox);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [hasSlices]);
+
+    if (!hasSlices) {
         return (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center py-8">
                 <p className="text-sm text-neutral-400">스냅샷에 종목을 추가하면</p>
@@ -81,12 +102,16 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
         );
     }
 
-    const { innerRadius, outerRadius } = roundedDonutRadiiPx({ compact: false });
+    const donutInner = radii.innerRadius;
+    const donutOuter = radii.outerRadius;
 
     return (
         <div className="flex w-full min-w-0 flex-col items-center gap-5">
             <div className="w-full rounded-2xl border border-neutral-100 bg-neutral-50/90 p-5 dark:border-neutral-800/80 dark:bg-neutral-800/40">
-                <div className="relative mx-auto min-h-[220px] w-full min-w-0 max-w-[320px]">
+                <div
+                    ref={chartBoxRef}
+                    className="mx-auto min-h-[220px] w-full min-w-0 max-w-[320px]"
+                >
                     <ChartContainer
                         config={reportDonutChartConfig}
                         className="[&_.recharts-text]:fill-background mx-auto aspect-square h-full max-h-[min(288px,calc(100vw-8rem))] w-full justify-center"
@@ -97,30 +122,23 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
                                 data={dataWithPct}
                                 cx="50%"
                                 cy="50%"
-                                innerRadius={innerRadius + 4}
-                                outerRadius={outerRadius + 6}
+                                innerRadius={donutInner}
+                                outerRadius={donutOuter}
                                 dataKey="value"
-                                {...roundedDonutPieProps(dataWithPct.length)}
+                                nameKey="name"
+                                {...donutPieRoundedProps({
+                                    sliceCount: dataWithPct.length,
+                                    weights: dataWithPct.map((d) => d.value),
+                                    innerRadius: donutInner,
+                                    outerRadius: donutOuter,
+                                })}
                             >
                                 {dataWithPct.map((entry, i) => (
-                                    <Cell key={i} fill={entry.color} />
+                                    <Cell key={`${entry.ticker}-${i}`} fill={entry.color} />
                                 ))}
                             </Pie>
                         </PieChart>
                     </ChartContainer>
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div className="max-w-[48%] text-center">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">
-                                합산 평가
-                            </p>
-                            <p className="mt-0.5 text-sm font-semibold tabular-nums leading-tight text-neutral-900 dark:text-neutral-100 sm:text-base">
-                                {krwFormat(total)}
-                            </p>
-                            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-                                {dataWithPct.length}개 종목
-                            </p>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -137,7 +155,7 @@ export function ReportDonutChart({ snapshots }: ReportDonutChartProps) {
                         />
                         <span className="min-w-0 flex-1 break-words leading-snug">
                             {d.name}
-                            {d.name !== d.ticker && (
+                            {d.name !== d.ticker && d.ticker !== "__OTHER__" && (
                                 <span className="ml-0.5 font-mono text-xs text-neutral-500 dark:text-neutral-400">
                                     ({d.ticker})
                                 </span>

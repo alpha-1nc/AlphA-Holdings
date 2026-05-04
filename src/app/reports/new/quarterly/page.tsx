@@ -182,7 +182,7 @@ function rowToKrw(row: PortfolioRow, usdRate: number, jpyRate: number): number {
 
 /* ── Shared style tokens ─────────────────────────────────────────────────*/
 const inputCls = [
-    "w-full rounded-xl bg-white px-4 py-2.5 text-sm",
+    "min-h-12 w-full rounded-xl bg-white px-5 py-3 text-base md:min-h-0",
     "text-neutral-900 placeholder:text-neutral-300",
     "ring-1 ring-neutral-200/80 outline-none",
     "transition focus:ring-2 focus:ring-neutral-400",
@@ -194,8 +194,8 @@ const inputCls = [
 /* ── Sub-components ──────────────────────────────────────────────────────*/
 function FormSection({ label, children }: { label: string; children: React.ReactNode }) {
     return (
-        <section className="mb-8">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+        <section className="mb-10">
+            <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                 {label}
             </p>
             <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
@@ -209,10 +209,10 @@ function FormSection({ label, children }: { label: string; children: React.React
 
 function FormRow({ label, sublabel, children }: { label: string; sublabel?: string; children: React.ReactNode }) {
     return (
-        <div className="flex flex-col gap-2 px-6 py-5 sm:flex-row sm:items-start sm:gap-6">
-            <div className="min-w-[160px] shrink-0">
-                <label className="text-sm font-medium text-neutral-600 dark:text-neutral-400">{label}</label>
-                {sublabel && <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
+        <div className="flex flex-col gap-3 px-7 py-6 sm:flex-row sm:items-start sm:gap-8">
+            <div className="min-w-[180px] shrink-0">
+                <label className="text-base font-medium text-neutral-600 dark:text-neutral-400">{label}</label>
+                {sublabel && <p className="mt-1 text-sm text-neutral-400 dark:text-neutral-500">{sublabel}</p>}
             </div>
             <div className="flex-1">{children}</div>
         </div>
@@ -236,11 +236,11 @@ function JournalField({
                 errorMessage ? "ring-2 ring-red-500 dark:ring-red-500" : "",
             ].join(" ")}
         >
-            <div className="flex items-baseline gap-2 border-b border-neutral-100 px-5 py-3 dark:border-neutral-800">
-                <label htmlFor={id} className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <div className="flex items-baseline gap-2 border-b border-neutral-100 px-6 py-3.5 dark:border-neutral-800">
+                <label htmlFor={id} className="text-base font-medium text-neutral-700 dark:text-neutral-300">
                     {label}
                 </label>
-                <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
+                <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
             </div>
             <textarea
                 id={id}
@@ -249,14 +249,14 @@ function JournalField({
                 placeholder={placeholder}
                 rows={rows}
                 className={[
-                    "w-full resize-none px-5 py-4 text-sm leading-relaxed",
+                    "w-full resize-none px-6 py-5 text-base leading-relaxed",
                     "text-neutral-900 placeholder:text-neutral-300",
                     "bg-transparent outline-none",
                     "dark:text-neutral-100 dark:placeholder:text-neutral-600",
                 ].join(" ")}
             />
             {errorMessage ? (
-                <p className="border-t border-red-100 px-5 py-2 text-sm text-red-600 dark:border-red-900/40 dark:text-red-400">
+                <p className="border-t border-red-100 px-6 py-2.5 text-base text-red-600 dark:border-red-900/40 dark:text-red-400">
                     {errorMessage}
                 </p>
             ) : null}
@@ -281,10 +281,10 @@ function PortfolioRowItem({
         const cashVc = rowValuationCurrency(row);
         return (
             <div className="group relative rounded-2xl bg-white ring-1 ring-neutral-200/80 transition hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700">
-                <div className="space-y-2 px-3 py-3">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-                        <div className="w-full shrink-0 sm:w-[100px]">
-                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">계좌</label>
+                <div className="space-y-3 px-5 py-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                        <div className="w-full shrink-0 sm:w-[118px]">
+                            <label className="mb-1.5 block text-sm font-medium uppercase tracking-widest text-neutral-400">계좌</label>
                             <select
                                 value={cashAt}
                                 onChange={(e) => {
@@ -292,34 +292,34 @@ function PortfolioRowItem({
                                     const cur = valuationCurrencyFromStockAccount(next);
                                     onChange({ stockAccountType: next, ticker: cur });
                                 }}
-                                className="w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
+                                className="w-full rounded-xl bg-neutral-50 px-3 py-2.5 text-sm font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
                             >
                                 {QUARTERLY_STOCK_ACCOUNT_OPTIONS.map((o) => (
                                     <option key={o.value} value={o.value}>{o.label}</option>
                                 ))}
                             </select>
-                            <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+                            <p className="mt-1.5 text-sm text-neutral-400 dark:text-neutral-500">
                                 {cashVc === "USD" ? "달러(USD)" : cashVc === "JPY" ? "엔(JPY)" : "원화(KRW)"}
                             </p>
                         </div>
                         <div className="min-w-0 flex-1">
-                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">유형</label>
-                            <div className="rounded-xl bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+                            <label className="mb-1.5 block text-sm font-medium uppercase tracking-widest text-neutral-400">유형</label>
+                            <div className="rounded-xl bg-neutral-50 px-4 py-2.5 text-base font-medium text-neutral-800 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
                                 현금 보유
-                                <span className="ml-2 text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                                <span className="ml-2 text-sm font-normal text-neutral-500 dark:text-neutral-400">
                                     (해당 계좌 통화 기준)
                                 </span>
                             </div>
                             {parseNumber(row.amount) > 0 && krwValue > 0 && (
-                                <p className="mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                                <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">
                                     약 {formatKRW(krwValue)}
                                 </p>
                             )}
                         </div>
-                        <div className="w-full shrink-0 sm:w-[160px]" id={QF.rowAmount(row.id)}>
-                            <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
+                        <div className="w-full shrink-0 sm:w-[184px]" id={QF.rowAmount(row.id)}>
+                            <label className="mb-1.5 block text-sm font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
                             <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-2">
                                     <input
                                         type="text"
                                         inputMode="decimal"
@@ -327,34 +327,34 @@ function PortfolioRowItem({
                                         onChange={(e) => onChange({ amount: e.target.value })}
                                         placeholder="0"
                                         className={[
-                                            "no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 outline-none transition focus:ring-2 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600",
+                                            "no-spinner w-full rounded-xl bg-neutral-50 px-3 py-2.5 text-right text-base text-neutral-900 placeholder:text-neutral-300 ring-1 outline-none transition focus:ring-2 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600",
                                             amountError
                                                 ? "ring-2 ring-red-500 dark:ring-red-500"
                                                 : "ring-neutral-200/80 focus:ring-neutral-400 dark:ring-neutral-700",
                                         ].join(" ")}
                                     />
-                                    <span className="shrink-0 text-[10px] font-medium text-neutral-400">{cashVc}</span>
+                                    <span className="shrink-0 text-sm font-medium text-neutral-400">{cashVc}</span>
                                 </div>
                                 {amountError ? (
-                                    <p className="text-[11px] leading-snug text-red-600 dark:text-red-400">{amountError}</p>
+                                    <p className="text-sm leading-snug text-red-600 dark:text-red-400">{amountError}</p>
                                 ) : null}
                             </div>
                         </div>
-                        <div className="flex justify-end sm:justify-start sm:pt-5">
+                        <div className="flex justify-end sm:justify-start sm:pt-7">
                             <button
                                 type="button"
                                 onClick={onDelete}
                                 disabled={!onDelete}
-                                className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                                className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                             >
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                                 </svg>
                             </button>
                         </div>
                     </div>
                 </div>
-                <p className="border-t border-neutral-100 px-3 py-2 text-[10px] text-neutral-400 dark:border-neutral-800 dark:text-neutral-500">
+                <p className="border-t border-neutral-100 px-5 py-2.5 text-sm text-neutral-400 dark:border-neutral-800 dark:text-neutral-500">
                     현금 행은 섹터·역할 분류 없이 합산만 반영됩니다.
                 </p>
             </div>
@@ -408,25 +408,25 @@ function PortfolioRowItem({
 
     return (
         <div className="group relative rounded-2xl bg-white ring-1 ring-neutral-200/80 transition hover:ring-neutral-300 dark:bg-neutral-900 dark:ring-neutral-800 dark:hover:ring-neutral-700">
-            <div className="space-y-2 px-3 py-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-                    <div className="w-full shrink-0 sm:w-[100px]">
-                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">계좌</label>
+            <div className="space-y-3 px-5 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                    <div className="w-full shrink-0 sm:w-[118px]">
+                        <label className="mb-1.5 block text-sm font-medium uppercase tracking-widest text-neutral-400">계좌</label>
                         <select
                             value={stockAt}
                             onChange={(e) => handleStockAccountChange(e.target.value as StockAccountType)}
-                            className="w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
+                            className="w-full rounded-xl bg-neutral-50 px-3 py-2.5 text-sm font-medium text-neutral-700 ring-1 ring-neutral-200/80 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-700"
                         >
                             {QUARTERLY_STOCK_ACCOUNT_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
                             ))}
                         </select>
-                        <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+                        <p className="mt-1.5 text-sm text-neutral-400 dark:text-neutral-500">
                             {vc === "USD" ? "달러(USD)" : vc === "JPY" ? "엔(JPY)" : "원화(KRW)"}
                         </p>
                     </div>
                     <div className="min-w-0 flex-1" id={QF.rowTicker(row.id)}>
-                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">종목</label>
+                        <label className="mb-1.5 block text-sm font-medium uppercase tracking-widest text-neutral-400">종목</label>
                         <div
                             className={
                                 tickerError
@@ -442,23 +442,23 @@ function PortfolioRowItem({
                             />
                         </div>
                         {tickerError ? (
-                            <p className="mt-1 text-[11px] leading-snug text-red-600 dark:text-red-400">{tickerError}</p>
+                            <p className="mt-1.5 text-sm leading-snug text-red-600 dark:text-red-400">{tickerError}</p>
                         ) : null}
                         {row.ticker.trim().length > 0 && (
-                            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-sm font-medium text-neutral-800 dark:text-neutral-100">
+                            <p className="mt-2 flex flex-wrap items-baseline gap-x-2 text-base font-medium text-neutral-800 dark:text-neutral-100">
                                 <span>{displayLabel}</span>
                                 {krwValue > 0 && (
-                                    <span className="text-xs font-normal text-neutral-500 dark:text-neutral-400">
+                                    <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400">
                                         (약 {formatKRW(krwValue)})
                                     </span>
                                 )}
                             </p>
                         )}
                     </div>
-                    <div className="w-full shrink-0 sm:w-[160px]" id={QF.rowAmount(row.id)}>
-                        <label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
+                    <div className="w-full shrink-0 sm:w-[184px]" id={QF.rowAmount(row.id)}>
+                        <label className="mb-1.5 block text-sm font-medium uppercase tracking-widest text-neutral-400">현재 평가액</label>
                         <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                                 <input
                                     type="text"
                                     inputMode="decimal"
@@ -466,27 +466,27 @@ function PortfolioRowItem({
                                     onChange={(e) => onChange({ amount: e.target.value })}
                                     placeholder="0"
                                     className={[
-                                        "no-spinner w-full rounded-xl bg-neutral-50 px-2.5 py-2 text-right text-sm text-neutral-900 placeholder:text-neutral-300 ring-1 outline-none transition focus:ring-2 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600",
+                                        "no-spinner w-full rounded-xl bg-neutral-50 px-3 py-2.5 text-right text-base text-neutral-900 placeholder:text-neutral-300 ring-1 outline-none transition focus:ring-2 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-600",
                                         amountError
                                             ? "ring-2 ring-red-500 dark:ring-red-500"
                                             : "ring-neutral-200/80 focus:ring-neutral-400 dark:ring-neutral-700",
                                     ].join(" ")}
                                 />
-                                <span className="shrink-0 text-[10px] font-medium text-neutral-400">{vc}</span>
+                                <span className="shrink-0 text-sm font-medium text-neutral-400">{vc}</span>
                             </div>
                             {amountError ? (
-                                <p className="text-[11px] leading-snug text-red-600 dark:text-red-400">{amountError}</p>
+                                <p className="text-sm leading-snug text-red-600 dark:text-red-400">{amountError}</p>
                             ) : null}
                         </div>
                     </div>
-                    <div className="flex justify-end sm:justify-start sm:pt-5">
+                    <div className="flex justify-end sm:justify-start sm:pt-7">
                         <button
                             type="button"
                             onClick={onDelete}
                             disabled={!onDelete}
-                            className="flex h-8 w-8 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
+                            className="flex h-10 w-10 items-center justify-center rounded-xl text-neutral-300 transition hover:bg-red-50 hover:text-red-400 disabled:pointer-events-none disabled:opacity-30 dark:text-neutral-600 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                         >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
                             </svg>
                         </button>
@@ -494,13 +494,13 @@ function PortfolioRowItem({
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 px-3 py-2 dark:border-neutral-800">
+            <div className="flex flex-wrap items-center gap-2.5 border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
                 {row.ticker && (
                     <TickerAvatar
                         ticker={row.ticker}
                         displayName={row.displayName}
                         logoUrl={row.logoUrl}
-                        size={24}
+                        size={28}
                         autoFmpLogo
                         editable
                         onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
@@ -508,10 +508,10 @@ function PortfolioRowItem({
                 )}
                 {isaPension ? (
                     <>
-                        <span className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
+                        <span className="rounded-lg bg-neutral-50 px-3 py-1.5 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200/60 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
                             ETF / Index
                         </span>
-                        <span className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
+                        <span className="rounded-lg bg-neutral-50 px-3 py-1.5 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200/60 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
                             {ASSET_ROLE_LABELS.INDEX}
                         </span>
                     </>
@@ -520,7 +520,7 @@ function PortfolioRowItem({
                         <select
                             value={row.sector}
                             onChange={(e) => onChange({ sector: e.target.value })}
-                            className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
+                            className="rounded-lg bg-neutral-50 px-3 py-1.5 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
                         >
                             <option value="">섹터 선택...</option>
                             {SECTORS.map((s) => (
@@ -530,7 +530,7 @@ function PortfolioRowItem({
                         <select
                             value={row.role}
                             onChange={(e) => onChange({ role: e.target.value as AssetRole })}
-                            className="rounded-lg bg-neutral-50 px-2.5 py-1 text-[11px] font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
+                            className="rounded-lg bg-neutral-50 px-3 py-1.5 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200/60 outline-none transition focus:ring-2 focus:ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700"
                         >
                             {(Object.keys(ASSET_ROLE_LABELS) as AssetRole[]).map((role) => (
                                 <option key={role} value={role}>{ASSET_ROLE_LABELS[role]}</option>
@@ -539,7 +539,7 @@ function PortfolioRowItem({
                     </>
                 )}
                 {row.sector && (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground md:text-sm">
                         {row.sector}
                     </span>
                 )}
@@ -744,36 +744,36 @@ export default function NewQuarterlyReportPage() {
     if (!mounted) return null;
 
     return (
-        <div className="mx-auto max-w-2xl px-4 py-8 md:py-12">
+        <div className="mx-auto max-w-3xl px-5 py-10 md:py-14">
             {/* Header */}
-            <div className="mb-10 space-y-6">
+            <div className="mb-12 space-y-7">
                 {/* Top bar: Type selector */}
                 <div className="flex items-center justify-end">
-                    <div className="inline-flex rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+                    <div className="inline-flex rounded-lg bg-neutral-100 p-1.5 dark:bg-neutral-800">
                         <Link
                             href="/reports/new"
-                            className="rounded-md px-4 py-1.5 text-sm font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                            className="rounded-md px-5 py-2 text-base font-medium text-neutral-500 transition hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
                         >
                             월별
                         </Link>
                         <Link
                             href="/reports/new/quarterly"
-                            className="rounded-md px-4 py-1.5 text-sm font-medium text-neutral-900 transition dark:text-neutral-100 bg-white shadow-sm dark:bg-neutral-900"
+                            className="rounded-md px-5 py-2 text-base font-medium text-neutral-900 transition dark:text-neutral-100 bg-white shadow-sm dark:bg-neutral-900"
                         >
                             분기별
                         </Link>
                     </div>
                 </div>
                 <div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">
+                    <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-[2rem]">
                         분기별 리포트 작성
                     </h1>
-                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                    <p className="mt-2 text-base text-neutral-500 dark:text-neutral-400">
                         분기 실적과 펀더멘털을 깊게 점검하고 다음 전략을 수립하세요.
                     </p>
                 </div>
                 <div className="flex justify-end">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-600 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-neutral-100 px-3.5 py-2 text-sm font-medium text-neutral-600 ring-1 ring-neutral-200/80 dark:bg-neutral-800 dark:text-neutral-300 dark:ring-neutral-700">
                         <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                         {getProfileLabel(profile)}
                     </span>
@@ -798,10 +798,10 @@ export default function NewQuarterlyReportPage() {
                                     fieldErrors[QF.usd] ? "ring-2 ring-red-500 dark:ring-red-500" : "",
                                 ].join(" ")}
                             />
-                            <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                            <span className="shrink-0 text-base text-neutral-400">KRW</span>
                         </div>
                         {fieldErrors[QF.usd] ? (
-                            <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors[QF.usd]}</p>
+                            <p className="text-base text-red-600 dark:text-red-400">{fieldErrors[QF.usd]}</p>
                         ) : null}
                     </div>
                 </FormRow>
@@ -821,10 +821,10 @@ export default function NewQuarterlyReportPage() {
                                     fieldErrors[QF.jpy] ? "ring-2 ring-red-500 dark:ring-red-500" : "",
                                 ].join(" ")}
                             />
-                            <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                            <span className="shrink-0 text-base text-neutral-400">KRW</span>
                         </div>
                         {fieldErrors[QF.jpy] ? (
-                            <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors[QF.jpy]}</p>
+                            <p className="text-base text-red-600 dark:text-red-400">{fieldErrors[QF.jpy]}</p>
                         ) : null}
                     </div>
                 </FormRow>
@@ -850,12 +850,12 @@ export default function NewQuarterlyReportPage() {
                                         inputCls,
                                         fieldErrors[QF.year] ? "ring-2 ring-red-500 dark:ring-red-500" : "",
                                     ].join(" ")}
-                                    style={{ width: "120px" }}
+                                    style={{ width: "132px" }}
                                 />
-                                <span className="text-sm text-neutral-400">년</span>
+                                <span className="text-base text-neutral-400">년</span>
                             </div>
                             {fieldErrors[QF.year] ? (
-                                <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors[QF.year]}</p>
+                                <p className="text-base text-red-600 dark:text-red-400">{fieldErrors[QF.year]}</p>
                             ) : null}
                         </div>
                         <div id={QF.quarter} className="flex flex-col gap-1">
@@ -869,7 +869,7 @@ export default function NewQuarterlyReportPage() {
                                     inputCls,
                                     fieldErrors[QF.quarter] ? "ring-2 ring-red-500 dark:ring-red-500" : "",
                                 ].join(" ")}
-                                style={{ width: "140px" }}
+                                style={{ width: "152px" }}
                             >
                                 <option value="">분기 선택</option>
                                 {[1, 2, 3, 4].map((q) => (
@@ -879,7 +879,7 @@ export default function NewQuarterlyReportPage() {
                                 ))}
                             </select>
                             {fieldErrors[QF.quarter] ? (
-                                <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors[QF.quarter]}</p>
+                                <p className="text-base text-red-600 dark:text-red-400">{fieldErrors[QF.quarter]}</p>
                             ) : null}
                         </div>
                     </div>
@@ -888,7 +888,7 @@ export default function NewQuarterlyReportPage() {
 
             {showInitialCapitalSection && (
                 <FormSection label="계좌별 초기 원금">
-                    <p className="px-6 pb-2 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+                    <p className="px-7 pb-3 text-base leading-relaxed text-neutral-500 dark:text-neutral-400">
                         첫 분기 리포트이거나 아직 초기 원금이 기록되지 않은 경우에만 표시됩니다. 계좌 유형별 원화 기준 초기 투입 원금을 입력하세요. (미입력 시 0으로 저장)
                     </p>
                     {INITIAL_CAPITAL_ACCOUNT_TYPES.map((at) => {
@@ -917,7 +917,7 @@ export default function NewQuarterlyReportPage() {
                                         placeholder="0"
                                         className={inputCls}
                                     />
-                                    <span className="shrink-0 text-sm text-neutral-400">KRW</span>
+                                    <span className="shrink-0 text-base text-neutral-400">KRW</span>
                                 </div>
                             </FormRow>
                         );
@@ -926,40 +926,40 @@ export default function NewQuarterlyReportPage() {
             )}
 
             {/* 포트폴리오 스냅샷 */}
-            <section id={QF.portfolio} className="mb-8">
-                <div className="mb-4 flex items-center justify-between">
+            <section id={QF.portfolio} className="mb-10">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                        <p className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                        <p className="text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                             포트폴리오 스냅샷
                         </p>
-                        <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+                        <p className="mt-1 text-base leading-relaxed text-neutral-400 dark:text-neutral-500">
                             종목 행은 티커·평가액을, 현금 행은 계좌·금액만 입력하세요. 통화는 계좌에 맞게 적용되며 원화 환산은 상단 환율로 자동 계산됩니다.
                         </p>
                         {fieldErrors[QF.portfolio] ? (
-                            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{fieldErrors[QF.portfolio]}</p>
+                            <p className="mt-3 text-base text-red-600 dark:text-red-400">{fieldErrors[QF.portfolio]}</p>
                         ) : null}
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                         <button
                             type="button"
                             onClick={addRow}
-                            className="inline-flex items-center gap-1 rounded-full bg-neutral-900 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
+                            className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-neutral-700 md:text-base dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300"
                         >
-                            <span className="text-base leading-none">+</span>
+                            <span className="text-lg leading-none">+</span>
                             종목 추가
                         </button>
                         <button
                             type="button"
                             onClick={addCashRow}
-                            className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-neutral-800 shadow-sm transition hover:bg-neutral-50 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                            className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-800 shadow-sm transition hover:bg-neutral-50 md:text-base dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
                         >
-                            <span className="text-base leading-none">+</span>
+                            <span className="text-lg leading-none">+</span>
                             현금 추가
                         </button>
                     </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {displayRows.map((row) => (
                         <PortfolioRowItem
                             key={row.id}
@@ -979,27 +979,27 @@ export default function NewQuarterlyReportPage() {
                 </div>
 
                 {/* Total bar */}
-                <div className="mt-4 overflow-hidden rounded-2xl bg-neutral-900 px-6 py-5 dark:bg-neutral-100">
+                <div className="mt-5 overflow-hidden rounded-2xl bg-neutral-900 px-7 py-6 dark:bg-neutral-100">
                     <div className="flex items-center justify-between gap-4">
-                        <span className="text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+                        <span className="text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                             총 평가금액
                         </span>
-                        <span className="text-right text-xl font-bold tracking-tight text-white dark:text-neutral-900">
+                        <span className="text-right text-2xl font-bold tracking-tight text-white dark:text-neutral-900">
                             {totalValuation > 0
                                 ? formatKRW(totalValuation)
-                                : <span className="text-neutral-500 dark:text-neutral-400 text-sm font-normal">종목을 입력하면 자동 계산됩니다</span>
+                                : <span className="text-neutral-500 dark:text-neutral-400 text-base font-normal">종목을 입력하면 자동 계산됩니다</span>
                             }
                         </span>
                     </div>
                     {totalValuation > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-4 flex flex-wrap gap-2">
                             {displayRows.map((r) => {
                                 const v = rowToKrw(r, usdRate, jpyRate);
                                 if (v <= 0) return null;
                                 return (
                                     <span
                                         key={r.id}
-                                        className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[10px] text-neutral-300 dark:bg-black/10 dark:text-neutral-600"
+                                        className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs text-neutral-300 dark:bg-black/10 dark:text-neutral-600 md:text-sm"
                                     >
                                         {r.kind === "cash"
                                             ? `현금 · ${QUARTERLY_STOCK_ACCOUNT_OPTIONS.find((o) => o.value === (r.stockAccountType ?? "US_DIRECT"))?.label ?? "현금"}`
@@ -1019,11 +1019,11 @@ export default function NewQuarterlyReportPage() {
             </section>
 
             {/* Section 4: 회고록 */}
-            <section className="mb-10">
-                <p className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
+            <section className="mb-12">
+                <p className="mb-5 text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500">
                     분기 리뷰
                 </p>
-                <div className="space-y-4">
+                <div className="space-y-5">
                     <JournalField
                         id="journal-earnings"
                         scrollId={QF.earningsReview}
@@ -1084,14 +1084,14 @@ export default function NewQuarterlyReportPage() {
             </section>
 
             {/* 저장 버튼 */}
-            <div className="flex flex-col-reverse gap-3 pb-8 sm:flex-row sm:justify-end md:pb-16">
+            <div className="flex flex-col-reverse gap-4 pb-10 sm:flex-row sm:justify-end md:pb-20">
                 <button
                     type="button"
                     onClick={() => handleSubmit(true)}
                     disabled={isSubmitting}
                     className={[
-                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-6 py-3.5 sm:w-auto",
-                        "text-sm font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
+                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-7 py-4 sm:w-auto",
+                        "text-base font-semibold tracking-tight ring-1 ring-neutral-200 shadow-sm",
                         "transition-all duration-200",
                         isSubmitting
                             ? "cursor-not-allowed bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500"
@@ -1105,8 +1105,8 @@ export default function NewQuarterlyReportPage() {
                     onClick={() => handleSubmit(false)}
                     disabled={isSubmitting}
                     className={[
-                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-8 py-3.5 sm:w-auto",
-                        "text-sm font-semibold tracking-tight text-white shadow-lg",
+                        "relative inline-flex w-full items-center justify-center gap-2.5 rounded-2xl px-9 py-4 sm:w-auto",
+                        "text-base font-semibold tracking-tight text-white shadow-lg",
                         "transition-all duration-200",
                         isSubmitting
                             ? "bg-neutral-400 cursor-not-allowed"
@@ -1115,7 +1115,7 @@ export default function NewQuarterlyReportPage() {
                 >
                     {isSubmitting ? (
                         <>
-                            <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg className="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                             </svg>
@@ -1123,7 +1123,7 @@ export default function NewQuarterlyReportPage() {
                         </>
                     ) : (
                         <>
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
                                 <polyline points="17 21 17 13 7 13 7 21" />
                                 <polyline points="7 3 7 8 15 8" />

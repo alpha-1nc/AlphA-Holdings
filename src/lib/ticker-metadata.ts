@@ -4,6 +4,8 @@
  * - 80~100개: 미국(빅테크/배당/금융/에너지/필수소비재), 일본 5대상사, 한국 주요 상장사·ETF
  */
 
+import { fillForPortfolioOrdinalSlice } from "@/lib/rounded-donut-chart";
+
 export interface TickerMetadata {
     name: string;
     domain: string;
@@ -138,7 +140,7 @@ export const TICKER_METADATA: Record<string, TickerMetadata> = {
     "현금": { name: "현금", domain: "", color: "#6B7280", sector: "Account" },
 };
 
-/** 폴백 — `getTickerColor`와 동일한 틸 톤 팔레트 (브랜드 레인보우 미사용) */
+/** `--donut-1`…`--donut-8` (`--chart-1`…`--chart-7` + 기타) 와 동일 순서 */
 export const FALLBACK_COLORS: readonly string[] = [
     "var(--donut-1)",
     "var(--donut-2)",
@@ -151,17 +153,10 @@ export const FALLBACK_COLORS: readonly string[] = [
 ];
 
 /**
- * 포트폴리오 UI(막대·도넛 범례 등)용 슬라이스 색 — 틸 계열 토큰만 사용(티커별 브랜드 컬러 미사용).
+ * 차트 세그먼트용: 종목 라벨은 무시하고 `index`(표시 순서)만으로 `--chart-*` 순환색.
  */
-export function getTickerColor(ticker: string, index: number): string {
-    const t = (ticker ?? "").trim();
-    let h = 0;
-    const s = t || `i:${index}`;
-    for (let i = 0; i < s.length; i++) {
-        h = (h * 31 + s.charCodeAt(i)) | 0;
-    }
-    const slot = (Math.abs(h) % 8) + 1;
-    return `var(--donut-${slot})`;
+export function getTickerColor(_ticker: string, index: number): string {
+    return fillForPortfolioOrdinalSlice(index);
 }
 
 /**

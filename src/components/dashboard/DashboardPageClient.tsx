@@ -37,11 +37,17 @@ import {
     getDashboardQuarterlyMetrics,
     type QuarterlyDashboardSeriesPoint,
 } from "@/app/actions/dashboard";
-import { AiBriefingBanner } from "@/components/dashboard/AiBriefingBanner";
 import { PageMainTitle } from "@/components/layout/page-main-title";
 import { useIsMobileLayout } from "@/hooks/use-is-mobile-layout";
 import { DashboardSummaryStatCard } from "@/components/ui/dashboard-summary-stat-card";
 import { MiniChart } from "@/components/ui/mini-chart";
+import {
+    dashboardPortfolioWeightDonutRadiiPx,
+    donutPieRoundedProps,
+    fillForPortfolioOrdinalSlice,
+} from "@/lib/rounded-donut-chart";
+import { sectorDisplayLabelKo } from "@/lib/sector-display-ko";
+import { collapseWeightPercentSegments } from "@/lib/portfolio-small-slice-collapse";
 import { cn } from "@/lib/utils";
 import type { Report, PortfolioItem, NewInvestment, PortfolioStrategy } from "@/generated/prisma";
 type ReportWithItems = Report & { 
@@ -568,12 +574,12 @@ function PortfolioWeightDonut({
     segments: { name: string; weight: number }[];
     group: DashboardAccountGroupFilter;
 }) {
-    const data = segments
-        .filter((s) => s.weight > 0)
-        .map((s, i) => ({
-            ...s,
-            fill: `var(--donut-${(i % 8) + 1})`,
-        }));
+    const collapsed = collapseWeightPercentSegments(segments.filter((s) => s.weight > 0));
+    const data = collapsed.map((s, i) => ({
+        ...s,
+        fill: fillForPortfolioOrdinalSlice(i),
+    }));
+    const { innerRadius: pwInnerR, outerRadius: pwOuterR } = dashboardPortfolioWeightDonutRadiiPx();
 
     return (
         <div className="h-full rounded-2xl border border-[var(--ah-border)] bg-[var(--ah-card)] p-5 shadow-sm transition-all duration-300 hover:shadow-md">
@@ -601,11 +607,14 @@ function PortfolioWeightDonut({
                                     nameKey="name"
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={45}
-                                    outerRadius={75}
-                                    paddingAngle={2}
-                                    cornerRadius={6}
-                                    strokeWidth={0}
+                                    innerRadius={pwInnerR}
+                                    outerRadius={pwOuterR}
+                                    {...donutPieRoundedProps({
+                                        sliceCount: data.length,
+                                        weights: data.map((d) => d.weight),
+                                        innerRadius: pwInnerR,
+                                        outerRadius: pwOuterR,
+                                    })}
                                     isAnimationActive
                                     animationDuration={700}
                                 >
@@ -761,38 +770,20 @@ function DistributionAnalysisCard({
 }) {
     const [activeTab, setActiveTab] = useState<"role" | "sector">("role");
 
-    const ROLE_COLORS: Record<string, string> = {
-        코어: "var(--role-alloc-core)",
-        성장: "var(--role-alloc-growth)",
-        방어: "var(--role-alloc-defensive)",
-        부스터: "var(--role-alloc-booster)",
-        지수: "var(--role-alloc-index)",
-        채권: "var(--role-alloc-bond)",
-        미지정: "var(--role-alloc-unassigned)",
-        기타: "var(--neutral-state)",
-    };
-
-    const SECTOR_COLORS = [
-        "var(--donut-1)",
-        "var(--donut-2)",
-        "var(--donut-3)",
-        "var(--donut-4)",
-        "var(--donut-5)",
-        "var(--ah-text-subtle)",
-    ];
-
     const activeData =
         activeTab === "role"
-            ? roleData.map((d) => ({
+            ? roleData.map((d, i) => ({
                   name: d.role,
                   value: d.weight,
-                  color: ROLE_COLORS[d.role] ?? "var(--ah-text-subtle)",
+                  color: fillForPortfolioOrdinalSlice(i),
               }))
             : sectorData.map((d, i) => ({
                   name: d.name,
                   value: d.weight,
-                  color: SECTOR_COLORS[i % SECTOR_COLORS.length],
+                  color: fillForPortfolioOrdinalSlice(i),
               }));
+    const { innerRadius: donutInnerR, outerRadius: donutOuterR } =
+        dashboardPortfolioWeightDonutRadiiPx();
 
     return (
         <div
@@ -842,13 +833,16 @@ function DistributionAnalysisCard({
                             nameKey="name"
                             cx="50%"
                             cy="50%"
-                            innerRadius={48}
-                            outerRadius={78}
-                            paddingAngle={3}
-                            cornerRadius={6}
-                            strokeWidth={0}
+                            innerRadius={donutInnerR}
+                            outerRadius={donutOuterR}
+                            {...donutPieRoundedProps({
+                                sliceCount: activeData.length,
+                                weights: activeData.map((d) => d.value),
+                                innerRadius: donutInnerR,
+                                outerRadius: donutOuterR,
+                            })}
                             isAnimationActive
-                            animationDuration={500}
+                            animationDuration={700}
                             animationBegin={0}
                         >
                             {activeData.map((d, i) => (
@@ -962,7 +956,7 @@ function UnifiedPortfolioCard({
                     const totalExCash = scoped.reduce((s, i) => s + i.krwAmount, 0);
                     const sectorMap = new Map<string, number>();
                     scoped.forEach((item) => {
-                        const sector = (item.sector as string | null) || "기타";
+                        const sector = sectorDisplayLabelKo((item.sector as string | null) ?? undefined);
                         sectorMap.set(sector, (sectorMap.get(sector) ?? 0) + item.krwAmount);
                     });
                     return Array.from(sectorMap.entries())
@@ -1234,12 +1228,6 @@ export function DashboardPageClient() {
             <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <PageMainTitle icon={Home}>Dashboard</PageMainTitle>
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${profileId === "alpha-ceo"
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted text-muted-foreground"
-                        }`}>
-                        {getProfileLabel(profileId as "alpha-ceo" | "partner")}
-                    </span>
                 </div>
                 <div
                     className="relative inline-flex w-full md:w-auto flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:overflow-visible"
@@ -1324,9 +1312,6 @@ export function DashboardPageClient() {
                     </div>
                 </div>
             </div>
-
-            {/* AI 브리핑 배너 */}
-            <AiBriefingBanner profileId={profileId as WorkspaceProfile} />
 
             {/* 기간별 투자 추이 — 분기별 리포트 기준 */}
             <div className="space-y-4 md:space-y-6">

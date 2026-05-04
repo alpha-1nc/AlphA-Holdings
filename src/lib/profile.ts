@@ -10,12 +10,6 @@ export const PROFILE_LABELS: Record<WorkspaceProfile, string> = {
     partner: "MindongFolio",
 };
 
-/** 모바일 상단 헤더 등 좁은 영역용 짧은 표기 */
-export const PROFILE_HEADER_SHORT: Record<WorkspaceProfile, string> = {
-    "alpha-ceo": "AlphA",
-    partner: "Mindong",
-};
-
 // 프로필 라벨 → 프로필 ID 역매핑
 export const LABEL_TO_PROFILE: Record<string, WorkspaceProfile> = {
     "AlphA Holdings Portfolio": "alpha-ceo",

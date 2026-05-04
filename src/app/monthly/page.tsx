@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BarChart2, ChevronRight, FileText } from "lucide-react";
+import { BarChart2, ChevronRight, FileText, Plus } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
@@ -172,9 +172,11 @@ export default function MonthlyReportPage() {
                 </div>
                 <Link
                     href="/reports/new"
-                    className="inline-flex items-center gap-2 rounded-full bg-neutral-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-neutral-800 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+                    className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold md:px-[1.125rem] md:text-[0.9375rem] transition-all hover:opacity-80"
+                    style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
                 >
-                    + 새리포트
+                    <Plus className="h-4 w-4 md:h-[1.125rem] md:w-[1.125rem]" />
+                    새리포트
                 </Link>
             </div>
 

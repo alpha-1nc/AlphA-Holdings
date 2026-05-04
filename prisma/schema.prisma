@@ -117,7 +117,6 @@ model Report {
   newInvestments   NewInvestment[]
   /** 월·분기 리포트에서 동기화된 신규 납입 — 리포트 삭제 시 함께 제거 */
   linkedProfileInvestments ProfileInvestment[] @relation("ReportInvestments")
-  reportAiComment ReportAiComment?
   initialCapitals AccountInitialCapital[]
 
   createdAt       DateTime        @default(now())
@@ -143,22 +142,6 @@ model AccountInitialCapital {
   @@unique([profileId, accountType])
 }
 
-// ── 리포트 AI 분석 결과 캐시 (월별/분기별) ─────────────────────────────
-model ReportAiComment {
-  id              String   @id @default(uuid())
-
-  reportId        Int      @unique
-  report         Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
-  monthlySummary String   // 현재 상태 요약
-  monthlyChange  String?  // 변화 설명
-  nextAction     String   // 다음 액션 (규칙 기반)
-  inputJson      Json     // AI 분석 입력 플래그 (규칙 엔진 결과)
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-}
-
 // ── 리포트 기준 포트폴리오 항목 (다중 통화) ───────────────
 model PortfolioItem {
   id               Int          @id @default(autoincrement())
@@ -177,24 +160,6 @@ model PortfolioItem {
   krwAmount        Float                             // 원화 환산 평가금액
 
   createdAt        DateTime     @default(now())
-}
-
-// ── 투자 분석 HTML (붙여넣기 등록 — 서버리스에서 public/ 쓰기 불가하므로 DB 저장) ──
-model AnalysisReportUpload {
-  id           String   @id @default(cuid())
-  year         Int
-  month        Int
-  companyCode  String   @map("company_code")
-  companyName  String   @map("company_name")
-  title        String
-  fileName     String   @map("file_name")
-  verdict      String?
-  html         String
-  addedAt      DateTime @default(now()) @map("added_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@unique([year, month, companyCode])
-  @@map("analysis_report_upload")
 }
 
 // ── 신규 투자금 (리포트별, 계좌별) ───────────────────────────────
@@ -232,23 +197,6 @@ model ProfileInvestment {
   @@index([profileId])
   @@index([sourceReportId])
   @@map("Investment")
-}
-
-model AnalysisReport {
-  id                String   @id @default(cuid())
-  ticker            String
-  companyName       String
-  slug              String   @unique
-  reportDate        DateTime @default(now())
-  periodLabel       String
-  reportData        Json
-  rating            String
-  totalScore        Float
-  appliedModel      String
-  /** 목록 카드용 커버 이미지 (data URL, 붙여넣기·파일 선택) */
-  cardImageDataUrl  String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
 }
 
 model WatchlistItem {

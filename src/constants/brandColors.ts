@@ -7,9 +7,7 @@ import { getTickerColor as _getTickerColor } from "@/lib/ticker-metadata";
 export { FALLBACK_COLORS } from "@/lib/ticker-metadata";
 
 /**
- * 티커에 맞는 브랜드 컬러 반환. 없으면 폴백 배열에서 자동 할당
- * @param ticker - 종목 티커 (대소문자 무관)
- * @param index - 폴백 시 사용할 순서 인덱스
+ * 순번 `index`(0…)만 사용 — 종목 문자열 무시. `fillForPortfolioOrdinalSlice`와 동일 규칙.
  */
 export function getTickerColor(ticker: string, index: number): string {
     return _getTickerColor(ticker, index);

@@ -50,7 +50,7 @@ function BulletListView({ text }: { text: string }) {
   if (items.length === 0) return null;
   return (
     <ul
-      className="list-disc space-y-1.5 pl-4 text-sm leading-relaxed"
+      className="list-disc space-y-1.5 pl-[1.125rem] text-[0.9375rem] leading-relaxed md:text-base"
       style={{ color: "var(--ah-text-muted)" }}
     >
       {items.map((line, i) => (
@@ -83,7 +83,7 @@ const STATUS_STYLE: Record<string, string> = {
 function TickerLogo({
   ticker,
   logoUrl,
-  size = 40,
+  size = 44,
 }: {
   ticker: string;
   logoUrl: string | null;
@@ -177,11 +177,11 @@ function AddModal({
         onClick={onClose}
       />
       <div
-        className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl"
+        className="relative w-full max-w-lg rounded-2xl p-7 shadow-2xl"
         style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
       >
         <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-base font-bold" style={{ color: "var(--ah-text-pri)" }}>
+          <h3 className="text-lg font-bold" style={{ color: "var(--ah-text-pri)" }}>
             종목 추가
           </h3>
           <button onClick={onClose} className="rounded-lg p-1.5 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800">
@@ -191,23 +191,24 @@ function AddModal({
 
         <div className="space-y-3">
           <div>
-            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ah-text-muted)" }}>
+            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
               종목 검색 *
             </label>
             <TickerSearchInput
               value={ticker}
               onChange={handleTickerSearchChange}
               placeholder="티커 또는 회사명으로 검색..."
+              inputClassName="px-3.5 py-2.5 text-sm md:text-[0.9375rem]"
             />
             {ticker && (
-              <p className="mt-1 text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+              <p className="mt-1.5 text-xs md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
                 {name || ticker}
               </p>
             )}
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ah-text-muted)" }}>
+            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
               상태
             </label>
             <div className="flex flex-wrap gap-2">
@@ -216,7 +217,7 @@ function AddModal({
                   key={t}
                   type="button"
                   onClick={() => setTag(t)}
-                  className="rounded-full px-3 py-1 text-xs font-medium transition-all"
+                  className="rounded-full px-3.5 py-1.5 text-xs font-medium transition-all md:text-[0.8125rem]"
                   style={{
                     background: tag === t ? "var(--ah-accent)" : "var(--ah-card-soft)",
                     color: tag === t ? "var(--ah-accent-fg)" : "var(--ah-text-muted)",
@@ -230,10 +231,10 @@ function AddModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ah-text-muted)" }}>
+            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
               관심 이유 (선택)
             </label>
-            <p className="mb-1.5 text-[11px] leading-snug" style={{ color: "var(--ah-text-subtle)" }}>
+            <p className="mb-2 text-xs leading-snug md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
               한 줄에 한 항목씩 입력하면 글머리 목록으로 보입니다. 줄 앞의 •, -, * 는 자동으로 정리됩니다.
             </p>
             <textarea
@@ -241,7 +242,7 @@ function AddModal({
               onChange={(e) => setInterestReason(e.target.value)}
               placeholder={BULLET_PLACEHOLDER}
               rows={5}
-              className="w-full resize-y rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none"
+              className="w-full resize-y rounded-xl px-3.5 py-2.5 text-[0.9375rem] transition-colors focus:outline-none md:text-base"
               style={{
                 background: "var(--ah-card-soft)",
                 border: "1px solid var(--ah-border)",
@@ -251,10 +252,10 @@ function AddModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ah-text-muted)" }}>
+            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
               리스크 (선택)
             </label>
-            <p className="mb-1.5 text-[11px] leading-snug" style={{ color: "var(--ah-text-subtle)" }}>
+            <p className="mb-2 text-xs leading-snug md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
               한 줄에 한 항목씩 입력하면 글머리 목록으로 보입니다.
             </p>
             <textarea
@@ -262,7 +263,7 @@ function AddModal({
               onChange={(e) => setRiskNotes(e.target.value)}
               placeholder={BULLET_PLACEHOLDER}
               rows={5}
-              className="w-full resize-y rounded-xl px-3 py-2.5 text-sm transition-colors focus:outline-none"
+              className="w-full resize-y rounded-xl px-3.5 py-2.5 text-[0.9375rem] transition-colors focus:outline-none md:text-base"
               style={{
                 background: "var(--ah-card-soft)",
                 border: "1px solid var(--ah-border)",
@@ -275,7 +276,7 @@ function AddModal({
         <button
           onClick={handleSubmit}
           disabled={loading || !ticker.trim()}
-          className="mt-5 w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40"
+          className="mt-5 w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 md:text-[0.9375rem]"
           style={{
             background: "var(--ah-accent)",
             color: "var(--ah-accent-fg)",
@@ -337,65 +338,65 @@ function WatchlistCard({
   );
 
   const fieldClass =
-    "w-full resize-y rounded-lg px-3 py-1.5 text-sm focus:outline-none min-h-[5rem]";
+    "w-full resize-y rounded-xl px-3.5 py-2 text-[0.9375rem] leading-relaxed focus:outline-none min-h-[6rem] md:text-base";
 
   const statusBadgeClass = STATUS_STYLE[displayStatus] ?? STATUS_STYLE["관심"];
 
   return (
     <div
-      className="group flex flex-col rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
+      className="group flex flex-col rounded-2xl p-6 transition-all duration-300 hover:shadow-md md:p-7"
       style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <TickerLogo ticker={item.ticker} logoUrl={item.logoUrl} size={40} />
-          <div>
-            <p className="text-sm font-bold" style={{ color: "var(--ah-text-pri)" }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <TickerLogo ticker={item.ticker} logoUrl={item.logoUrl} size={48} />
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold md:text-lg" style={{ color: "var(--ah-text-pri)" }}>
               {item.ticker}
             </p>
-            <p className="text-xs" style={{ color: "var(--ah-text-muted)" }}>
+            <p className="mt-0.5 text-[0.8125rem] md:text-sm" style={{ color: "var(--ah-text-muted)" }}>
               {item.companyName}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusBadgeClass}`}>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className={`rounded-full px-2.5 py-[0.3125rem] text-xs font-semibold md:text-[0.8125rem] ${statusBadgeClass}`}>
             {displayStatus}
           </span>
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-lg p-1.5 opacity-70 transition-all hover:opacity-100 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            className="rounded-lg p-1.5 opacity-70 transition-all hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-neutral-800"
             title="상태·메모 수정"
             aria-label="상태·메모 수정"
           >
-            <Pencil className="h-3.5 w-3.5" style={{ color: "var(--ah-text-muted)" }} />
+            <Pencil className="h-4 w-4" style={{ color: "var(--ah-text-muted)" }} />
           </button>
           <button
             type="button"
             onClick={() => onDelete(item.id)}
             className="rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100 hover:bg-rose-500/10"
           >
-            <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+            <Trash2 className="h-4 w-4 text-rose-500" />
           </button>
         </div>
       </div>
 
-      <div className="mt-3 flex-1">
+      <div className="mt-4 flex-1">
         {editing ? (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div>
-              <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
                 상태
               </span>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {STATUS_OPTIONS.map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setStatus(t)}
-                    className="rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all"
+                    className="rounded-full px-3 py-1 text-xs font-medium transition-all md:text-[0.8125rem]"
                     style={{
                       background: status === t ? "var(--ah-accent)" : "var(--ah-card-soft)",
                       color: status === t ? "var(--ah-accent-fg)" : "var(--ah-text-muted)",
@@ -408,10 +409,10 @@ function WatchlistCard({
               </div>
             </div>
             <div>
-              <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
                 관심 이유
               </span>
-              <p className="mb-1 text-[10px] leading-snug" style={{ color: "var(--ah-text-subtle)" }}>
+              <p className="mb-1.5 text-xs leading-snug" style={{ color: "var(--ah-text-subtle)" }}>
                 한 줄에 한 항목 (글머리로 표시)
               </p>
               <textarea
@@ -427,10 +428,10 @@ function WatchlistCard({
               />
             </div>
             <div>
-              <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
                 리스크
               </span>
-              <p className="mb-1 text-[10px] leading-snug" style={{ color: "var(--ah-text-subtle)" }}>
+              <p className="mb-1.5 text-xs leading-snug" style={{ color: "var(--ah-text-subtle)" }}>
                 한 줄에 한 항목 (글머리로 표시)
               </p>
               <textarea
@@ -445,11 +446,11 @@ function WatchlistCard({
                 }}
               />
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2.5 pt-0.5">
               <button
                 type="button"
                 onClick={saveEdit}
-                className="flex-1 rounded-lg py-1.5 text-xs font-semibold"
+                className="flex-1 rounded-lg py-2 text-xs font-semibold md:text-[0.8125rem]"
                 style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
               >
                 저장
@@ -457,7 +458,7 @@ function WatchlistCard({
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="flex-1 rounded-lg py-1.5 text-xs font-medium"
+                className="flex-1 rounded-lg py-2 text-xs font-medium md:text-[0.8125rem]"
                 style={{ background: "var(--ah-card-soft)", color: "var(--ah-text-muted)" }}
               >
                 취소
@@ -470,7 +471,7 @@ function WatchlistCard({
               <div className="space-y-3">
                 {bulletLinesToArray(item.interestReason ?? "").length > 0 && (
                   <div>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
                       관심 이유
                     </p>
                     <BulletListView text={item.interestReason ?? ""} />
@@ -478,7 +479,7 @@ function WatchlistCard({
                 )}
                 {bulletLinesToArray(item.riskNotes ?? "").length > 0 && (
                   <div>
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--ah-text-subtle)" }}>
                       리스크
                     </p>
                     <BulletListView text={item.riskNotes ?? ""} />
@@ -486,7 +487,7 @@ function WatchlistCard({
                 )}
               </div>
             ) : (
-              <p className="text-sm" style={{ color: "var(--ah-text-subtle)" }}>
+              <p className="text-[0.9375rem] leading-relaxed md:text-base" style={{ color: "var(--ah-text-subtle)" }}>
                 연필 아이콘으로 상태·관심 이유·리스크를 입력하세요.
               </p>
             )}
@@ -496,18 +497,18 @@ function WatchlistCard({
 
       <div className="mt-4 flex items-center justify-between border-t pt-3"
            style={{ borderColor: "var(--ah-border)" }}>
-        <span className="text-xs" style={{ color: "var(--ah-text-subtle)" }}>
+        <span className="text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
           {new Date(item.addedAt).toLocaleDateString("ko-KR")}
         </span>
         <a
           href={`https://finance.yahoo.com/quote/${item.ticker}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 text-xs transition-colors hover:opacity-70"
+          className="flex items-center gap-1 text-[0.8125rem] transition-colors hover:opacity-70 md:text-sm"
           style={{ color: "var(--ah-text-subtle)" }}
         >
           Yahoo Finance
-          <ExternalLink className="h-3 w-3" />
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
         </a>
       </div>
     </div>
@@ -563,7 +564,7 @@ export function WatchlistClient() {
   }
 
   return (
-    <div className="w-full space-y-6 p-0">
+    <div className="w-full space-y-7 p-0">
       {showAddModal && (
         <AddModal
           profileId={profileId}
@@ -579,10 +580,10 @@ export function WatchlistClient() {
         <PageMainTitle icon={Bookmark}>Watchlist</PageMainTitle>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all hover:opacity-80"
+          className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold md:px-[1.125rem] md:text-[0.9375rem] transition-all hover:opacity-80"
           style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4 md:h-[1.125rem] md:w-[1.125rem]" />
           종목 추가
         </button>
       </div>
@@ -590,7 +591,7 @@ export function WatchlistClient() {
       {/* 검색 + 상태 필터 */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div
-          className="inline-flex flex-wrap items-center gap-1 rounded-full p-1"
+          className="inline-flex flex-wrap items-center gap-1 rounded-full p-1 md:p-1.5"
           style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
         >
           {STATUS_FILTERS.map((s) => (
@@ -598,7 +599,7 @@ export function WatchlistClient() {
               key={s}
               type="button"
               onClick={() => setActiveStatus(s)}
-              className="rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200"
+              className="rounded-full px-3 py-1.5 text-[0.75rem] font-medium md:px-[0.9rem] md:py-[0.45rem] md:text-[0.8125rem] transition-all duration-200"
               style={{
                 background: activeStatus === s ? "var(--ah-accent)" : "transparent",
                 color: activeStatus === s ? "var(--ah-accent-fg)" : "var(--ah-text-muted)",
@@ -616,20 +617,20 @@ export function WatchlistClient() {
 
         {/* 검색 */}
         <div
-          className="flex items-center gap-2 rounded-full px-3.5 py-2"
+          className="flex min-h-[2.75rem] flex-1 items-center gap-2 rounded-full px-3.5 py-1.5 sm:max-w-none sm:flex-initial md:py-2"
           style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
         >
-          <Search className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--ah-text-subtle)" }} />
+          <Search className="h-4 w-4 shrink-0" style={{ color: "var(--ah-text-subtle)" }} />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="티커, 종목명 검색"
-            className="w-40 bg-transparent text-sm focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent py-0.5 text-sm focus:outline-none md:text-[0.9375rem] sm:min-w-[13rem]"
             style={{ color: "var(--ah-text-pri)" }}
           />
           {search && (
-            <button onClick={() => setSearch("")}>
-              <X className="h-3.5 w-3.5" style={{ color: "var(--ah-text-subtle)" }} />
+            <button type="button" onClick={() => setSearch("")} className="shrink-0 rounded-lg p-1 hover:bg-neutral-100/80 dark:hover:bg-neutral-800/80">
+              <X className="h-4 w-4" style={{ color: "var(--ah-text-subtle)" }} />
             </button>
           )}
         </div>
@@ -637,19 +638,19 @@ export function WatchlistClient() {
 
       {/* 카드 그리드 */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5">
           {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-44 animate-pulse rounded-2xl"
+            <div key={i} className="h-52 animate-pulse rounded-2xl md:h-56"
                  style={{ background: "var(--ah-card-soft)" }} />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-          <Bookmark className="h-10 w-10" style={{ color: "var(--ah-text-subtle)" }} />
-          <p className="text-base font-semibold" style={{ color: "var(--ah-text-pri)" }}>
+        <div className="flex flex-col items-center justify-center gap-3 py-24 text-center md:gap-4 md:py-28">
+          <Bookmark className="h-10 w-10 md:h-11 md:w-11" style={{ color: "var(--ah-text-subtle)" }} />
+          <p className="text-base font-semibold md:text-lg" style={{ color: "var(--ah-text-pri)" }}>
             {search || activeStatus !== "전체" ? "검색 결과가 없습니다" : "와치리스트가 비어있습니다"}
           </p>
-          <p className="text-sm" style={{ color: "var(--ah-text-muted)" }}>
+          <p className="max-w-md text-sm leading-relaxed md:text-[0.9375rem]" style={{ color: "var(--ah-text-muted)" }}>
             {search || activeStatus !== "전체"
               ? "다른 검색어나 상태를 선택해 보세요"
               : "관심 종목을 추가해 모니터링하세요"}
@@ -657,16 +658,16 @@ export function WatchlistClient() {
           {!search && activeStatus === "전체" && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="mt-2 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
+              className="mt-1 flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold md:text-[0.9375rem]"
               style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 md:h-[1.125rem] md:w-[1.125rem]" />
               첫 종목 추가
             </button>
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 lg:gap-5">
           {filtered.map((item) => (
             <WatchlistCard
               key={item.id}
