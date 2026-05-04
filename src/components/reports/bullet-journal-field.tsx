@@ -9,9 +9,6 @@ import { normalizeJournalBulletText } from "@/lib/bullet-list-text";
 
 const BULLET = "• ";
 
-export const JOURNAL_BULLET_HINT =
-  "한 줄에 한 항목씩 쓰면 글머리 목록으로 표시됩니다. Enter로 다음 항목(•), Shift+Enter로 줄만 바꿉니다. 앞의 •, -, *는 자동으로 정리됩니다.";
-
 export const JOURNAL_BULLET_PLACEHOLDER = `예:\n금리·유동성\n반도체 수급`;
 
 const TA_CLASS = [
@@ -36,12 +33,17 @@ function useBulletJournalTextHandlers(value: string, onChange: (v: string) => vo
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
+        const ne = e.nativeEvent;
+        if ("isComposing" in ne && ne.isComposing) return;
+        if ((e as unknown as { keyCode?: number }).keyCode === 229) return;
+
         e.preventDefault();
         const ta = e.currentTarget;
         const start = ta.selectionStart;
         const end = ta.selectionEnd;
+        const domValue = ta.value;
         const insert = `\n${BULLET}`;
-        const next = value.slice(0, start) + insert + value.slice(end);
+        const next = domValue.slice(0, start) + insert + domValue.slice(end);
         onChange(next);
         const pos = start + insert.length;
         queueMicrotask(() => {
@@ -52,10 +54,13 @@ function useBulletJournalTextHandlers(value: string, onChange: (v: string) => vo
 
       if (e.key === "Backspace") {
         const ta = e.currentTarget;
+        const ne = e.nativeEvent;
+        if ("isComposing" in ne && ne.isComposing) return;
+
         const pos = ta.selectionStart;
         const selEnd = ta.selectionEnd;
         if (pos !== selEnd) return;
-        const v = value;
+        const v = ta.value;
         const lineStart = v.lastIndexOf("\n", pos - 1) + 1;
         const lineToCaret = v.slice(lineStart, pos);
         if (/^•\s*$/.test(lineToCaret) && lineStart > 0) {
@@ -69,7 +74,7 @@ function useBulletJournalTextHandlers(value: string, onChange: (v: string) => vo
         }
       }
     },
-    [onChange, value],
+    [onChange],
   );
 
   return { handleChange, onKeyDown };
@@ -112,9 +117,6 @@ export function BulletJournalField({
         </label>
         <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
       </div>
-      <p className="border-b border-neutral-100 px-6 py-2.5 text-sm leading-relaxed text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-        {JOURNAL_BULLET_HINT}
-      </p>
       <textarea
         id={id}
         value={value}
@@ -162,9 +164,6 @@ export function BulletJournalFieldCompact({
         </label>
         <span className="text-sm font-medium text-neutral-400 dark:text-neutral-500">{sublabel}</span>
       </div>
-      <p className="border-b border-neutral-100 px-6 py-2.5 text-sm leading-relaxed text-neutral-500 dark:border-neutral-800 dark:text-neutral-400">
-        {JOURNAL_BULLET_HINT}
-      </p>
       <textarea
         id={id}
         value={value}
