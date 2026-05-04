@@ -229,12 +229,25 @@ export function TickerSearchInput({
 
     useEffect(() => {
         if (!showDropdown || !mounted) return;
-        const onScrollOrResize = () => updateDropdownLayout();
-        window.addEventListener("resize", onScrollOrResize);
-        window.addEventListener("scroll", onScrollOrResize, true);
+        const reposition = () => updateDropdownLayout();
+        window.addEventListener("resize", reposition);
+
+        const scrollAncestors: HTMLElement[] = [];
+        let el: HTMLElement | null = wrapRef.current?.parentElement ?? null;
+        while (el) {
+            const oy = window.getComputedStyle(el).overflowY;
+            if (oy === "auto" || oy === "scroll") {
+                el.addEventListener("scroll", reposition, true);
+                scrollAncestors.push(el);
+            }
+            el = el.parentElement;
+        }
+
         return () => {
-            window.removeEventListener("resize", onScrollOrResize);
-            window.removeEventListener("scroll", onScrollOrResize, true);
+            window.removeEventListener("resize", reposition);
+            for (const n of scrollAncestors) {
+                n.removeEventListener("scroll", reposition, true);
+            }
         };
     }, [showDropdown, mounted, updateDropdownLayout]);
 
@@ -367,7 +380,8 @@ export function TickerSearchInput({
                     className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900"
                     style={{
                         position: "fixed",
-                        zIndex: 100,
+                        /* 모달·헤더(z-50) 위에 확실히 표시 */
+                        zIndex: 200,
                         left: dropdownLayout.left,
                         width: dropdownLayout.width,
                         maxHeight: dropdownLayout.maxHeight,
@@ -386,8 +400,8 @@ export function TickerSearchInput({
                         </div>
                     ) : results.length > 0 ? (
                         <ul
-                            className="overflow-y-auto py-1"
-                            style={{ maxHeight: dropdownLayout.maxHeight - 2 }}
+                            className="overflow-y-auto overscroll-contain py-1 [-webkit-overflow-scrolling:touch]"
+                            style={{ maxHeight: Math.max(80, dropdownLayout.maxHeight - 8) }}
                         >
                             {results.map((t, idx) => (
                                 <li key={`${t.symbol}-${t.exchange}-${idx}`}>

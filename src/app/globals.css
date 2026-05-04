@@ -156,6 +156,15 @@
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--accent-600);
+
+  /* scrollbar — 트랙=배경(흰 띠 없음). 썸은 bg와 불투명 혼합( transparent 믹스 버그 회피 ) */
+  --scrollbar-track: var(--bg);
+  --scrollbar-thumb: color-mix(in srgb, var(--text-primary) 42%, var(--bg));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent-600) 55%, var(--text-primary));
+  --scrollbar-thumb-active: color-mix(in srgb, var(--accent-500) 58%, var(--text-primary));
+  --scrollbar-thumb-edge: rgb(255 255 255 / 0.22);
+  --scrollbar-size: 12px;
+  --scrollbar-radius: 9999px;
 }
 
 .dark {
@@ -255,12 +264,71 @@
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--accent-400);
+
+  --scrollbar-thumb: color-mix(in srgb, var(--text-primary) 36%, var(--bg));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent-400) 52%, var(--text-secondary));
+  --scrollbar-thumb-active: color-mix(in srgb, var(--accent-500) 55%, var(--text-secondary));
+  --scrollbar-thumb-edge: rgb(255 255 255 / 0.14);
 }
+
+/* ── 전역 스크롤바: Firefox + WebKit, 라이트/다크 자동 ── */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: auto;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   }
+
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    min-height: 3rem;
+    border-radius: var(--scrollbar-radius);
+    border: 2px solid var(--scrollbar-track);
+    background-color: var(--scrollbar-thumb);
+    background-clip: padding-box;
+    box-shadow:
+      inset 0 1px 0 var(--scrollbar-thumb-edge),
+      inset 0 -1px 0 rgb(15 23 42 / 0.06);
+    transition:
+      background-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .dark *::-webkit-scrollbar-thumb {
+    box-shadow:
+      inset 0 1px 0 var(--scrollbar-thumb-edge),
+      inset 0 -1px 0 rgb(0 0 0 / 0.35);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: var(--scrollbar-thumb-hover);
+    }
+
+    *::-webkit-scrollbar-thumb:active {
+      background-color: var(--scrollbar-thumb-active);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *::-webkit-scrollbar-thumb {
+      transition: none;
+    }
+  }
+
   body {
     background-color: var(--ah-bg);
     @apply text-foreground;

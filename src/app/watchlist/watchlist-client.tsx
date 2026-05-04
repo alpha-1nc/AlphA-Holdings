@@ -171,119 +171,145 @@ function AddModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden overscroll-contain">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div
-        className="relative w-full max-w-lg rounded-2xl p-7 shadow-2xl"
-        style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
+        className="flex min-h-full items-end justify-center p-4 pb-[calc(1.25rem+env(safe-area-inset-bottom,0px))] pt-10 sm:items-center sm:py-10"
+        aria-modal="true"
+        role="dialog"
       >
-        <div className="mb-5 flex items-center justify-between">
-          <h3 className="text-lg font-bold" style={{ color: "var(--ah-text-pri)" }}>
-            종목 추가
-          </h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800">
-            <X className="h-4 w-4" style={{ color: "var(--ah-text-muted)" }} />
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
-              종목 검색 *
-            </label>
-            <TickerSearchInput
-              value={ticker}
-              onChange={handleTickerSearchChange}
-              placeholder="티커 또는 회사명으로 검색..."
-              inputClassName="px-3.5 py-2.5 text-sm md:text-[0.9375rem]"
-            />
-            {ticker && (
-              <p className="mt-1.5 text-xs md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
-                {name || ticker}
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
-              상태
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {STATUS_OPTIONS.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTag(t)}
-                  className="rounded-full px-3.5 py-1.5 text-xs font-medium transition-all md:text-[0.8125rem]"
-                  style={{
-                    background: tag === t ? "var(--ah-accent)" : "var(--ah-card-soft)",
-                    color: tag === t ? "var(--ah-accent-fg)" : "var(--ah-text-muted)",
-                    border: "1px solid var(--ah-border)",
-                  }}
-                >
-                  {t}
-                </button>
-              ))}
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          aria-hidden
+          onClick={onClose}
+        />
+        <div
+          className="relative z-[1] mx-auto flex w-full max-w-lg flex-col overflow-hidden rounded-2xl shadow-2xl"
+          style={{
+            background: "var(--ah-card)",
+            border: "1px solid var(--ah-border)",
+            maxHeight: "min(92dvh, calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 4.5rem))",
+          }}
+        >
+          <div className="shrink-0 border-b px-6 pb-4 pt-6 md:px-7 md:pb-5 md:pt-7"
+               style={{ borderColor: "var(--ah-border)" }}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold" style={{ color: "var(--ah-text-pri)" }}>
+                종목 추가
+              </h3>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg p-1.5 transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              >
+                <X className="h-4 w-4" style={{ color: "var(--ah-text-muted)" }} />
+              </button>
             </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
-              관심 이유 (선택)
-            </label>
-            <p className="mb-2 text-xs leading-snug md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
-              한 줄에 한 항목씩 입력하면 글머리 목록으로 보입니다. 줄 앞의 •, -, * 는 자동으로 정리됩니다.
-            </p>
-            <textarea
-              value={interestReason}
-              onChange={(e) => setInterestReason(e.target.value)}
-              placeholder={BULLET_PLACEHOLDER}
-              rows={5}
-              className="w-full resize-y rounded-xl px-3.5 py-2.5 text-[0.9375rem] transition-colors focus:outline-none md:text-base"
-              style={{
-                background: "var(--ah-card-soft)",
-                border: "1px solid var(--ah-border)",
-                color: "var(--ah-text-pri)",
-              }}
-            />
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4 md:px-7 md:py-5">
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
+                  종목 검색 *
+                </label>
+                <TickerSearchInput
+                  value={ticker}
+                  onChange={handleTickerSearchChange}
+                  placeholder="티커 또는 회사명으로 검색..."
+                  inputClassName="px-3.5 py-2.5 text-sm md:text-[0.9375rem]"
+                />
+                {ticker && (
+                  <p className="mt-1.5 text-xs md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
+                    {name || ticker}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
+                  상태
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_OPTIONS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTag(t)}
+                      className="rounded-full px-3.5 py-1.5 text-xs font-medium transition-all md:text-[0.8125rem]"
+                      style={{
+                        background: tag === t ? "var(--ah-accent)" : "var(--ah-card-soft)",
+                        color: tag === t ? "var(--ah-accent-fg)" : "var(--ah-text-muted)",
+                        border: "1px solid var(--ah-border)",
+                      }}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
+                  관심 이유 (선택)
+                </label>
+                <p className="mb-2 text-xs leading-snug md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
+                  한 줄에 한 항목씩 입력하면 글머리 목록으로 보입니다. 줄 앞의 •, -, * 는 자동으로 정리됩니다.
+                </p>
+                <textarea
+                  value={interestReason}
+                  onChange={(e) => setInterestReason(e.target.value)}
+                  placeholder={BULLET_PLACEHOLDER}
+                  rows={4}
+                  className="min-h-[6.5rem] w-full resize-y rounded-xl px-3.5 py-2.5 text-[0.9375rem] transition-colors focus:outline-none md:text-base"
+                  style={{
+                    background: "var(--ah-card-soft)",
+                    border: "1px solid var(--ah-border)",
+                    color: "var(--ah-text-pri)",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
+                  리스크 (선택)
+                </label>
+                <p className="mb-2 text-xs leading-snug md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
+                  한 줄에 한 항목씩 입력하면 글머리 목록으로 보입니다.
+                </p>
+                <textarea
+                  value={riskNotes}
+                  onChange={(e) => setRiskNotes(e.target.value)}
+                  placeholder={BULLET_PLACEHOLDER}
+                  rows={4}
+                  className="min-h-[6.5rem] w-full resize-y rounded-xl px-3.5 py-2.5 text-[0.9375rem] transition-colors focus:outline-none md:text-base"
+                  style={{
+                    background: "var(--ah-card-soft)",
+                    border: "1px solid var(--ah-border)",
+                    color: "var(--ah-text-pri)",
+                  }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium" style={{ color: "var(--ah-text-muted)" }}>
-              리스크 (선택)
-            </label>
-            <p className="mb-2 text-xs leading-snug md:text-[0.8125rem]" style={{ color: "var(--ah-text-subtle)" }}>
-              한 줄에 한 항목씩 입력하면 글머리 목록으로 보입니다.
-            </p>
-            <textarea
-              value={riskNotes}
-              onChange={(e) => setRiskNotes(e.target.value)}
-              placeholder={BULLET_PLACEHOLDER}
-              rows={5}
-              className="w-full resize-y rounded-xl px-3.5 py-2.5 text-[0.9375rem] transition-colors focus:outline-none md:text-base"
+          <div
+            className="shrink-0 border-t px-6 pb-5 pt-4 md:px-7 md:pb-6 md:pt-5"
+            style={{ borderColor: "var(--ah-border)" }}
+          >
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={loading || !ticker.trim()}
+              className="w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 md:text-[0.9375rem]"
               style={{
-                background: "var(--ah-card-soft)",
-                border: "1px solid var(--ah-border)",
-                color: "var(--ah-text-pri)",
+                background: "var(--ah-accent)",
+                color: "var(--ah-accent-fg)",
               }}
-            />
+            >
+              {loading ? "추가 중..." : "추가"}
+            </button>
           </div>
         </div>
-
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !ticker.trim()}
-          className="mt-5 w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 md:text-[0.9375rem]"
-          style={{
-            background: "var(--ah-accent)",
-            color: "var(--ah-accent-fg)",
-          }}
-        >
-          {loading ? "추가 중..." : "추가"}
-        </button>
       </div>
     </div>
   );

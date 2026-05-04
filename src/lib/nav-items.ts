@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Home, BarChart2, TrendingUp, Bookmark, PenLine, Settings } from "lucide-react";
+import type { ReportType } from "@/generated/prisma";
 
 /** 상단/하단 네비 공통 — href, 아이콘, 접근성 라벨, 하단 탭 짧은 레이블 */
 export const MAIN_NAV_ITEMS: {
@@ -46,9 +47,17 @@ export function getMainNavForPath(pathname: string): { icon: LucideIcon; label: 
   return { icon: Home, label: "홈" };
 }
 
+/** 리포트 상세·편집 URL은 `/monthly`·`/quarterly` 프리픽스가 없음 — DB `type`으로 하단 탭 인덱스 결정 */
+export function getBottomTabIndexForReportType(type: ReportType): number {
+  if (type === "QUARTERLY") {
+    return MAIN_NAV_ITEMS.findIndex((x) => x.href === "/quarterly");
+  }
+  return MAIN_NAV_ITEMS.findIndex((x) => x.href === "/monthly");
+}
+
 /**
  * 모바일 하단 탭 — 가장 긴 href 프리픽스가 우선 (`/` 제외 후 정렬).
- * 리포트 상세처럼 목록에 없는 경로는 홈 탭 인덱스(0)로 폴백.
+ * `/reports/[id]` 등 매칭 없으면 홈(0). (리포트 상세는 레이아웃에서 타입 기반 오버라이드)
  */
 export function getBottomTabIndexForPath(pathname: string): number {
   if (pathname === "/") {
