@@ -15,7 +15,7 @@ import {
     CardTitle,
 } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
-import { PortfolioItemLogoAvatar } from "@/components/reports/portfolio-item-logo-avatar";
+import { PortfolioSnapshotAvatar } from "@/components/reports/portfolio-snapshot-avatar";
 import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
 import { QuarterlyReportTabs } from "@/components/reports/QuarterlyReportTabs";
 import { getProfileFromLabel } from "@/lib/profile";
@@ -434,12 +434,12 @@ export default async function ReportDetailPage(props: {
                                                     className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr] items-center gap-2 px-3 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition"
                                                 >
                                                     <div className="flex items-center gap-2.5">
-                                                        <PortfolioItemLogoAvatar
-                                                            portfolioItemId={item.id}
-                                                            reportId={id}
+                                                        <PortfolioSnapshotAvatar
+                                                            accountType={item.accountType}
                                                             ticker={item.ticker}
                                                             displayName={item.displayName}
                                                             logoUrl={item.logoUrl}
+                                                            size={44}
                                                         />
                                                         <div>
                                                             <p className="text-sm font-semibold leading-snug text-neutral-700 dark:text-neutral-200">

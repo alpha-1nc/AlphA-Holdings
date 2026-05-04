@@ -27,7 +27,7 @@ import {
 } from "@/lib/profile";
 import { TickerSearchInput, type TickerSearchChangeMeta } from "@/components/dashboard/ticker-search-input";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
-import { TickerAvatar } from "@/components/dashboard/ticker-avatar";
+import { PortfolioSnapshotAvatar } from "@/components/reports/portfolio-snapshot-avatar";
 import { ASSET_ROLE_LABELS } from "@/types/portfolio-strategy";
 import type { Report, PortfolioItem, NewInvestment, AccountType, AssetRole } from "@/generated/prisma";
 
@@ -561,14 +561,12 @@ function PortfolioRowItem({
 
             <div className="flex flex-wrap items-center gap-2.5 border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
                 {row.ticker && (
-                    <TickerAvatar
+                    <PortfolioSnapshotAvatar
+                        accountType={stockAt}
                         ticker={row.ticker}
                         displayName={row.displayName}
                         logoUrl={row.logoUrl}
                         size={28}
-                        autoFmpLogo
-                        editable
-                        onLogoChange={(url) => onChange({ logoUrl: url ?? undefined })}
                     />
                 )}
                 {isaPension ? (

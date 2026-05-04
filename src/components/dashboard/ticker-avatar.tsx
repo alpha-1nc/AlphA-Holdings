@@ -33,6 +33,8 @@ interface TickerAvatarProps {
   autoFmpLogo?: boolean;
   /** 편집 가능 시 클릭하여 이미지 붙여넣기 창 */
   editable?: boolean;
+  /** 이미지·FMP 로고가 없을 때 표시할 글자 수 (기본 2, 분기 스냅샷 등은 1) */
+  initialCharCount?: 1 | 2;
   onLogoChange?: (url: string | null) => void;
   /** 부모에서 비동기 저장 중 (예: 서버 액션) */
   isSaving?: boolean;
@@ -46,6 +48,7 @@ export function TickerAvatar({
   roundedSquare = false,
   autoFmpLogo = false,
   editable = false,
+  initialCharCount: initialCharCountProp = 2,
   onLogoChange,
   isSaving = false,
 }: TickerAvatarProps) {
@@ -56,8 +59,11 @@ export function TickerAvatar({
   const dialogPasteRef = useRef<HTMLTextAreaElement>(null);
 
   const t = ticker.trim();
+  const stripped = t.replace(/[^A-Za-z0-9가-힣]/g, "");
   const initial =
-    (t.replace(/[^A-Za-z0-9가-힣]/g, "").slice(0, 2) || t[0] || "?").toUpperCase();
+    initialCharCountProp === 1
+      ? (stripped.slice(0, 1) || t.charAt(0) || "?").toUpperCase()
+      : (stripped.slice(0, 2) || t.charAt(0) || "?").toUpperCase();
 
   const trimmedLogo = logoUrl?.trim() ?? "";
   const fmpUrl = autoFmpLogo && t ? getFmpLogoUrl(t) : null;
