@@ -5,7 +5,12 @@ import { PrismaClient } from "@/generated/prisma";
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined;
+    /** schema enum/모델 변경 시 dev HMR 캐시 무효화용 — 값을 바꾸면 클라이언트 재생성 */
+    prismaClientEpoch?: string;
 };
+
+/** ReportType 등 enum 변경 시 epoch를 올려 dev 서버 재시작 없이 stale client 방지 */
+const PRISMA_CLIENT_EPOCH = "20260615-journal";
 
 /** `schema.prisma` 가 있는 디렉터리 — Prisma CLI와 동일하게 SQLite 상대 경로 기준 */
 const PRISMA_SCHEMA_DIR = path.join(process.cwd(), "prisma");
@@ -67,10 +72,14 @@ function getDatasourceUrl(): string {
 }
 
 export const prisma =
-    globalForPrisma.prisma ??
-    new PrismaClient({
-        datasourceUrl: getDatasourceUrl(),
-        log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    });
+    globalForPrisma.prismaClientEpoch === PRISMA_CLIENT_EPOCH && globalForPrisma.prisma
+        ? globalForPrisma.prisma
+        : new PrismaClient({
+              datasourceUrl: getDatasourceUrl(),
+              log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+          });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = prisma;
+    globalForPrisma.prismaClientEpoch = PRISMA_CLIENT_EPOCH;
+}

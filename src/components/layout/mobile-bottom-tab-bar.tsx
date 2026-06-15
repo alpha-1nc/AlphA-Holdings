@@ -54,14 +54,12 @@ export function MobileBottomTabBar() {
 
   const menuItems = useMemo<InteractiveMobileMenuItem[]>(
     () =>
-      MAIN_NAV_ITEMS.filter(({ href }) => href !== "/reports/new").map(
-        ({ href, icon, shortLabel, label }) => ({
+      MAIN_NAV_ITEMS.map(({ href, icon, shortLabel, label }) => ({
           href,
           icon,
           label: shortLabel,
           accessibleLabel: label,
-        }),
-      ),
+        })),
     [],
   );
 

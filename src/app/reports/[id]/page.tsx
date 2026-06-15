@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/card";
 import { ReportDonutChart } from "@/components/dashboard/portfolio-donut-chart";
 import { PortfolioSnapshotAvatar } from "@/components/reports/portfolio-snapshot-avatar";
-import { ReportDeleteButton } from "@/components/dashboard/report-delete-button";
 import { QuarterlyReportTabs } from "@/components/reports/QuarterlyReportTabs";
 import { getProfileFromLabel } from "@/lib/profile";
 import { sortPortfolioItemsForDisplay } from "@/lib/portfolio-display-order";
@@ -159,7 +158,7 @@ export default async function ReportDetailPage(props: {
         value: item.krwAmount,
     }));
 
-    const backHref = report.type === "MONTHLY" ? "/monthly" : "/quarterly";
+    const backHref = "/journal";
     const profileId = getProfileFromLabel(report.profile) ?? "alpha-ceo";
 
     const journalEntries =
@@ -343,7 +342,7 @@ export default async function ReportDetailPage(props: {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M19 12H5M12 5l-7 7 7 7" />
                             </svg>
-                            {report.type === "MONTHLY" ? "월별 리포트" : "분기별 리포트"}
+                            일지
                         </Link>
                     </div>
                     <h2 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900 dark:text-white">
@@ -363,19 +362,6 @@ export default async function ReportDetailPage(props: {
                                 day: "2-digit",
                             })}
                         </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href={`/reports/${id}/edit`}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
-                        >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                            </svg>
-                            수정
-                        </Link>
-                        <ReportDeleteButton reportId={id} reportType={report.type} />
                     </div>
                 </div>
             </div>

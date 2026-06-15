@@ -11,17 +11,13 @@ import {
     LineChart,
     Line,
 } from "recharts";
-import { Home } from "lucide-react";
-import { getReportsByProfilePublished } from "@/app/actions/reports";
+import { Home, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { getPortfolioStrategies } from "@/app/actions/strategy";
-import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { WorkspaceProfile } from "@/lib/profile";
 import {
-    computeRoleAllocation,
-    computeTickerDeviationsByAccountGroups,
-    isCashLikePortfolioItem,
-    type RoleAllocationItem,
+    computeTickerDeviationsByAccountGroupsFromHoldings,
     type TickerDeviationItem,
 } from "@/lib/role-allocation";
 import {
@@ -29,12 +25,10 @@ import {
     ACCOUNT_TYPE_LABEL,
     type AccountGroupKey,
     accountTypesForDashboardGroup,
-    portfolioItemsForDashboardGroup,
     type DashboardAccountGroupFilter,
 } from "@/lib/accountGroups";
 import {
     getDashboardInvestmentNewInflows,
-    getDashboardQuarterlyMetrics,
     type QuarterlyDashboardSeriesPoint,
 } from "@/app/actions/dashboard";
 import { PageMainTitle } from "@/components/layout/page-main-title";
@@ -46,14 +40,9 @@ import {
     donutPieRoundedProps,
     fillForPortfolioOrdinalSlice,
 } from "@/lib/rounded-donut-chart";
-import { sectorDisplayLabelKo } from "@/lib/sector-display-ko";
 import { collapseWeightPercentSegments } from "@/lib/portfolio-small-slice-collapse";
 import { cn } from "@/lib/utils";
-import type { Report, PortfolioItem, NewInvestment, PortfolioStrategy } from "@/generated/prisma";
-type ReportWithItems = Report & { 
-    portfolioItems: PortfolioItem[];
-    newInvestments?: NewInvestment[];
-};
+import type { PortfolioStrategy, Holding, AccountType } from "@/generated/prisma";
 
 const GROUP_DEVIATION_TITLES: Record<AccountGroupKey, string> = {
     직투: "직투",
@@ -61,6 +50,89 @@ const GROUP_DEVIATION_TITLES: Record<AccountGroupKey, string> = {
     연금저축: "연금저축",
 };
 const DEVIATION_GROUP_ORDER: AccountGroupKey[] = ["직투", "ISA", "연금저축"];
+
+type RealtimeMetrics = {
+    totalValueKrw: number;
+    totalCostKrw: number;
+    totalProfitKrw: number;
+    totalProfitRate: number;
+    dailyProfitKrw: number;
+    lastSynced: string | null;
+    byAccount: Record<string, number>;
+    holdingCount: number;
+};
+
+type SnapshotRow = {
+    date: string;
+    totalValueKrw: number;
+    netCashFlowKrw: number | null;
+    positions?: Array<{ accountType: string; marketValueKrw: number }> | null;
+};
+
+function filteredValueFromByAccount(
+    byAccount: Record<string, number>,
+    group: DashboardAccountGroupFilter,
+): number {
+    if (group === "직투") {
+        return (byAccount.US_DIRECT ?? 0) + (byAccount.KR_DIRECT ?? 0);
+    }
+    if (group === "ISA") return byAccount.ISA ?? 0;
+    if (group === "연금저축") return byAccount.PENSION ?? 0;
+    return 0;
+}
+
+/** realtime.byAccount 기준으로 상단 요약 카드 수치 필터 (계좌별 원가는 추후 정밀화) */
+function filterMetricsByGroup(realtime: RealtimeMetrics, group: DashboardAccountGroupFilter) {
+    if (group === "all") {
+        return {
+            totalValueKrw: realtime.totalValueKrw,
+            totalCostKrw: realtime.totalCostKrw,
+            totalProfitKrw: realtime.totalProfitKrw,
+            totalProfitRate: realtime.totalProfitRate,
+            dailyProfitKrw: realtime.dailyProfitKrw,
+        };
+    }
+
+    const totalValueKrw = filteredValueFromByAccount(realtime.byAccount, group);
+    const ratio = realtime.totalValueKrw > 0 ? totalValueKrw / realtime.totalValueKrw : 0;
+    const totalCostKrw = realtime.totalCostKrw * ratio;
+    const totalProfitKrw = totalValueKrw - totalCostKrw;
+    const totalProfitRate = totalCostKrw > 0 ? totalProfitKrw / totalCostKrw : 0;
+    const dailyProfitKrw = realtime.dailyProfitKrw * ratio;
+
+    return { totalValueKrw, totalCostKrw, totalProfitKrw, totalProfitRate, dailyProfitKrw };
+}
+
+function snapshotsToSeries(
+    snapshots: SnapshotRow[],
+    group: DashboardAccountGroupFilter,
+): QuarterlyDashboardSeriesPoint[] {
+    const types = group === "all" ? null : accountTypesForDashboardGroup(group);
+    return snapshots.map((snap) => {
+        let totalValueKrw = snap.totalValueKrw;
+        let netCashFlowKrw = snap.netCashFlowKrw ?? 0;
+        if (types && snap.positions && Array.isArray(snap.positions)) {
+            const filtered = snap.positions.filter((p) =>
+                types.includes(p.accountType as AccountType),
+            );
+            totalValueKrw = filtered.reduce((s, p) => s + p.marketValueKrw, 0);
+            if (snap.totalValueKrw > 0) {
+                netCashFlowKrw = (netCashFlowKrw * totalValueKrw) / snap.totalValueKrw;
+            }
+        }
+        const profit = totalValueKrw - netCashFlowKrw;
+        const returnRate = netCashFlowKrw > 0 ? (profit / netCashFlowKrw) * 100 : 0;
+        const d = new Date(snap.date);
+        const periodLabel = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+        return {
+            periodLabel,
+            totalInvested: netCashFlowKrw,
+            totalCurrent: totalValueKrw,
+            profit,
+            returnRate,
+        };
+    });
+}
 
 function DeviationDivergingBar({ data, groupTitle }: { data: TickerDeviationItem[]; groupTitle: string }) {
     if (!data.length) return null;
@@ -692,38 +764,13 @@ function EmptyState() {
                 <p className="mt-1 text-sm text-neutral-400 dark:text-neutral-500">새 리포트를 작성하면 여기서 현황을 한눈에 확인할 수 있어요.</p>
             </div>
             <Link
-                href="/reports/new"
+                href="/journal/new"
                 className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-95"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
-                새 리포트 작성
-            </Link>
-        </div>
-    );
-}
-
-function QuarterlyEmptyState() {
-    return (
-        <div className="flex min-h-[calc(100vh-80px)] flex-col items-center justify-center gap-4 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6M3 21h18M3 10.5l9-7.5 9 7.5" />
-                </svg>
-            </div>
-            <div>
-                <p className="text-base font-semibold text-neutral-700 dark:text-neutral-200">분기별 리포트가 없습니다.</p>
-                <p className="mt-1 text-sm text-neutral-400 dark:text-neutral-500">대시보드는 분기별 리포트를 기준으로 표시됩니다. 분기 리포트를 작성해 주세요.</p>
-            </div>
-            <Link
-                href="/reports/new/quarterly"
-                className="mt-2 inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-md transition hover:bg-primary/90 active:scale-95"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                분기별 리포트 작성
+                새 일지 작성
             </Link>
         </div>
     );
@@ -761,217 +808,6 @@ function DonutWeightTooltip({
     );
 }
 
-function DistributionAnalysisCard({
-    roleData,
-    sectorData,
-}: {
-    roleData: { role: string; weight: number }[];
-    sectorData: { name: string; weight: number }[];
-}) {
-    const [activeTab, setActiveTab] = useState<"role" | "sector">("role");
-
-    const activeData =
-        activeTab === "role"
-            ? roleData.map((d, i) => ({
-                  name: d.role,
-                  value: d.weight,
-                  color: fillForPortfolioOrdinalSlice(i),
-              }))
-            : sectorData.map((d, i) => ({
-                  name: d.name,
-                  value: d.weight,
-                  color: fillForPortfolioOrdinalSlice(i),
-              }));
-    const { innerRadius: donutInnerR, outerRadius: donutOuterR } =
-        dashboardPortfolioWeightDonutRadiiPx();
-
-    return (
-        <div
-            className="flex h-full flex-col rounded-2xl p-5 transition-all duration-300 hover:shadow-md"
-            style={{ background: "var(--ah-card)", border: "1px solid var(--ah-border)" }}
-        >
-            <div className="mb-5 flex flex-col gap-3 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
-                <h3 className="text-sm font-bold shrink-0" style={{ color: "var(--ah-text-pri)" }}>
-                    {activeTab === "role" ? "역할별 분산" : "섹터별 분산"}
-                </h3>
-
-                <div
-                    className="relative flex min-h-[2.5rem] w-full min-w-0 flex-1 flex-nowrap items-stretch gap-1 overflow-hidden rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:inline-flex md:h-auto md:w-auto md:flex-none md:items-center md:justify-start md:overflow-visible"
-                    role="tablist"
-                    aria-label="역할·섹터 보기"
-                >
-                    {(["role", "sector"] as const).map((tab) => {
-                        const selected = activeTab === tab;
-                        return (
-                            <button
-                                key={tab}
-                                type="button"
-                                role="tab"
-                                aria-selected={selected}
-                                onClick={() => setActiveTab(tab)}
-                                className={[
-                                    "relative z-10 flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-center text-[0.7rem] font-semibold transition-all duration-300 sm:text-xs md:flex-none md:shrink-0 md:px-3.5",
-                                    selected
-                                        ? "bg-[var(--ah-accent)] text-[var(--ah-accent-fg)] shadow-sm"
-                                        : "text-[var(--ah-text-muted)] hover:text-[var(--ah-text-pri)]",
-                                ].join(" ")}
-                            >
-                                {tab === "role" ? "역할" : "섹터"}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
-
-            <div className="relative mx-auto h-44 w-44">
-                <ResponsiveContainer width="100%" height="100%" debounce={50}>
-                    <PieChart>
-                        <Pie
-                            key={activeTab}
-                            data={activeData}
-                            dataKey="value"
-                            nameKey="name"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={donutInnerR}
-                            outerRadius={donutOuterR}
-                            {...donutPieRoundedProps({
-                                sliceCount: activeData.length,
-                                weights: activeData.map((d) => d.value),
-                                innerRadius: donutInnerR,
-                                outerRadius: donutOuterR,
-                            })}
-                            isAnimationActive
-                            animationDuration={700}
-                            animationBegin={0}
-                        >
-                            {activeData.map((d, i) => (
-                                <Cell key={`${d.name}-${i}`} fill={d.color} />
-                            ))}
-                        </Pie>
-                        <Tooltip
-                            content={({ active, payload }) => {
-                                if (!active || !payload?.length) return null;
-                                const d = payload[0];
-                                return (
-                                    <div
-                                        className="rounded-lg px-3 py-2 text-xs shadow-lg"
-                                        style={{
-                                            background: "var(--ah-card)",
-                                            border: "1px solid var(--ah-border)",
-                                            color: "var(--ah-text-pri)",
-                                        }}
-                                    >
-                                        <p className="font-semibold">{d.name}</p>
-                                        <p style={{ color: "var(--ah-text-muted)" }}>
-                                            {Math.round(d.value as number)}%
-                                        </p>
-                                    </div>
-                                );
-                            }}
-                        />
-                    </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                        <p className="text-xs" style={{ color: "var(--ah-text-subtle)" }}>
-                            {activeData.length}개
-                        </p>
-                        <p className="text-sm font-bold" style={{ color: "var(--ah-text-pri)" }}>
-                            {activeTab === "role" ? "역할" : "섹터"}
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="mt-5 flex-1 space-y-2">
-                {activeData.map((d, i) => (
-                    <div
-                        key={`${d.name}-${i}`}
-                        className="flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors duration-150"
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "var(--ah-card-soft)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "transparent";
-                        }}
-                    >
-                        <div className="flex items-center gap-2.5">
-                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: d.color }} />
-                            <span className="text-sm" style={{ color: "var(--ah-text-pri)" }}>
-                                {d.name}
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="h-1 w-16 overflow-hidden rounded-full" style={{ background: "var(--ah-card-soft)" }}>
-                                <div
-                                    className="h-full rounded-full transition-all duration-700"
-                                    style={{
-                                        width: `${Math.min(d.value, 100)}%`,
-                                        background: d.color,
-                                        opacity: 0.8,
-                                    }}
-                                />
-                            </div>
-                            <span
-                                className="w-10 text-right text-sm font-semibold tabular-nums"
-                                style={{ color: "var(--ah-text-pri)" }}
-                            >
-                                {Math.round(d.value)}%
-                            </span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-function UnifiedPortfolioCard({
-    group,
-    latestQuarterly,
-    roleAllocationData,
-}: {
-    group: DashboardAccountGroupFilter;
-    latestQuarterly: ReportWithItems | undefined;
-    roleAllocationData: RoleAllocationItem[];
-}) {
-    return (
-        <div className="flex h-full min-h-0 flex-col rounded-2xl border border-[var(--ah-border)] bg-[var(--ah-card)] p-5 shadow-sm transition-all duration-300 hover:shadow-md">
-            <DistributionAnalysisCard
-                roleData={roleAllocationData.map((d) => ({
-                    role: d.label ?? String(d.role ?? ""),
-                    weight: d.actualWeight,
-                }))}
-                sectorData={(() => {
-                    if (!latestQuarterly) return [];
-                    const types = accountTypesForDashboardGroup(group);
-                    const scoped = latestQuarterly.portfolioItems.filter(
-                        (i) =>
-                            types.includes(i.accountType) &&
-                            i.accountType !== "CASH" &&
-                            i.krwAmount > 0 &&
-                            !isCashLikePortfolioItem(i),
-                    );
-                    const totalExCash = scoped.reduce((s, i) => s + i.krwAmount, 0);
-                    const sectorMap = new Map<string, number>();
-                    scoped.forEach((item) => {
-                        const sector = sectorDisplayLabelKo((item.sector as string | null) ?? undefined);
-                        sectorMap.set(sector, (sectorMap.get(sector) ?? 0) + item.krwAmount);
-                    });
-                    return Array.from(sectorMap.entries())
-                        .map(([name, value]) => ({
-                            name,
-                            weight: totalExCash > 0 ? (value / totalExCash) * 100 : 0,
-                        }))
-                        .sort((a, b) => b.weight - a.weight)
-                        .slice(0, 6);
-                })()}
-            />
-        </div>
-    );
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    Main Dashboard
 ══════════════════════════════════════════════════════════════════════════ */
@@ -982,11 +818,13 @@ export function DashboardPageClient() {
     const isMobileLayout = useIsMobileLayout();
 
     const [profileId, setProfileId] = useState<string>("alpha-ceo");
-    const [reports, setReports] = useState<ReportWithItems[]>([]);
     const [strategies, setStrategies] = useState<PortfolioStrategy[]>([]);
     const [loading, setLoading] = useState(true);
-    const [metricsLoading, setMetricsLoading] = useState(true);
-    const [metrics, setMetrics] = useState<Awaited<ReturnType<typeof getDashboardQuarterlyMetrics>> | null>(null);
+    const [realtimeLoading, setRealtimeLoading] = useState(true);
+    const [syncing, setSyncing] = useState(false);
+    const [realtimeMetrics, setRealtimeMetrics] = useState<RealtimeMetrics | null>(null);
+    const [holdings, setHoldings] = useState<Holding[]>([]);
+    const [rawSnapshots, setRawSnapshots] = useState<SnapshotRow[]>([]);
     const [investmentNewFlows, setInvestmentNewFlows] = useState<
         Awaited<ReturnType<typeof getDashboardInvestmentNewInflows>> | null
     >(null);
@@ -1016,23 +854,18 @@ export function DashboardPageClient() {
         }));
     }, [investmentNewFlows]);
 
-    const quarterlyReports = useMemo(
-        () => [...reports].filter((r) => r.type === "QUARTERLY").reverse(),
-        [reports],
-    );
-    const latestQuarterly =
-        quarterlyReports.length > 0 ? quarterlyReports[quarterlyReports.length - 1] : undefined;
-
-    /** 선택 계좌 필터에 포함된 종목만 표시명 기준 합산 (현금 행 제외) */
-    const consolidatedHoldings = useMemo(() => {
-        if (!latestQuarterly) return [];
-        const scoped = portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group).filter(
-            (i) => i.accountType !== "CASH" && i.krwAmount > 0,
-        );
+    /** 선택 계좌 필터 + marketValueKrw 기준 종목 비중 (실시간 holdings) */
+    const consolidatedHoldingsRealtime = useMemo(() => {
+        const scoped = holdings.filter((h) => {
+            if (h.marketValueKrw <= 0) return false;
+            if (group === "all") return true;
+            const types = accountTypesForDashboardGroup(group);
+            return types.includes(h.accountType);
+        });
         const byName = new Map<string, number>();
-        for (const i of scoped) {
-            const name = getPortfolioItemDisplayLabel({ ticker: i.ticker, displayName: i.displayName });
-            byName.set(name, (byName.get(name) ?? 0) + i.krwAmount);
+        for (const h of scoped) {
+            const name = h.name ?? h.ticker;
+            byName.set(name, (byName.get(name) ?? 0) + h.marketValueKrw);
         }
         const totalKrw = [...byName.values()].reduce((s, v) => s + v, 0);
         return [...byName.entries()]
@@ -1042,7 +875,23 @@ export function DashboardPageClient() {
                 weight: totalKrw > 0 ? (krw / totalKrw) * 100 : 0,
             }))
             .sort((a, b) => b.krw - a.krw);
-    }, [latestQuarterly, group]);
+    }, [holdings, group]);
+
+    const holdingsForDeviation = useMemo(() => {
+        if (group === "all") return holdings;
+        const types = accountTypesForDashboardGroup(group);
+        return holdings.filter((h) => types.includes(h.accountType));
+    }, [holdings, group]);
+
+    const snapshotSeries = useMemo(
+        () => snapshotsToSeries(rawSnapshots, group),
+        [rawSnapshots, group],
+    );
+
+    const filteredRealtime = useMemo(() => {
+        if (!realtimeMetrics) return null;
+        return filterMetricsByGroup(realtimeMetrics, group);
+    }, [realtimeMetrics, group]);
 
     const visibleDeviationGroups = useMemo((): AccountGroupKey[] => {
         if (group === "all") return DEVIATION_GROUP_ORDER;
@@ -1050,15 +899,9 @@ export function DashboardPageClient() {
     }, [group]);
 
     const deviationByGroup = useMemo(() => {
-        const itemsForDeviation =
-            latestQuarterly == null
-                ? null
-                : group === "all"
-                  ? latestQuarterly.portfolioItems
-                  : portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group);
-        if (itemsForDeviation == null || strategies.length === 0) return null;
-        return computeTickerDeviationsByAccountGroups(itemsForDeviation, strategies);
-    }, [latestQuarterly, strategies, group]);
+        if (holdingsForDeviation.length === 0 || strategies.length === 0) return null;
+        return computeTickerDeviationsByAccountGroupsFromHoldings(holdingsForDeviation, strategies);
+    }, [holdingsForDeviation, strategies]);
 
     const allDeviations = useMemo(() => {
         if (!deviationByGroup) return [];
@@ -1080,26 +923,54 @@ export function DashboardPageClient() {
     useEffect(() => {
         if (!profileId) return;
         setLoading(true);
-        const profileLabel = getProfileLabel(profileId as "alpha-ceo" | "partner");
-        Promise.all([
-            getReportsByProfilePublished(profileLabel),
-            getPortfolioStrategies(profileId as WorkspaceProfile),
-        ])
-            .then(([reportData, strategyData]) => {
-                setReports(reportData as ReportWithItems[]);
-                setStrategies(strategyData);
-            })
+        getPortfolioStrategies(profileId as WorkspaceProfile)
+            .then(setStrategies)
             .finally(() => setLoading(false));
     }, [profileId]);
 
+    const fetchRealtimeData = useCallback(async () => {
+        setRealtimeLoading(true);
+        try {
+            const [rtRes, snapRes, holdRes] = await Promise.all([
+                fetch("/api/dashboard/realtime"),
+                fetch("/api/snapshots?days=90"),
+                fetch("/api/holdings"),
+            ]);
+            if (rtRes.ok) {
+                const rt = await rtRes.json();
+                setRealtimeMetrics(rt);
+            }
+            if (snapRes.ok) {
+                const snap = await snapRes.json();
+                setRawSnapshots(snap.snapshots ?? []);
+            }
+            if (holdRes.ok) {
+                const hold = await holdRes.json();
+                setHoldings(hold.holdings ?? []);
+            }
+        } finally {
+            setRealtimeLoading(false);
+        }
+    }, []);
+
+    const handleSync = useCallback(async () => {
+        setSyncing(true);
+        try {
+            const res = await fetch("/api/sync", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error(data.error ?? "동기화 실패");
+            toast.success("동기화 완료");
+            await fetchRealtimeData();
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : "동기화 중 오류");
+        } finally {
+            setSyncing(false);
+        }
+    }, [fetchRealtimeData]);
+
     useEffect(() => {
-        if (!profileId) return;
-        const profileLabel = getProfileLabel(profileId as "alpha-ceo" | "partner");
-        setMetricsLoading(true);
-        getDashboardQuarterlyMetrics(profileLabel, group)
-            .then(setMetrics)
-            .finally(() => setMetricsLoading(false));
-    }, [profileId, group]);
+        void fetchRealtimeData();
+    }, [fetchRealtimeData]);
 
     useEffect(() => {
         if (!profileId) return;
@@ -1135,20 +1006,19 @@ export function DashboardPageClient() {
         );
     }
 
-    if (reports.length === 0) return <EmptyState />;
+    if (!loading && !realtimeLoading && (realtimeMetrics?.holdingCount ?? 0) === 0) {
+        return <EmptyState />;
+    }
 
-    if (quarterlyReports.length === 0) return <QuarterlyEmptyState />;
-
-    const summary = metrics?.summary;
-    const invested = summary?.totalInvested ?? 0;
-    const current = summary?.totalCurrent ?? 0;
-    const hasSummaryTotals = summary != null && !metricsLoading;
-    const profit = summary != null ? summary.profit : 0;
-    const returnRate = summary != null ? summary.returnRate : 0;
+    const invested = filteredRealtime?.totalCostKrw ?? 0;
+    const current = filteredRealtime?.totalValueKrw ?? 0;
+    const hasSummaryTotals = filteredRealtime != null && !realtimeLoading && (realtimeMetrics?.holdingCount ?? 0) > 0;
+    const profit = filteredRealtime?.totalProfitKrw ?? 0;
+    const returnRate = (filteredRealtime?.totalProfitRate ?? 0) * 100;
     const isPositive = profit >= 0;
     const profitSign = isPositive ? "+" : "";
 
-    const series = metrics?.series ?? [];
+    const series = snapshotSeries;
 
     const investedHist = series.map((r) => r.totalInvested);
     const currentHist = series.map((r) => r.totalCurrent);
@@ -1186,39 +1056,29 @@ export function DashboardPageClient() {
         deltaReturnPoints = last.returnRate - prev.returnRate;
     }
 
-    const summaryPeriodCaption =
-        hasSummaryTotals && summary
-            ? `기준: ${summary.periodLabel}`
-            : metricsLoading
-              ? "불러오는 중…"
-              : "분기별 리포트 없음";
+    const lastSyncedDate = realtimeMetrics?.lastSynced ? new Date(realtimeMetrics.lastSynced) : null;
+    const summaryPeriodCaption = lastSyncedDate
+        ? `마지막 동기화: ${lastSyncedDate.toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+        : realtimeLoading
+          ? "불러오는 중…"
+          : "동기화 기록 없음";
     const calendarYear = new Date().getFullYear();
     const flowBars = investmentNewFlows?.monthlyBars ?? [];
     const latestFlowBar =
         flowBars.length > 0 ? flowBars[flowBars.length - 1] : null;
 
-    const itemsScopedForRole = latestQuarterly
-        ? portfolioItemsForDashboardGroup(latestQuarterly.portfolioItems, group)
-        : [];
-
-    const roleAllocationData = latestQuarterly
-        ? computeRoleAllocation(itemsScopedForRole)
-        : [];
-
     const groupHasHoldings = (key: AccountGroupKey) => {
-        if (!latestQuarterly) return false;
         const types = ACCOUNT_GROUPS[key];
-        return latestQuarterly.portfolioItems.some(
-            (i) =>
-                i.accountType !== "CASH" &&
-                i.krwAmount > 0 &&
-                (types as readonly (typeof i.accountType)[]).includes(i.accountType),
+        return holdings.some(
+            (h) =>
+                h.marketValueKrw > 0 &&
+                (types as readonly AccountType[]).includes(h.accountType),
         );
     };
 
-    /** ISA·연금저축: 역할/섹터 분산 카드 생략, 비중 도넛은 아래 '포트폴리오 구성' 좌측으로 이동, 추이 차트는 전폭 */
+    /** ISA·연금저축: 비중 도넛은 '포트폴리오 구성' 좌측으로 이동, 추이 차트는 전폭 */
     const portfolioDonutBesideTrendChart = group !== "ISA" && group !== "연금저축";
-    const portfolioDonutSegments = consolidatedHoldings.map(({ name, weight }) => ({ name, weight }));
+    const portfolioDonutSegments = consolidatedHoldingsRealtime.map(({ name, weight }) => ({ name, weight }));
 
     const qoqDeltaBadge = series.length >= 2;
 
@@ -1229,11 +1089,25 @@ export function DashboardPageClient() {
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <PageMainTitle icon={Home}>Dashboard</PageMainTitle>
                 </div>
-                <div
-                    className="relative flex w-full flex-nowrap items-stretch gap-1 overflow-hidden rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:inline-flex md:w-auto md:items-center md:justify-start md:overflow-visible"
-                    role="tablist"
-                    aria-label="계좌 필터"
-                >
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        disabled={syncing}
+                        onClick={() => void handleSync()}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] px-3 py-1.5 text-xs font-semibold text-[var(--ah-text-muted)] shadow-sm transition hover:text-[var(--ah-text-pri)] disabled:opacity-50"
+                    >
+                        {syncing ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                        새로고침
+                    </button>
+                    <div
+                        className="relative flex w-full flex-nowrap items-stretch gap-1 overflow-hidden rounded-full border border-[var(--ah-border)] bg-[var(--ah-card)] p-1 shadow-sm md:inline-flex md:w-auto md:items-center md:justify-start md:overflow-visible"
+                        role="tablist"
+                        aria-label="계좌 필터"
+                    >
                     {(
                         [
                             ["전체", "all"],
@@ -1264,10 +1138,11 @@ export function DashboardPageClient() {
                             </button>
                         );
                     })}
+                    </div>
                 </div>
             </div>
 
-            {/* Summary — 좌: 투자금·평가금 / 우: 수익금·수익률 (기준 분기는 상단 한 줄만) */}
+            {/* Summary — 좌: 투자금·평가금 / 우: 수익금·수익률 */}
             <div className="space-y-1.5">
                 <p className="text-end text-[11px] leading-snug text-[var(--ah-text-muted)]">
                     {summaryPeriodCaption}
@@ -1276,7 +1151,7 @@ export function DashboardPageClient() {
                     <div className="flex flex-col gap-2 md:min-h-0 md:gap-3">
                         <DashboardSummaryStatCard
                             title="총 투자금"
-                            value={hasSummaryTotals ? krwFmtKm(invested) : metricsLoading ? "…" : "—"}
+                            value={hasSummaryTotals ? krwFmtKm(invested) : realtimeLoading ? "…" : "—"}
                             delta={deltaInvested}
                             showDeltaBadge={qoqDeltaBadge}
                             trendData={investedHist}
@@ -1284,7 +1159,7 @@ export function DashboardPageClient() {
                         />
                         <DashboardSummaryStatCard
                             title="현재 총 평가금"
-                            value={hasSummaryTotals ? krwFmtKm(current) : metricsLoading ? "…" : "—"}
+                            value={hasSummaryTotals ? krwFmtKm(current) : realtimeLoading ? "…" : "—"}
                             delta={deltaCurrent}
                             showDeltaBadge={qoqDeltaBadge}
                             trendData={currentHist}
@@ -1294,7 +1169,7 @@ export function DashboardPageClient() {
                     <div className="flex flex-col gap-2 md:min-h-0 md:gap-3">
                         <DashboardSummaryStatCard
                             title="누적 수익금"
-                            value={hasSummaryTotals ? krwFmtKmSigned(profit) : metricsLoading ? "…" : "—"}
+                            value={hasSummaryTotals ? krwFmtKmSigned(profit) : realtimeLoading ? "…" : "—"}
                             delta={deltaProfit}
                             showDeltaBadge={qoqDeltaBadge}
                             trendData={profitHist}
@@ -1302,7 +1177,7 @@ export function DashboardPageClient() {
                         />
                         <DashboardSummaryStatCard
                             title="누적 수익률"
-                            value={hasSummaryTotals ? `${profitSign}${Math.round(returnRate)}%` : metricsLoading ? "…" : "—"}
+                            value={hasSummaryTotals ? `${profitSign}${Math.round(returnRate)}%` : realtimeLoading ? "…" : "—"}
                             delta={deltaReturnPoints}
                             deltaUnit="points"
                             showDeltaBadge={qoqDeltaBadge}
@@ -1319,15 +1194,15 @@ export function DashboardPageClient() {
                     기간별 투자 추이
                 </h2>
 
-                {metricsLoading ? (
+                {realtimeLoading ? (
                     <div className="h-[min(22rem,85vw)] animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
                 ) : series.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/80 px-6 py-14 text-center dark:border-neutral-700 dark:bg-neutral-900/40">
                         <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
-                            표시할 분기별 리포트 데이터가 없습니다.
+                            표시할 스냅샷 데이터가 없습니다.
                         </p>
                         <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
-                            분기별 리포트를 작성하면 추이 그래프가 나타납니다.
+                            새로고침으로 동기화하면 추이 그래프가 나타납니다.
                         </p>
                     </div>
                 ) : (
@@ -1344,7 +1219,7 @@ export function DashboardPageClient() {
                 )}
             </div>
 
-            {/* Portfolio Composition — based on latest quarterly report */}
+            {/* Portfolio Composition — 실시간 holdings 기준 */}
             <div className="space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -1352,43 +1227,28 @@ export function DashboardPageClient() {
                             포트폴리오 구성
                         </h2>
                         <p className="mt-0.5 break-words text-xs" style={{ color: "var(--ah-text-muted)" }}>
-                            최신 분기별 리포트 기준
-                            {latestQuarterly && (
-                                <span className="ml-1 font-medium" style={{ color: "var(--ah-text-pri)" }}>
-                                    ({latestQuarterly.periodLabel})
-                                </span>
-                            )}
+                            실시간 · 토스/KIS 기준
                         </p>
                     </div>
-                    {latestQuarterly && (
-                        <Link
-                            href={`/reports/${latestQuarterly.id}`}
-                            className="shrink-0 text-xs text-[var(--ah-text-subtle)] transition-colors hover:text-[var(--ah-text-pri)]"
-                        >
-                            리포트 보기 →
-                        </Link>
-                    )}
                 </div>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-                    {portfolioDonutBesideTrendChart ? (
-                        <UnifiedPortfolioCard
-                            group={group}
-                            latestQuarterly={latestQuarterly}
-                            roleAllocationData={roleAllocationData}
-                        />
+                    {realtimeLoading ? (
+                        <div className="h-72 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
                     ) : (
                         <PortfolioWeightDonut group={group} segments={portfolioDonutSegments} />
                     )}
 
                     {/* 자산 요약과 동일 높이(stretch)·패딩 */}
                     <div className="flex h-full min-h-0 flex-col">
-                        {!latestQuarterly ? (
+                        {realtimeLoading ? (
+                            <div className="h-72 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
+                        ) : holdings.length === 0 ? (
                             <div
                                 className="flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl border px-5 py-10 text-center md:px-6"
                                 style={{ background: "var(--ah-card)", borderColor: "var(--ah-border)", borderWidth: 1 }}
                             >
                                 <p className="text-xs text-neutral-400 dark:text-neutral-500">
-                                    분기별 리포트가 없습니다
+                                    보유 종목이 없습니다. 새로고침으로 동기화해 주세요.
                                 </p>
                             </div>
                         ) : strategies.length === 0 ? (

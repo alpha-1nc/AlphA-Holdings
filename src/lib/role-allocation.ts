@@ -1,5 +1,6 @@
 import type { PortfolioItem } from "@/generated/prisma";
 import type { PortfolioStrategy } from "@/generated/prisma";
+import type { Holding } from "@/generated/prisma";
 import type { AccountType, AssetRole } from "@/generated/prisma";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import {
@@ -183,6 +184,79 @@ export function computeTickerDeviationsByAccountGroups(
       const displayLabel = getPortfolioItemDisplayLabel({
         ticker: row.ticker,
         displayName: strat?.displayName ?? row.displayName,
+      });
+      rows.push({
+        ticker: row.ticker,
+        accountType: row.accountType,
+        displayLabel,
+        targetWeight,
+        actualWeight,
+        diff,
+      });
+    }
+
+    result[groupKey] = rows;
+  }
+
+  return result;
+}
+
+/**
+ * 계좌 그룹별 목표 대비 괴리율 (실시간 Holding 기준, 그룹 내 총액 대비 비중).
+ * 해당 그룹에 보유 종목이 없으면 빈 배열.
+ */
+export function computeTickerDeviationsByAccountGroupsFromHoldings(
+  holdings: Holding[],
+  strategies: PortfolioStrategy[],
+): Record<AccountGroupKey, TickerDeviationItem[]> {
+  const strategyMap = new Map<string, PortfolioStrategy>();
+  for (const s of strategies) {
+    strategyMap.set(portfolioTickerAccountKey(s.ticker, s.accountType), s);
+  }
+
+  const result = {} as Record<AccountGroupKey, TickerDeviationItem[]>;
+  const groupKeys = Object.keys(ACCOUNT_GROUPS) as AccountGroupKey[];
+
+  for (const groupKey of groupKeys) {
+    const types = ACCOUNT_GROUPS[groupKey];
+    const rawHoldings = holdings.filter(
+      (h) =>
+        h.marketValueKrw > 0 &&
+        (types as readonly AccountType[]).includes(h.accountType),
+    );
+
+    if (rawHoldings.length === 0) {
+      result[groupKey] = [];
+      continue;
+    }
+
+    const merged = new Map<
+      string,
+      { ticker: string; accountType: AccountType; marketValueKrw: number; name: string | null | undefined }
+    >();
+    for (const h of rawHoldings) {
+      const k = portfolioTickerAccountKey(h.ticker, h.accountType);
+      const prev = merged.get(k);
+      merged.set(k, {
+        ticker: h.ticker,
+        accountType: h.accountType,
+        marketValueKrw: (prev?.marketValueKrw ?? 0) + h.marketValueKrw,
+        name: prev?.name ?? h.name,
+      });
+    }
+
+    const totalKrw = [...merged.values()].reduce((s, x) => s + x.marketValueKrw, 0);
+    const mergedSorted = [...merged.values()].sort((a, b) => b.marketValueKrw - a.marketValueKrw);
+    const rows: TickerDeviationItem[] = [];
+    for (const row of mergedSorted) {
+      const sk = portfolioTickerAccountKey(row.ticker, row.accountType);
+      const strat = strategyMap.get(sk);
+      const targetWeight = strat?.targetWeight ?? 0;
+      const actualWeight = totalKrw > 0 ? (row.marketValueKrw / totalKrw) * 100 : 0;
+      const diff = actualWeight - targetWeight;
+      const displayLabel = getPortfolioItemDisplayLabel({
+        ticker: row.ticker,
+        displayName: strat?.displayName ?? row.name,
       });
       rows.push({
         ticker: row.ticker,

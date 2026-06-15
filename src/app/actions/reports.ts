@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { PrismaClient } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import type { AssetRole, ReportType, ReportStatus, Prisma } from "@/generated/prisma";
+import { ReportType as ReportTypeEnum } from "@/generated/prisma";
 import {
   INITIAL_CAPITAL_ACCOUNT_TYPES,
   type InitialCapitalAccountType,
@@ -282,7 +283,7 @@ export async function upsertAccountInitialCapitalsOnEdit(
   }
 }
 
-export type ReportTypeInput = "MONTHLY" | "QUARTERLY";
+export type ReportTypeInput = (typeof ReportTypeEnum)[keyof typeof ReportTypeEnum];
 export type ReportStatusInput = "DRAFT" | "PUBLISHED";
 
 // ── periodLabel을 날짜로 변환하여 정렬 가능한 값 반환 ─────────────
@@ -311,7 +312,7 @@ export async function getReportsByProfileAndType(profile: string, type?: ReportT
   const reports = await prisma.report.findMany({
     where: {
       profile,
-      ...(type ? { type } : {}),
+      ...(type ? { type: type as ReportType } : {}),
     },
     include: {
       portfolioItems: true,
@@ -556,13 +557,15 @@ export async function createReport(payload: CreateReportPayload) {
         initialCapitalByAccount,
       );
     }
-    await syncInvestmentsForReportTx(tx, profileValue, created.id, rest.periodLabel, newInvestments);
+    // ProfileInvestment는 독립 납입 원장 — 리포트 저장 시 자동 동기화 비활성화
+    // await syncInvestmentsForReportTx(tx, profileValue, created.id, rest.periodLabel, newInvestments);
     return created;
   });
 
   revalidatePath("/");
   revalidatePath("/monthly");
   revalidatePath("/quarterly");
+  revalidatePath("/journal");
   return report;
 }
 
@@ -641,7 +644,8 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
       );
     }
 
-    await syncInvestmentsForReportTx(tx, profileValue, id, payload.periodLabel, newInvestments);
+    // ProfileInvestment는 독립 납입 원장 — 리포트 저장 시 자동 동기화 비활성화
+    // await syncInvestmentsForReportTx(tx, profileValue, id, payload.periodLabel, newInvestments);
 
     return updatedReport;
   });
@@ -649,6 +653,7 @@ export async function updateReportFull(id: number, payload: CreateReportPayload)
   revalidatePath("/");
   revalidatePath("/monthly");
   revalidatePath("/quarterly");
+  revalidatePath("/journal");
   revalidatePath(`/reports/${id}`);
   revalidatePath(`/reports/${id}/edit`);
   return report;
@@ -660,6 +665,7 @@ export async function deleteReport(id: number) {
   revalidatePath("/");
   revalidatePath("/monthly");
   revalidatePath("/quarterly");
+  revalidatePath("/journal");
 }
 
 // ── 기간 헬퍼 (월별·분기 연동) — 순수 함수는 @/lib/report-period 참고 ──

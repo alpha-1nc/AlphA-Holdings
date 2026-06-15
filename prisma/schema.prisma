@@ -32,6 +32,7 @@ enum AccountType {
 enum ReportType {
   MONTHLY
   QUARTERLY
+  JOURNAL
 }
 
 // ── 리포트 상태 Enum (임시저장 vs 작성 완료) ─────────────────
@@ -60,6 +61,9 @@ model Profile {
   portfolioStrategies PortfolioStrategy[]
   accountInitialCapitals AccountInitialCapital[]
   profileInvestments ProfileInvestment[]
+  holdings     Holding[]
+  snapshots    PortfolioSnapshot[]
+  transactions Transaction[]
 
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -107,10 +111,12 @@ model Report {
   status          ReportStatus    @default(DRAFT)
 
   // 텍스트 기록
-  summary         String?                           // 월/분기 증시 요약
-  journal         String?                           // 투자 일지 / 느낀 점
-  strategy        String?                           // 다음 전략
+  summary         String?                           // 월/분기 증시 요약 · JOURNAL 시장 요약
+  journal         String?                           // 투자 일지 / 느낀 점 · JOURNAL 메모
+  strategy        String?                           // 다음 전략 · JOURNAL 다음 계획
   earningsReview  String?                           // 분기별 어닝/실적 리뷰 (QUARTERLY 전용)
+  journalKeyword  String?                           // JOURNAL 한 줄 키워드
+  journalReview   String?                           // JOURNAL 포트폴리오 리뷰
 
   // 관계
   portfolioItems   PortfolioItem[]
@@ -118,6 +124,8 @@ model Report {
   /** 월·분기 리포트에서 동기화된 신규 납입 — 리포트 삭제 시 함께 제거 */
   linkedProfileInvestments ProfileInvestment[] @relation("ReportInvestments")
   initialCapitals AccountInitialCapital[]
+  snapshotId  String?
+  snapshot    PortfolioSnapshot? @relation("ReportSnapshot", fields: [snapshotId], references: [id], onDelete: SetNull)
 
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
@@ -213,4 +221,104 @@ model WatchlistItem {
 
   @@unique([profileId, ticker])
   @@map("watchlist_item")
+}
+
+// ── 데이터 출처 Enum ──────────────────────────────────────
+enum HoldingSource {
+  TOSS
+  KIS
+  MANUAL
+}
+
+enum OrderSide {
+  BUY
+  SELL
+}
+
+enum OrderTypeKind {
+  LIMIT
+  MARKET
+}
+
+// ── 실시간 보유 포지션 ────────────────────────────────────
+model Holding {
+  id              String        @id @default(cuid())
+  profileId       String
+  profile         Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  source          HoldingSource
+  accountType     AccountType
+  ticker          String
+  name            String?
+  marketCountry   String?
+  currency        Currency
+  quantity        Float
+  avgPrice        Float
+  lastPrice       Float
+  marketValue     Float
+  marketValueKrw  Float
+  profitLoss      Float?
+  profitLossRate  Float?
+  dailyProfitLoss Float?
+  manualNote      String?
+  syncedAt        DateTime      @default(now())
+
+  @@unique([profileId, source, accountType, ticker])
+  @@index([profileId])
+}
+
+// ── 일별 포트폴리오 스냅샷 ───────────────────────────────
+model PortfolioSnapshot {
+  id              String    @id @default(cuid())
+  profileId       String
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date            DateTime
+  totalValueKrw   Float
+  totalCostKrw    Float?
+  netCashFlowKrw  Float?
+  usdRate         Float?
+  positions       Json?
+  syncedAt        DateTime  @default(now())
+  journalReports  Report[]  @relation("ReportSnapshot")
+
+  @@unique([profileId, date])
+  @@index([profileId])
+}
+
+// ── 체결 내역 ─────────────────────────────────────────────
+model Transaction {
+  id              String         @id @default(cuid())
+  profileId       String
+  profile         Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  source          HoldingSource
+  accountType     AccountType
+  brokerOrderId   String?
+  clientOrderId   String?
+  ticker          String
+  side            OrderSide
+  orderType       OrderTypeKind
+  quantity        Float
+  price           Float?
+  currency        Currency
+  status          String
+  filledQuantity  Float?
+  avgFilledPrice  Float?
+  commission      Float?
+  tax             Float?
+  orderedAt       DateTime
+  filledAt        DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@index([profileId])
+  @@index([brokerOrderId])
+}
+
+// ── 증권사 토큰 캐시 ──────────────────────────────────────
+model BrokerToken {
+  id          String        @id @default(cuid())
+  source      HoldingSource
+  accessToken String
+  expiresAt   DateTime
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([source])
 }

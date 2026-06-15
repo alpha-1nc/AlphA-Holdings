@@ -44,6 +44,8 @@ credentials.json
 prisma/dev.db
 prisma/*.db
 prisma/*.db-journal
+prisma/dev.db.backup*
+prisma/*.backup*
 
 # vercel
 .vercel

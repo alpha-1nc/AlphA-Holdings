@@ -128,6 +128,9 @@ function quarterlyPair(profile: string): ReportWithItems[] {
         strategy: "",
         earningsReview:
             "핵심 보유종목 실적 발표는 대체로 추정치 부합. 다음 분기는 금리·환율 변동폭 모니터링.",
+        journalKeyword: null,
+        journalReview: null,
+        snapshotId: null,
         portfolioItems: makePortfolioItems(-9101, TICKERS_Q1, -93100),
         newInvestments: q1New,
         createdAt: new Date("2026-03-31T06:30:00.000Z"),
@@ -150,6 +153,9 @@ function quarterlyPair(profile: string): ReportWithItems[] {
         strategy: "",
         earningsReview:
             "전분기 말부터 환헤지 필요성 검토했으며 분기 신규 납입은 ISA·직투 병행.",
+        journalKeyword: null,
+        journalReview: null,
+        snapshotId: null,
         portfolioItems: makePortfolioItems(-9102, TICKERS_Q2, -93200),
         newInvestments: q2New,
         createdAt: new Date("2026-06-29T06:30:00.000Z"),
@@ -183,6 +189,9 @@ function monthlySeries(profile: string): ReportWithItems[] {
         journal: "",
         strategy: "",
         earningsReview: null,
+        journalKeyword: null,
+        journalReview: null,
+        snapshotId: null,
         portfolioItems: [],
         newInvestments:
             m.newKrw > 0

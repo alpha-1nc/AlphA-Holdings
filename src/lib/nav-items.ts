@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Home, BarChart2, TrendingUp, Bookmark, PenLine, Settings } from "lucide-react";
+import { Home, Wallet, Bookmark, PenLine, Settings } from "lucide-react";
 import type { ReportType } from "@/generated/prisma";
 
 /** 상단/하단 네비 공통 — href, 아이콘, 접근성 라벨, 하단 탭 짧은 레이블 */
@@ -11,10 +11,9 @@ export const MAIN_NAV_ITEMS: {
   shortLabel: string;
 }[] = [
   { href: "/", icon: Home, label: "홈", shortLabel: "Home" },
-  { href: "/monthly", icon: BarChart2, label: "월별 리포트", shortLabel: "Monthly" },
-  { href: "/quarterly", icon: TrendingUp, label: "분기별 리포트", shortLabel: "" },
+  { href: "/holdings", icon: Wallet, label: "보유종목", shortLabel: "Holdings" },
+  { href: "/journal", icon: PenLine, label: "일지", shortLabel: "Journal" },
   { href: "/watchlist", icon: Bookmark, label: "와치리스트", shortLabel: "Watch" },
-  { href: "/reports/new", icon: PenLine, label: "새 리포트", shortLabel: "New" },
   { href: "/settings", icon: Settings, label: "설정", shortLabel: "Settings" },
 ];
 
@@ -23,15 +22,19 @@ export function getMainNavForPath(pathname: string): { icon: LucideIcon; label: 
   if (pathname === "/") {
     return { icon: Home, label: "홈" };
   }
-  if (pathname.startsWith("/reports/new")) {
-    const item = MAIN_NAV_ITEMS.find((x) => x.href === "/reports/new")!;
+  if (pathname.startsWith("/holdings")) {
+    const item = MAIN_NAV_ITEMS.find((x) => x.href === "/holdings")!;
+    return { icon: item.icon, label: item.label };
+  }
+  if (pathname.startsWith("/journal")) {
+    const item = MAIN_NAV_ITEMS.find((x) => x.href === "/journal")!;
     return { icon: item.icon, label: item.label };
   }
   if (/^\/reports\/[^/]+\/edit/.test(pathname)) {
     return { icon: PenLine, label: "리포트 편집" };
   }
   if (/^\/reports\/[^/]+$/.test(pathname)) {
-    return { icon: BarChart2, label: "리포트" };
+    return { icon: PenLine, label: "리포트" };
   }
 
   const ordered = [...MAIN_NAV_ITEMS]
@@ -47,12 +50,9 @@ export function getMainNavForPath(pathname: string): { icon: LucideIcon; label: 
   return { icon: Home, label: "홈" };
 }
 
-/** 리포트 상세·편집 URL은 `/monthly`·`/quarterly` 프리픽스가 없음 — DB `type`으로 하단 탭 인덱스 결정 */
-export function getBottomTabIndexForReportType(type: ReportType): number {
-  if (type === "QUARTERLY") {
-    return MAIN_NAV_ITEMS.findIndex((x) => x.href === "/quarterly");
-  }
-  return MAIN_NAV_ITEMS.findIndex((x) => x.href === "/monthly");
+/** 리포트 상세·편집 URL은 `/journal` 프리픽스가 없음 — 하단 탭은 일지로 통일 */
+export function getBottomTabIndexForReportType(_type: ReportType): number {
+  return MAIN_NAV_ITEMS.findIndex((x) => x.href === "/journal");
 }
 
 /**
