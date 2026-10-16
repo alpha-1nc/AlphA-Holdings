@@ -117,6 +117,8 @@ model Report {
   earningsReview  String?                           // 분기별 어닝/실적 리뷰 (QUARTERLY 전용)
   journalKeyword  String?                           // JOURNAL 한 줄 키워드
   journalReview   String?                           // JOURNAL 포트폴리오 리뷰
+  /** JOURNAL 저장 시점 포트폴리오 박제(JSON). 라이브 스냅샷 참조와 별도 */
+  journalFrozenSnapshot Json?
 
   // 관계
   portfolioItems   PortfolioItem[]
@@ -266,13 +268,17 @@ model Holding {
   @@index([profileId])
 }
 
-// ── 일별 포트폴리오 스냅샷 ───────────────────────────────
+// ── 포트폴리오 스냅샷 (일별·주간) ───────────────────────────
 model PortfolioSnapshot {
   id              String    @id @default(cuid())
   profileId       String
   profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   date            DateTime
+  /** DAILY = 일별(기존), WEEKLY = 주간 총자산(해당 주 월요일 키) */
+  snapshotKind    String    @default("DAILY")
   totalValueKrw   Float
+  /** 총자산 = 평가금 + 현금/예수금 (주간 추이용, nullable) */
+  totalAssetKrw   Float?
   totalCostKrw    Float?
   netCashFlowKrw  Float?
   usdRate         Float?
@@ -280,8 +286,9 @@ model PortfolioSnapshot {
   syncedAt        DateTime  @default(now())
   journalReports  Report[]  @relation("ReportSnapshot")
 
-  @@unique([profileId, date])
+  @@unique([profileId, date, snapshotKind])
   @@index([profileId])
+  @@index([profileId, snapshotKind])
 }
 
 // ── 체결 내역 ─────────────────────────────────────────────
