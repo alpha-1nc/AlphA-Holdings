@@ -55,3 +55,8 @@ prisma/*.backup*
 next-env.d.ts
 
 /src/generated/prisma
+
+# 로컬 산출물 (스크린샷·백업)
+/backups/
+/screenshots/
+/.preview-screenshots/
