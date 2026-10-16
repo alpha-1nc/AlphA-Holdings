@@ -37,7 +37,8 @@ export type DashboardQuarterlyMetrics = {
 
 /**
  * 분기별 리포트 기준 대시보드 상단 카드·추이 그래프용 수치.
- * 상단 총 투자금은 calcAccountCapital(전체 누적), 추이 시리즈는 분기 말 시점까지의 누적 납입 기준.
+ * @deprecated 실시간 대시보드는 /api/dashboard/realtime + holdings(매입원가) 기준으로 전환됨.
+ * 분기 리포트 아카이브·verify 스크립트 호환용으로 유지.
  */
 export async function getDashboardQuarterlyMetrics(
   profileLabel: string,

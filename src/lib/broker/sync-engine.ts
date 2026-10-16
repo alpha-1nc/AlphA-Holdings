@@ -1,4 +1,9 @@
 import { prisma } from '@/lib/prisma'
+import {
+  computeBrokerCostBasisMetrics,
+  holdingProfitLossKrw,
+} from '@/lib/profit'
+import { getWeekMonday } from '@/lib/week-snapshot'
 import { getTossAccounts, getTossHoldings, getTossExchangeRate } from './toss-client'
 import { getKisIsaHoldings } from './kis-client'
 
@@ -74,7 +79,11 @@ export async function syncHoldings() {
   for (const item of kisItems) {
     if (!item.pdno || parseFloat(item.hldg_qty) === 0) continue
 
+    const quantity = parseFloat(item.hldg_qty)
     const marketValue = parseFloat(item.evlu_amt)
+    // KIS: bfdy_cprs_icdc = 전일 대비 주당 등락 → 보유수량 곱하면 일간 평가손익(원)
+    const dailyProfitLoss =
+      parseFloat(item.bfdy_cprs_icdc || '0') * quantity
     await prisma.holding.upsert({
       where: {
         profileId_source_accountType_ticker: {
@@ -92,48 +101,57 @@ export async function syncHoldings() {
         name: item.prdt_name,
         marketCountry: 'KR',
         currency: 'KRW',
-        quantity: parseFloat(item.hldg_qty),
+        quantity,
         avgPrice: parseFloat(item.pchs_avg_pric),
         lastPrice: parseFloat(item.prpr),
         marketValue,
         marketValueKrw: marketValue,
         profitLoss: parseFloat(item.evlu_pfls_amt),
         profitLossRate: parseFloat(item.evlu_pfls_rt) / 100,
+        dailyProfitLoss,
         syncedAt: new Date(),
       },
       update: {
         name: item.prdt_name,
-        quantity: parseFloat(item.hldg_qty),
+        quantity,
         avgPrice: parseFloat(item.pchs_avg_pric),
         lastPrice: parseFloat(item.prpr),
         marketValue,
         marketValueKrw: marketValue,
         profitLoss: parseFloat(item.evlu_pfls_amt),
         profitLossRate: parseFloat(item.evlu_pfls_rt) / 100,
+        dailyProfitLoss,
         syncedAt: new Date(),
       },
     })
   }
   console.log(`[sync] KIS ISA ${kisItems.length}종목 완료`)
 
-  // ── 3) 일별 스냅샷 적재 ──────────────────────────────────
+  // ── 3) 일별·주간 스냅샷 적재 ──────────────────────────────
   await saveSnapshot(usdRate)
 
   console.log('[sync] 동기화 완료')
   return { tossCount: tossItems.length, kisCount: kisItems.length, usdRate }
 }
 
+/** 보유 평가금 합 + 현금(가능 시). 현재 브로커 API에 예수금 미연동 → 평가금만. */
+function computeTotalAssetKrw(holdings: Awaited<ReturnType<typeof prisma.holding.findMany>>): number {
+  const { totalValueKrw } = computeBrokerCostBasisMetrics(holdings)
+  // TODO: 토스/KIS 예수금·현금 API 연동 시 cashKrw 합산
+  const cashKrw = 0
+  return totalValueKrw + cashKrw
+}
+
 async function saveSnapshot(usdRate: number) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  // 전체 holding 합산
   const holdings = await prisma.holding.findMany({ where: { profileId: PROFILE_ID } })
-  const totalValueKrw = holdings.reduce((sum, h) => sum + h.marketValueKrw, 0)
+  const { totalValueKrw, totalPurchaseCostKrw } = computeBrokerCostBasisMetrics(holdings)
+  const totalAssetKrw = computeTotalAssetKrw(holdings)
 
-  // 누적 순납입 (ProfileInvestment 합산)
-  const cashFlows = await prisma.profileInvestment.findMany({ where: { profileId: PROFILE_ID } })
-  const netCashFlowKrw = cashFlows.reduce((sum, cf) => sum + cf.amountKrw, 0)
+  // netCashFlowKrw = 매입원가 합 (실시간 수익률 분모와 동일 원천)
+  const netCashFlowKrw = totalPurchaseCostKrw
 
   const positions = holdings.map(h => ({
     ticker: h.ticker,
@@ -142,15 +160,73 @@ async function saveSnapshot(usdRate: number) {
     currency: h.currency,
     quantity: h.quantity,
     lastPrice: h.lastPrice,
+    marketValue: h.marketValue,
     marketValueKrw: h.marketValueKrw,
+    profitLoss: h.profitLoss,
+    profitLossKrw: holdingProfitLossKrw(h),
     profitLossRate: h.profitLossRate,
   }))
 
   await prisma.portfolioSnapshot.upsert({
-    where: { profileId_date: { profileId: PROFILE_ID, date: today } },
-    create: { profileId: PROFILE_ID, date: today, totalValueKrw, netCashFlowKrw, usdRate, positions },
-    update: { totalValueKrw, netCashFlowKrw, usdRate, positions, syncedAt: new Date() },
+    where: {
+      profileId_date_snapshotKind: {
+        profileId: PROFILE_ID,
+        date: today,
+        snapshotKind: 'DAILY',
+      },
+    },
+    create: {
+      profileId: PROFILE_ID,
+      date: today,
+      snapshotKind: 'DAILY',
+      totalValueKrw,
+      totalAssetKrw,
+      netCashFlowKrw,
+      usdRate,
+      positions,
+    },
+    update: {
+      totalValueKrw,
+      totalAssetKrw,
+      netCashFlowKrw,
+      usdRate,
+      positions,
+      syncedAt: new Date(),
+    },
   })
 
-  console.log(`[sync] 스냅샷 저장: ${today.toISOString().slice(0, 10)}, 총 ${Math.round(totalValueKrw / 10000)}만원`)
+  console.log(`[sync] 일별 스냅샷: ${today.toISOString().slice(0, 10)}, 총 ${Math.round(totalValueKrw / 10000)}만원`)
+
+  const weekMonday = getWeekMonday(new Date())
+  await prisma.portfolioSnapshot.upsert({
+    where: {
+      profileId_date_snapshotKind: {
+        profileId: PROFILE_ID,
+        date: weekMonday,
+        snapshotKind: 'WEEKLY',
+      },
+    },
+    create: {
+      profileId: PROFILE_ID,
+      date: weekMonday,
+      snapshotKind: 'WEEKLY',
+      totalValueKrw,
+      totalAssetKrw,
+      netCashFlowKrw,
+      usdRate,
+      positions,
+    },
+    update: {
+      totalValueKrw,
+      totalAssetKrw,
+      netCashFlowKrw,
+      usdRate,
+      positions,
+      syncedAt: new Date(),
+    },
+  })
+
+  console.log(
+    `[sync] 주간 스냅샷: ${weekMonday.toISOString().slice(0, 10)} (W), 총자산 ${Math.round(totalAssetKrw / 10000)}만원`,
+  )
 }

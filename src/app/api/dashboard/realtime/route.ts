@@ -1,27 +1,41 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { calcAccountCapital, calcDepositsByAccountType } from '@/lib/calcCapital'
+import {
+  computeBrokerCostBasisMetrics,
+  filterValuedHoldings,
+  hasKnownCostBasis,
+  holdingProfitLossKrw,
+} from '@/lib/profit'
+import { AccountType } from '@/generated/prisma'
+
+const ALL_ACCOUNT_TYPES: AccountType[] = [
+  'US_DIRECT',
+  'KR_DIRECT',
+  'JP_DIRECT',
+  'ISA',
+  'PENSION',
+  'CASH',
+]
 
 export async function GET() {
   const profileId = process.env.SYNC_PROFILE_ID!
 
   const holdings = await prisma.holding.findMany({ where: { profileId } })
 
-  // 총 평가금 (원화 합산)
-  const totalValueKrw = holdings.reduce((sum, h) => sum + h.marketValueKrw, 0)
+  const { totalValueKrw, totalProfitKrw, totalPurchaseCostKrw, totalProfitRate } =
+    computeBrokerCostBasisMetrics(holdings)
 
-  // 총 투자원금 (누적 순납입)
-  const cashFlows = await prisma.profileInvestment.findMany({ where: { profileId } })
-  const totalCostKrw = cashFlows.reduce((sum, cf) => sum + cf.amountKrw, 0)
-
-  // 누적 수익금 / 수익률
-  const totalProfitKrw = totalValueKrw - totalCostKrw
-  const totalProfitRate = totalCostKrw > 0 ? totalProfitKrw / totalCostKrw : 0
+  // 총 납입액(IC + PI) — 수익률 분모와 별도
+  const [totalDepositsKrw, depositsByAccountType] = await Promise.all([
+    calcAccountCapital(profileId, ALL_ACCOUNT_TYPES, ''),
+    calcDepositsByAccountType(profileId),
+  ])
 
   // 일간 손익 합산
   const dailyProfitKrw = holdings.reduce((sum, h) => {
     if (!h.dailyProfitLoss) return sum
     if (h.currency === 'KRW') return sum + h.dailyProfitLoss
-    // USD → KRW 환산 (marketValueKrw / marketValue 비율 사용)
     const rate = h.marketValue > 0 ? h.marketValueKrw / h.marketValue : 1
     return sum + h.dailyProfitLoss * rate
   }, 0)
@@ -31,21 +45,31 @@ export async function GET() {
     ? holdings.reduce((latest, h) => h.syncedAt > latest ? h.syncedAt : latest, holdings[0].syncedAt)
     : null
 
-  // 계좌별 합산
-  const byAccount = holdings.reduce((acc, h) => {
-    if (!acc[h.accountType]) acc[h.accountType] = 0
-    acc[h.accountType] += h.marketValueKrw
+  // 계좌별 평가금·매입원가 (원가 미입력 연금은 평가금만 집계)
+  const valuedHoldings = filterValuedHoldings(holdings)
+  const byAccount = valuedHoldings.reduce((acc, h) => {
+    if (!acc[h.accountType]) {
+      acc[h.accountType] = { valueKrw: 0, purchaseCostKrw: 0, profitKrw: 0 }
+    }
+    acc[h.accountType].valueKrw += h.marketValueKrw
+    if (hasKnownCostBasis(h)) {
+      const profitKrw = holdingProfitLossKrw(h)
+      acc[h.accountType].profitKrw += profitKrw
+      acc[h.accountType].purchaseCostKrw += h.marketValueKrw - profitKrw
+    }
     return acc
-  }, {} as Record<string, number>)
+  }, {} as Record<string, { valueKrw: number; purchaseCostKrw: number; profitKrw: number }>)
 
   return NextResponse.json({
     totalValueKrw,
-    totalCostKrw,
+    totalCostKrw: totalPurchaseCostKrw,
+    totalDepositsKrw,
     totalProfitKrw,
     totalProfitRate,
     dailyProfitKrw,
     lastSynced,
     byAccount,
+    depositsByAccountType,
     holdingCount: holdings.length,
   })
 }

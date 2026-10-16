@@ -1,0 +1,161 @@
+/* ──────────────────────────────────────────────────────────────
+   계좌 필터 — 미니멀 무채색 pill 스위처.
+   부드러운 인디케이터 슬라이드만, 글래스 과다 효과 없음.
+   ────────────────────────────────────────────────────────────── */
+
+.ag-switcher {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  gap: 0;
+  padding: 4px;
+  border-radius: 999px;
+  box-sizing: border-box;
+  background-color: color-mix(in oklab, var(--background) 60%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 40%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.ag-switcher__indicator {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / var(--ag-count, 4));
+  border-radius: 999px;
+  background-color: color-mix(in oklab, var(--foreground) 8%, var(--background));
+  border: 1px solid color-mix(in oklab, var(--border) 50%, transparent);
+  box-shadow: 0 1px 3px color-mix(in oklab, var(--foreground) 6%, transparent);
+  translate: calc(var(--ag-idx, 0) * 100%) 0;
+  transition: translate 380ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: translate;
+}
+
+.ag-switcher[data-idx="0"] .ag-switcher__indicator {
+  animation: agSquish0 380ms ease;
+}
+.ag-switcher[data-idx="1"] .ag-switcher__indicator {
+  animation: agSquish1 380ms ease;
+}
+.ag-switcher[data-idx="2"] .ag-switcher__indicator {
+  animation: agSquish2 380ms ease;
+}
+.ag-switcher[data-idx="3"] .ag-switcher__indicator {
+  animation: agSquish3 380ms ease;
+}
+.ag-switcher[data-idx="4"] .ag-switcher__indicator {
+  animation: agSquish4 380ms ease;
+}
+.ag-switcher[data-idx="5"] .ag-switcher__indicator {
+  animation: agSquish5 380ms ease;
+}
+.ag-switcher[data-idx="6"] .ag-switcher__indicator {
+  animation: agSquish6 380ms ease;
+}
+
+@keyframes agSquish0 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+@keyframes agSquish1 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+@keyframes agSquish2 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+@keyframes agSquish3 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+@keyframes agSquish4 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+@keyframes agSquish5 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+@keyframes agSquish6 {
+  0% { scale: 1 1; }
+  50% { scale: 1.08 0.94; }
+  100% { scale: 1 1; }
+}
+
+.ag-switcher__option {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 0.85rem;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 220ms ease;
+}
+
+.ag-switcher__option:hover {
+  color: color-mix(in oklab, var(--foreground) 75%, transparent);
+}
+
+.ag-switcher__option[data-active="true"] {
+  color: var(--foreground);
+  cursor: default;
+}
+
+/* ── 히어로 대형 스위처 ── */
+.ag-switcher--hero {
+  padding: 5px;
+}
+
+.ag-switcher--hero .ag-switcher__indicator {
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc((100% - 10px) / var(--ag-count, 4));
+}
+
+.ag-switcher--hero .ag-switcher__option {
+  min-height: 44px;
+  padding: 0 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+@media (min-width: 640px) {
+  .ag-switcher--hero .ag-switcher__option {
+    min-height: 48px;
+    padding: 0 1.25rem;
+    font-size: 0.92rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-switcher__indicator {
+    transition: none;
+    animation: none !important;
+  }
+}

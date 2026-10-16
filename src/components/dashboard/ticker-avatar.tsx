@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ClipboardPaste, Loader2, Trash2 } from "lucide-react";
+import { ClipboardPaste, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -11,12 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { StockLogo } from "@/components/stock/stock-logo";
 import {
   extractImgSrcFromHtml,
   normalizeHttpUrl,
   resizeImageToDataUrl,
 } from "@/lib/image-paste";
-import { getFmpLogoUrl } from "@/lib/ticker-logo";
 
 interface TickerAvatarProps {
   ticker: string;
@@ -27,13 +27,15 @@ interface TickerAvatarProps {
   /** 둥근 사각형 (기업 분석 리포트 스타일) — 기본은 원형 */
   roundedSquare?: boolean;
   /**
-   * true이면 저장된 logoUrl이 없거나 로드 실패 시 FMP 티커 이미지 URL을 시도합니다.
+   * true이면 저장된 logoUrl이 없거나 로드 실패 시 /logos/{TICKER}.png 를 시도합니다.
    * (와치리스트·분기 스냅샷과 동일한 원형·스케일 스타일)
    */
+  autoLocalLogo?: boolean;
+  /** @deprecated autoLocalLogo 사용 */
   autoFmpLogo?: boolean;
   /** 편집 가능 시 클릭하여 이미지 붙여넣기 창 */
   editable?: boolean;
-  /** 이미지·FMP 로고가 없을 때 표시할 글자 수 (기본 2, 분기 스냅샷 등은 1) */
+  /** 이미지·로컬 로고가 없을 때 표시할 글자 수 (기본 2, 분기 스냅샷 등은 1) */
   initialCharCount?: 1 | 2;
   onLogoChange?: (url: string | null) => void;
   /** 부모에서 비동기 저장 중 (예: 서버 액션) */
@@ -46,6 +48,7 @@ export function TickerAvatar({
   logoUrl,
   size = 28,
   roundedSquare = false,
+  autoLocalLogo: autoLocalLogoProp,
   autoFmpLogo = false,
   editable = false,
   initialCharCount: initialCharCountProp = 2,
@@ -53,43 +56,9 @@ export function TickerAvatar({
   isSaving = false,
 }: TickerAvatarProps) {
   void _displayNameProp;
-  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
-  const [failedFmpUrl, setFailedFmpUrl] = useState<string | null>(null);
+  const autoLocalLogo = autoLocalLogoProp ?? autoFmpLogo;
   const [dialogOpen, setDialogOpen] = useState(false);
   const dialogPasteRef = useRef<HTMLTextAreaElement>(null);
-
-  const t = ticker.trim();
-  const stripped = t.replace(/[^A-Za-z0-9가-힣]/g, "");
-  const initial =
-    initialCharCountProp === 1
-      ? (stripped.slice(0, 1) || t.charAt(0) || "?").toUpperCase()
-      : (stripped.slice(0, 2) || t.charAt(0) || "?").toUpperCase();
-
-  const trimmedLogo = logoUrl?.trim() ?? "";
-  const fmpUrl = autoFmpLogo && t ? getFmpLogoUrl(t) : null;
-
-  const customFailed = Boolean(trimmedLogo && failedLogoUrl === trimmedLogo);
-  const customOk = Boolean(trimmedLogo && !customFailed);
-  const fmpFailed = Boolean(fmpUrl && failedFmpUrl === fmpUrl);
-  const fmpOk = Boolean(fmpUrl && !fmpFailed);
-
-  const displayUrl = customOk ? trimmedLogo : fmpOk && fmpUrl ? fmpUrl : null;
-  const hasValidLogo = displayUrl !== null;
-
-  useEffect(() => {
-    setFailedLogoUrl(null);
-    setFailedFmpUrl(null);
-  }, [trimmedLogo, t, autoFmpLogo]);
-  const sizeClass =
-    size >= 40
-      ? "h-10 w-10"
-      : size >= 36
-        ? "h-9 w-9"
-        : size >= 32
-          ? "h-8 w-8"
-          : size === 28
-            ? "h-7 w-7"
-            : "h-6 w-6";
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -106,7 +75,7 @@ export function TickerAvatar({
         setDialogOpen(false);
       }
     },
-    [onLogoChange]
+    [onLogoChange],
   );
 
   const handleImageBlob = useCallback(
@@ -120,7 +89,7 @@ export function TickerAvatar({
         toast.error("이미지를 불러오지 못했습니다.");
       }
     },
-    [persist]
+    [persist],
   );
 
   const tryConsumeClipboard = useCallback(
@@ -169,7 +138,7 @@ export function TickerAvatar({
 
       return false;
     },
-    [handleImageBlob, persist]
+    [handleImageBlob, persist],
   );
 
   const onDialogPaste = useCallback(
@@ -183,7 +152,7 @@ export function TickerAvatar({
         }
       })();
     },
-    [tryConsumeClipboard]
+    [tryConsumeClipboard],
   );
 
   const handleRemoveImage = useCallback(() => {
@@ -191,63 +160,31 @@ export function TickerAvatar({
     setDialogOpen(false);
   }, [onLogoChange]);
 
-  const shapeClass = roundedSquare ? "rounded-xl" : "rounded-full";
-  const pendingOverlay = isSaving;
-
   const avatarEl = (
     <span
-      className={`relative inline-flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden ${shapeClass} ring-1 ring-neutral-200 dark:ring-neutral-700 ${
-        editable
-          ? "cursor-pointer transition hover:ring-primary/40 dark:hover:ring-primary/50"
-          : ""
-      }`}
+      className={editable ? "inline-flex" : undefined}
       onClick={editable ? () => setDialogOpen(true) : undefined}
       role={editable ? "button" : undefined}
       tabIndex={editable ? 0 : undefined}
       onKeyDown={
         editable ? (e) => e.key === "Enter" && setDialogOpen(true) : undefined
       }
-      aria-label={
-        editable ? "종목 이미지 붙여넣기 창 열기" : undefined
-      }
+      aria-label={editable ? "종목 이미지 붙여넣기 창 열기" : undefined}
     >
-      <span
-        className="absolute inset-0 flex items-center justify-center bg-neutral-100 font-bold text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-        style={{
-          fontSize: Math.max(10, Math.floor(size * 0.45)),
-          opacity: hasValidLogo ? 0 : 1,
-        }}
-        aria-hidden={hasValidLogo || undefined}
-      >
-        {pendingOverlay && !hasValidLogo ? (
-          <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
-        ) : (
-          initial
-        )}
-      </span>
-      {hasValidLogo && displayUrl && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] bg-white dark:bg-neutral-800">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            key={displayUrl}
-            src={displayUrl}
-            alt=""
-            aria-hidden
-            draggable={false}
-            className="block object-contain"
-            style={{ width: "76%", height: "76%" }}
-            onError={() => {
-              if (displayUrl === trimmedLogo) setFailedLogoUrl(trimmedLogo);
-              else if (fmpUrl && displayUrl === fmpUrl) setFailedFmpUrl(fmpUrl);
-            }}
-          />
-        </div>
-      )}
-      {pendingOverlay && hasValidLogo && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-          <Loader2 className="h-4 w-4 animate-spin text-foreground" />
-        </div>
-      )}
+      <StockLogo
+        ticker={ticker}
+        logoUrl={logoUrl}
+        size={size}
+        roundedSquare={roundedSquare}
+        autoLocalLogo={autoLocalLogo}
+        initialCharCount={initialCharCountProp}
+        isSaving={isSaving}
+        className={
+          editable
+            ? "cursor-pointer transition hover:ring-primary/40 dark:hover:ring-primary/50"
+            : undefined
+        }
+      />
     </span>
   );
 
@@ -314,7 +251,7 @@ export function TickerAvatar({
                   variant="outline"
                   size="sm"
                   className="shrink-0 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={pendingOverlay}
+                  disabled={isSaving}
                   onClick={handleRemoveImage}
                 >
                   <Trash2 className="h-3.5 w-3.5" />

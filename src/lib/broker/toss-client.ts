@@ -2,6 +2,20 @@ import { getTossAccessToken } from './toss-token'
 
 const TOSS_BASE = 'https://openapi.tossinvest.com'
 
+export class TossApiError extends Error {
+  status: number
+  path: string
+  retryAfterSec?: number
+
+  constructor(status: number, path: string, retryAfterSec?: number) {
+    super(`Toss API 오류 ${status}: ${path}`)
+    this.name = 'TossApiError'
+    this.status = status
+    this.path = path
+    this.retryAfterSec = retryAfterSec
+  }
+}
+
 async function tossGet(path: string, params?: Record<string, string>, accountSeq?: number) {
   const token = await getTossAccessToken()
   const url = new URL(`${TOSS_BASE}${path}`)
@@ -16,7 +30,15 @@ async function tossGet(path: string, params?: Record<string, string>, accountSeq
   }
 
   const res = await fetch(url.toString(), { headers })
-  if (!res.ok) throw new Error(`Toss API 오류 ${res.status}: ${path}`)
+  if (!res.ok) {
+    const retryHeader = res.headers.get('retry-after')
+    const retryAfterSec = retryHeader ? Number.parseInt(retryHeader, 10) : undefined
+    throw new TossApiError(
+      res.status,
+      path,
+      Number.isFinite(retryAfterSec) ? retryAfterSec : undefined,
+    )
+  }
   return res.json()
 }
 
@@ -32,10 +54,12 @@ export async function getTossHoldings(accountSeq: number) {
   return data.result
 }
 
-// 환율 조회 (USD/KRW)
-export async function getTossExchangeRate(): Promise<number> {
+// 환율 조회 (USD/KRW, JPY/KRW 등)
+export async function getTossExchangeRate(
+  baseCurrency: 'USD' | 'JPY' = 'USD',
+): Promise<number> {
   const data = await tossGet('/api/v1/exchange-rate', {
-    baseCurrency: 'USD',
+    baseCurrency,
     quoteCurrency: 'KRW',
   })
   return parseFloat(data.result.rate)
