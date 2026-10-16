@@ -25,9 +25,10 @@ Next.js `public` 디렉터리이므로 브라우저에서는 `/logos/{파일명}
 - 통화(`USD`/`KRW`)나 출처(`TOSS`/`KIS`)별로 파일명이 달라지지 **않습니다**.
 - FMP 자동 fetch(`getFmpLogoUrl`)도 `ticker.toUpperCase()` 로 URL을 만듭니다.
 
-> **현재 코드 상태:** 아직 `/logos/` 로컬 경로를 읽는 로직은 **연결되어 있지 않습니다**.  
-> 지금은 DB에 저장된 `logoUrl` 또는 FMP 원격 URL → 실패 시 **이니셜 원형 fallback** 순입니다.  
-> 이 폴더에 PNG를 넣으면, 이후 코드에서 `/logos/{TICKER}.png` 형태로 우선 참조하도록 연결할 예정입니다.
+> **현재 코드 상태:** `/logos/` 로컬 경로를 읽는 로직이 **연결되어 있습니다**.  
+> `src/lib/ticker-logo.ts`의 `getLocalLogoUrl()`이 `/logos/{TICKER}.png` 경로를 반환하며,  
+> `ticker-avatar.tsx`와 `stock-logo.tsx`에서 이 경로를 우선 사용합니다.  
+> 실패 시(파일이 없거나 로드 실패) **이니셜 원형 fallback**으로 넘어갑니다.
 
 ---
 
@@ -65,7 +66,9 @@ PNG 파일이 없거나, URL 로드에 실패하면 UI가 자동으로 **이니�
 
 ## 준비할 로고 체크리스트
 
-프로필: **AlphA Holdings Portfolio** (`SYNC_PROFILE_ID = cmnbr0tqi0000ryqz2yzaxdnf`)  
+프로필: **AlphA Holdings Portfolio** (`.env`의 `SYNC_PROFILE_ID`로 지정)  
+값은 환경마다 다름 — 로컬 DB와 서버 DB의 Profile ID가 서로 다르므로  
+각 환경의 `.env`에서 확인할 것.  
 기준: `Holding` 테이블 현재 보유 종목 (2026-06-19)
 
 | 파일명 | 종목명 | 통화 | 계좌 | 출처 | 준비 |
