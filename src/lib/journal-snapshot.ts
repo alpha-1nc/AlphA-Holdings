@@ -1,16 +1,20 @@
 import type { AccountType } from "@/generated/prisma";
 import { ACCOUNT_GROUPS, type AccountGroupKey } from "@/lib/accountGroups";
+import {
+  computeBrokerCostBasisFromSnapshotPositions,
+  computeMonthlyIntervalReturnRatePercent,
+  type SnapshotPositionProfitInput,
+} from "@/lib/profit";
 
-export type SnapshotPosition = {
-  accountType: string;
-  marketValueKrw: number;
-};
+export type SnapshotPosition = SnapshotPositionProfitInput;
 
 export type JournalSnapshotSummary = {
   id: string;
   date: Date;
   totalValueKrw: number;
   returnRate: number | null;
+  /** true = 월 구간 수익률, false = 직전 스냅샷 없어 매입원가 기준 폴백 */
+  isIntervalReturn: boolean;
   accountWeights: Array<{
     key: AccountGroupKey;
     label: string;
@@ -37,6 +41,14 @@ export function periodLabelToMonthBounds(periodLabel: string): { start: Date; en
   };
 }
 
+export function previousPeriodLabel(periodLabel: string): string | null {
+  const bounds = periodLabelToMonthBounds(periodLabel);
+  if (!bounds) return null;
+  const prev = new Date(bounds.start);
+  prev.setMonth(prev.getMonth() - 1);
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+}
+
 export function currentPeriodLabel(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -52,13 +64,19 @@ export function generatePeriodOptions(count = 24): string[] {
   return options;
 }
 
-export function buildJournalSnapshotSummary(snapshot: {
-  id: string;
-  date: Date;
-  totalValueKrw: number;
-  netCashFlowKrw: number | null;
-  positions: unknown;
-}): JournalSnapshotSummary {
+export function buildJournalSnapshotSummary(
+  snapshot: {
+    id: string;
+    date: Date;
+    totalValueKrw: number;
+    netCashFlowKrw: number | null;
+    positions: unknown;
+  },
+  options?: {
+    prevSnapshot?: { totalValueKrw: number } | null;
+    monthNewDepositsKrw?: number;
+  },
+): JournalSnapshotSummary {
   const positions = Array.isArray(snapshot.positions)
     ? (snapshot.positions as SnapshotPosition[])
     : [];
@@ -81,9 +99,16 @@ export function buildJournalSnapshotSummary(snapshot: {
   const totalFromPositions = Object.values(groupValues).reduce((s, v) => s + v, 0);
   const totalValueKrw = snapshot.totalValueKrw > 0 ? snapshot.totalValueKrw : totalFromPositions;
 
-  const netCashFlow = snapshot.netCashFlowKrw ?? 0;
-  const returnRate =
-    netCashFlow > 0 ? ((totalValueKrw - netCashFlow) / netCashFlow) * 100 : null;
+  const fallbackMetrics = computeBrokerCostBasisFromSnapshotPositions(positions, totalValueKrw);
+  const prevEndValue = options?.prevSnapshot?.totalValueKrw ?? null;
+  const monthNewDeposits = options?.monthNewDepositsKrw ?? 0;
+
+  const { returnRate, isInterval } = computeMonthlyIntervalReturnRatePercent(
+    totalValueKrw,
+    prevEndValue,
+    monthNewDeposits,
+    fallbackMetrics,
+  );
 
   const accountWeights = (Object.keys(ACCOUNT_GROUPS) as AccountGroupKey[]).map((key) => {
     const valueKrw = groupValues[key];
@@ -101,6 +126,7 @@ export function buildJournalSnapshotSummary(snapshot: {
     date: snapshot.date,
     totalValueKrw,
     returnRate,
+    isIntervalReturn: isInterval,
     accountWeights,
   };
 }

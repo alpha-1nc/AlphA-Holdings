@@ -54,10 +54,10 @@
 /* ── Design tokens: AlphA — 메인 포인트 #5dfcb3, 포인트 위 텍스트는 검정(변수 공통) ── */
 
 :root {
-  --bg: #f5f7f9;
+  --bg: #fafafa;
   --surface: #ffffff;
-  --surface-2: #f8fafb;
-  --surface-3: #eef2f5;
+  --surface-2: #f5f5f5;
+  --surface-3: #efefef;
   --border: rgba(15, 23, 42, 0.08);
   --border-strong: rgba(15, 23, 42, 0.14);
   --text-primary: #101828;
@@ -84,6 +84,29 @@
   --negative-soft: rgba(249, 115, 22, 0.12);
   --neutral-state: #94a3b8;
   --neutral-soft: rgba(148, 163, 184, 0.12);
+
+  /* ── 상승 초록 / 하락 빨강 (토스 감성 — 색은 여기에만) ── */
+  --up: #16a34a;
+  --up-soft: rgba(22, 163, 74, 0.12);
+  --down: #e5484d;
+  --down-soft: rgba(229, 72, 77, 0.12);
+
+  /* ── 글래스 (라이트: 프로스티드 화이트) ── */
+  --glass-card-bg: color-mix(in srgb, white 66%, transparent);
+  --glass-solid-bg: color-mix(in srgb, white 80%, transparent);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-border-hi: rgba(255, 255, 255, 0.9);
+  --glass-blur: 20px;
+  --glass-saturate: 1.4;
+  --glass-brightness: 1.02;
+  --glass-reflex-light: 1;
+  --glass-reflex-dark: 0.35;
+
+  /* ── 간격/둥글기 (여백 넉넉) ── */
+  --radius-card: 24px;
+  --radius-pill: 999px;
+  --gap-card: 22px;
+  --pad-card: 26px;
 
   /* shadcn / Tailwind semantic mapping */
   --background: var(--bg);
@@ -168,22 +191,26 @@
 }
 
 .dark {
-  --bg: #0b0d12;
-  --surface: #11141a;
-  --surface-2: #151922;
-  --surface-3: #1a1f2b;
+  /* ── 배경/표면 — 거의 순수 검정 + 미묘한 카드 표면 ── */
+  --bg: #050505;
+  --surface: #111111;
+  --surface-2: #161616;
+  --surface-3: #1c1c1c;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
-  --text-primary: #f5f7fa;
-  --text-secondary: #a7b0be;
-  --text-tertiary: #7d8796;
 
+  /* ── 텍스트 위계 ── */
+  --text-primary: #f4f5f7;
+  --text-secondary: rgba(244, 245, 247, 0.58);
+  --text-tertiary: rgba(244, 245, 247, 0.34);
+
+  /* accent 램프는 유지하되 포인트 컬러로는 쓰지 않음(중립화는 아래 --accent-500에서) */
   --accent-50: #071a15;
   --accent-100: #0e2b25;
   --accent-200: #154038;
   --accent-300: #1c5c50;
   --accent-400: #2dd4a3;
-  --accent-500: #5dfcb3;
+  --accent-500: var(--text-primary); /* 무채색 중립화 — 포인트 컬러 없음 */
   --accent-600: #7affc4;
   --accent-700: #a8ffdd;
   --accent-800: #d1ffee;
@@ -191,12 +218,39 @@
 
   --on-accent-fg: #0a0a0a;
 
+  /* ── 상승/하락 (색은 여기에만) ── */
+  --up: #4ade80;
+  --up-soft: rgba(74, 222, 128, 0.12);
+  --down: #f87171;
+  --down-soft: rgba(248, 113, 113, 0.12);
+
+  /* 기존 시맨틱(--positive/--negative)은 기존 화면 호환 위해 값 유지(변경 없음) */
   --positive: #22c55e;
   --positive-soft: rgba(34, 197, 94, 0.14);
   --negative: #f97316;
   --negative-soft: rgba(249, 115, 22, 0.14);
   --neutral-state: #94a3b8;
   --neutral-soft: rgba(148, 163, 184, 0.14);
+
+  /* ── 글래스 ── */
+  --glass-card-bg: color-mix(in srgb, white 6%, transparent);
+  --glass-solid-bg: color-mix(in srgb, white 8%, transparent);
+  --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.05));
+  --glass-bg-solid: rgba(255, 255, 255, 0.045); /* 데이터 영역용(가독성 높은 솔리드 느낌) */
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-hi: rgba(255, 255, 255, 0.38); /* 상단/좌측 엣지 하이라이트 (강화) */
+  --glass-blur: 24px;
+  --glass-saturate: 1.6;
+  --glass-brightness: 1.05;
+  /* 스위처 반사 기법 — 무채색 강도 조절 (white/black only) */
+  --glass-reflex-light: 1;
+  --glass-reflex-dark: 1.2;
+
+  /* ── 간격/둥글기 (여백 넉넉, 미니멀) ── */
+  --radius-card: 24px;
+  --radius-pill: 999px;
+  --gap-card: 22px;
+  --pad-card: 26px;
 
   --background: var(--bg);
   --foreground: var(--text-primary);
@@ -269,6 +323,292 @@
   --scrollbar-thumb-hover: color-mix(in srgb, var(--accent-400) 52%, var(--text-secondary));
   --scrollbar-thumb-active: color-mix(in srgb, var(--accent-500) 55%, var(--text-secondary));
   --scrollbar-thumb-edge: rgb(255 255 255 / 0.14);
+}
+
+/* ── 글래스모피즘 재사용 유틸 (다크 전용 — 토큰은 .dark에서 정의) ──
+   값 조정은 globals.css 의 .dark 글래스 토큰 한 곳에서만 바꾸면 된다. */
+
+@layer components {
+  .glass-card {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background-color: var(--glass-card-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    box-shadow:
+      inset 0 0 0 1px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 8%), transparent),
+      inset 1.5px 2.5px 0 -2px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 72%), transparent),
+      inset -1.5px -1.5px 0 -2px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 48%), transparent),
+      inset -2px -6px 4px -6px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 32%), transparent),
+      inset 0 2px 4px -2px
+        color-mix(in srgb, black calc(var(--glass-reflex-dark) * 20%), transparent),
+      inset 2px -4px 4px -4px
+        color-mix(in srgb, black calc(var(--glass-reflex-dark) * 14%), transparent),
+      0 1px 5px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 16%), transparent),
+      0 8px 24px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 20%), transparent);
+    transition:
+      box-shadow 300ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      transform 300ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      background-color 300ms;
+  }
+
+  .glass-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* 유리 표면 빛 반사 — 상단 하이라이트 띠 */
+  .glass-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 35%);
+    pointer-events: none;
+  }
+
+  .glass-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 0 0 1px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 12%), transparent),
+      inset 1.5px 2.5px 0 -2px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 80%), transparent),
+      inset -1.5px -1.5px 0 -2px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 56%), transparent),
+      inset -2px -6px 4px -6px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 40%), transparent),
+      inset 0 2px 4px -2px
+        color-mix(in srgb, black calc(var(--glass-reflex-dark) * 20%), transparent),
+      0 2px 8px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 20%), transparent),
+      0 14px 32px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 24%), transparent);
+  }
+
+  /* 데이터/숫자 많은 영역: 가독성 위해 더 솔리드 + 동일 반사 기법(약하게) */
+  .glass-solid {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    background-color: var(--glass-solid-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    box-shadow:
+      inset 0 0 0 1px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 6%), transparent),
+      inset 1.2px 2px 0 -2px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 55%), transparent),
+      inset -1.2px -1.2px 0 -2px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 36%), transparent),
+      inset -2px -5px 3px -6px
+        color-mix(in srgb, white calc(var(--glass-reflex-light) * 24%), transparent),
+      inset 0 2px 4px -2px
+        color-mix(in srgb, black calc(var(--glass-reflex-dark) * 18%), transparent),
+      inset 2px -4px 4px -4px
+        color-mix(in srgb, black calc(var(--glass-reflex-dark) * 12%), transparent),
+      0 1px 4px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 14%), transparent),
+      0 6px 20px color-mix(in srgb, black calc(var(--glass-reflex-dark) * 18%), transparent);
+    transition:
+      box-shadow 300ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      background-color 300ms;
+  }
+
+  .glass-solid > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .glass-solid::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: inherit;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 30%);
+    pointer-events: none;
+  }
+
+  /* ── 숫자 타이포 ── */
+  .num-hero {
+    font-size: clamp(40px, 5vw, 56px);
+    font-weight: 500;
+    letter-spacing: -0.025em;
+    line-height: 1;
+  }
+  /* 대시보드 히어로 주인공 숫자 — 화면에서 가장 큰 요소 */
+  .num-hero-xl {
+    font-size: clamp(44px, 8.5vw, 88px);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 0.98;
+    font-variant-numeric: tabular-nums;
+  }
+  /* 히어로 개선 — 절제된 크기(기존 xl의 ~65%) */
+  .num-hero-md {
+    font-size: clamp(28px, 5.5vw, 56px);
+    font-weight: 600;
+    letter-spacing: -0.032em;
+    line-height: 1.02;
+    font-variant-numeric: tabular-nums;
+  }
+  .num-lg {
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .label-dim {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    font-weight: 400;
+  }
+
+  /* ── 글래스 버튼 ──
+     값 조정은 globals.css 한 곳에서. primary=반투명 흰 글래스, ghost=테두리형. */
+  .btn-glass {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-pill);
+    padding: 0.65rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-primary);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+    backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+    -webkit-backdrop-filter: blur(16px) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    border-top-color: var(--glass-border-hi);
+    border-left-color: rgba(255, 255, 255, 0.24);
+    box-shadow:
+      0 6px 18px rgba(0, 0, 0, 0.35),
+      inset 0 1px 1px rgba(255, 255, 255, 0.28);
+    transition:
+      transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
+      border-color 0.25s ease,
+      background 0.25s ease;
+  }
+  .btn-glass:hover {
+    transform: translateY(-2px);
+    border-top-color: rgba(255, 255, 255, 0.55);
+    box-shadow:
+      0 12px 28px rgba(0, 0, 0, 0.45),
+      0 0 24px rgba(255, 255, 255, 0.12),
+      inset 0 1px 1px rgba(255, 255, 255, 0.38);
+  }
+  .btn-glass:active {
+    transform: scale(0.97);
+  }
+
+  .btn-glass-ghost {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-pill);
+    padding: 0.65rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--glass-border);
+    transition:
+      transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1),
+      background 0.25s ease,
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+  .btn-glass-ghost:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--glass-border-hi);
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  }
+  .btn-glass-ghost:active {
+    transform: scale(0.97);
+  }
+
+  /* 버튼 안 화살표 아이콘 호버 시 미세 이동 */
+  .btn-glass .btn-arrow,
+  .btn-glass-ghost .btn-arrow {
+    transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .btn-glass:hover .btn-arrow,
+  .btn-glass-ghost:hover .btn-arrow {
+    transform: translateX(3px);
+  }
+
+  /* === 카드 표면 표준 === */
+  .surface-card {
+    @apply rounded-2xl border border-border bg-card p-6;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition:
+      border-color 0.2s ease-out,
+      box-shadow 0.2s ease-out;
+  }
+  .dark .surface-card {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
+  }
+
+  /* ── 셸 디자인 시스템: 메트릭 카드 + 타이포 위계 ── */
+  .shell-metric-card {
+    @apply rounded-2xl border border-border bg-card p-5;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    transition:
+      border-color 0.2s ease-out,
+      box-shadow 0.2s ease-out;
+  }
+  .dark .shell-metric-card {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02);
+  }
+
+  .shell-label {
+    @apply text-xs font-semibold uppercase tracking-[0.25em] text-foreground/40;
+  }
+
+  .shell-num-lg {
+    @apply text-2xl font-semibold tracking-tight text-foreground md:text-3xl;
+  }
+
+  .shell-body-muted {
+    @apply text-foreground/60;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-card,
+  .btn-glass,
+  .btn-glass-ghost {
+    transition: none;
+  }
+  .glass-card-hover:hover,
+  .btn-glass:hover,
+  .btn-glass-ghost:hover {
+    transform: none;
+  }
+  .btn-glass:active,
+  .btn-glass-ghost:active {
+    transform: none;
+  }
+  .btn-glass:hover .btn-arrow,
+  .btn-glass-ghost:hover .btn-arrow {
+    transform: none;
+  }
 }
 
 /* ── 전역 스크롤바: Firefox + WebKit, 라이트/다크 자동 ── */
@@ -713,4 +1053,54 @@ body {
     transform: none !important;
     transition: none !important;
   }
+}
+
+/* ── Holdings: uitripled stocks-dashboard 레퍼런스 타이포·색상 토큰 ── */
+.holdings-dashboard {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "rlig" 1, "calt" 1;
+
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  color: var(--foreground);
+}
+
+.dark .holdings-dashboard {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
 }

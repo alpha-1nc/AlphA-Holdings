@@ -10,7 +10,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** ReportType 등 enum 변경 시 epoch를 올려 dev 서버 재시작 없이 stale client 방지 */
-const PRISMA_CLIENT_EPOCH = "20260615-journal";
+const PRISMA_CLIENT_EPOCH = "20260617-weekly-snapshot";
 
 /** `schema.prisma` 가 있는 디렉터리 — Prisma CLI와 동일하게 SQLite 상대 경로 기준 */
 const PRISMA_SCHEMA_DIR = path.join(process.cwd(), "prisma");

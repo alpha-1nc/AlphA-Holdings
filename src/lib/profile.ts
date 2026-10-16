@@ -13,18 +13,22 @@ export const PROFILE_LABELS: Record<WorkspaceProfile, string> = {
 /** 설정 화면 — 운용 프로필 소개 카드 문구 */
 export const WORKSPACE_PROFILE_INTRO: Record<
     WorkspaceProfile,
-    { name: string; title: string; bio: string }
+    { name: string; title: string; bioLines: string[] }
 > = {
     "alpha-ceo": {
         name: "AlphA Holdings",
         title: "AlphA Holdings Portfolio",
-        bio:
-            "AlphA Inc. 산하의 자산운용본부에 속해 있으며 AlphA Inc.의 투자와 자산을 통제 하고 관리하며 포트폴리오를 운용합니다.",
+        bioLines: [
+            "AlphA Inc. 산하 자산운용본부 소속 포트폴리오입니다.",
+            "AlphA Inc.의 투자와 자산을 통제·관리하며 포트폴리오를 운용합니다.",
+        ],
     },
     partner: {
         name: "MindongFolio",
         title: "개인 포트폴리오",
-        bio: "Mindong의 개인 포트폴리오이며 AlphA Holdings에 의해 위탁 운용됩니다.",
+        bioLines: [
+            "Mindong의 개인 포트폴리오이며 AlphA Holdings에 의해 위탁 운용됩니다.",
+        ],
     },
 };
 

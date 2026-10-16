@@ -7,14 +7,16 @@ export const MAIN_NAV_ITEMS: {
   href: string;
   icon: LucideIcon;
   label: string;
+  /** 사이드바 영문 라벨 */
+  shellLabel: string;
   /** 모바일 하단 탭용 (한 줄, 영문) */
   shortLabel: string;
 }[] = [
-  { href: "/", icon: Home, label: "홈", shortLabel: "Home" },
-  { href: "/holdings", icon: Wallet, label: "보유종목", shortLabel: "Holdings" },
-  { href: "/journal", icon: PenLine, label: "일지", shortLabel: "Journal" },
-  { href: "/watchlist", icon: Bookmark, label: "와치리스트", shortLabel: "Watch" },
-  { href: "/settings", icon: Settings, label: "설정", shortLabel: "Settings" },
+  { href: "/", icon: Home, label: "홈", shellLabel: "Dashboard", shortLabel: "Home" },
+  { href: "/holdings", icon: Wallet, label: "보유종목", shellLabel: "Holdings", shortLabel: "Holdings" },
+  { href: "/journal", icon: PenLine, label: "일지", shellLabel: "Journal", shortLabel: "Journal" },
+  { href: "/watchlist", icon: Bookmark, label: "와치리스트", shellLabel: "Watchlist", shortLabel: "Watch" },
+  { href: "/settings", icon: Settings, label: "설정", shellLabel: "Settings", shortLabel: "Settings" },
 ];
 
 /** pathname에 맞는 상단(모바일) 표시용 아이콘·제목 — 메인 메뉴 및 리포트 하위 경로 */

@@ -131,6 +131,7 @@ function quarterlyPair(profile: string): ReportWithItems[] {
         journalKeyword: null,
         journalReview: null,
         snapshotId: null,
+        journalFrozenSnapshot: null,
         portfolioItems: makePortfolioItems(-9101, TICKERS_Q1, -93100),
         newInvestments: q1New,
         createdAt: new Date("2026-03-31T06:30:00.000Z"),
@@ -156,6 +157,7 @@ function quarterlyPair(profile: string): ReportWithItems[] {
         journalKeyword: null,
         journalReview: null,
         snapshotId: null,
+        journalFrozenSnapshot: null,
         portfolioItems: makePortfolioItems(-9102, TICKERS_Q2, -93200),
         newInvestments: q2New,
         createdAt: new Date("2026-06-29T06:30:00.000Z"),
@@ -192,6 +194,7 @@ function monthlySeries(profile: string): ReportWithItems[] {
         journalKeyword: null,
         journalReview: null,
         snapshotId: null,
+        journalFrozenSnapshot: null,
         portfolioItems: [],
         newInvestments:
             m.newKrw > 0

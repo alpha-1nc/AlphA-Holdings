@@ -21,6 +21,11 @@ interface MiniChartProps {
      * 패딩 고정·막대 영역만 flex-grow (부모는 grid row-span으로 높이 고정)
      */
     alignToFlowCards?: boolean;
+    /**
+     * 막대를 컨테이너 가로폭 전체로 균등 분산(각 막대 flex-1).
+     * 좌측에 몰리지 않고 우측 끝까지 꽉 차게 펼친다.
+     */
+    fill?: boolean;
 }
 
 const defaultFormatter = (v: number) => String(v);
@@ -41,13 +46,15 @@ export function MiniChart({
     title = "ACTIVITY",
     className,
     alignToFlowCards = false,
+    fill = false,
 }: MiniChartProps) {
     const barColumnClassName = useMemo(() => {
+        if (fill) return "min-w-0 flex-1";
         const n = data.length;
         if (n >= 12) return "w-4 shrink-0";
         if (n >= 6) return "w-6 shrink-0";
         return "w-8 max-w-[2rem] shrink-0";
-    }, [data.length]);
+    }, [data.length, fill]);
 
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
     const [displayValue, setDisplayValue] = useState<number | null>(null);
@@ -158,7 +165,8 @@ export function MiniChart({
             <div
                 className={cn(
                     /* overflow-hidden 제거: 호버 scale 시 상단·툴팁 잘림 방지 */
-                    "flex items-end justify-center gap-1.5 pb-px",
+                    "flex items-end pb-px",
+                    fill ? "justify-between gap-1.5" : "justify-center gap-1.5",
                     alignToFlowCards
                         ? "min-h-0 flex-1"
                         : "min-h-[5.75rem] flex-none lg:min-h-0 lg:flex-1",
@@ -186,6 +194,7 @@ export function MiniChart({
                             <div
                                 className={cn(
                                     "w-full origin-bottom cursor-pointer rounded-full transition-all duration-300 ease-out",
+                                    fill && "max-w-[2.25rem]",
                                     isHovered
                                         ? barBgHoverPri
                                         : isNeighbor

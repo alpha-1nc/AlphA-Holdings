@@ -1,12 +1,16 @@
 /**
  * 티커 심볼로 로고 URL을 반환하는 유틸리티
- * 1순위: FMP 이미지 URL (API 키 불필요, URL 직접 사용)
- * 2순위: Clearbit (글로벌 기업 도메인 기반)
- * 없으면 null 반환 → UI에서 이니셜 폴백
+ * UI 기본: public/logos/{TICKER}.png (로컬 우선)
+ * watchlist 동기화용 resolveLogoUrl은 레거시 FMP HEAD 검증 유지
  */
 
+/** public/logos/{대문자 티커}.png — Next.js static 경로 */
+export function getLocalLogoUrl(ticker: string): string {
+  return `/logos/${ticker.trim().toUpperCase()}.png`;
+}
+
+/** @deprecated UI 표시에는 getLocalLogoUrl 사용. watchlist resolveLogoUrl 전용 */
 export function getFmpLogoUrl(ticker: string): string {
-  // FMP는 URL만으로 이미지 직접 제공 (API 키 없이도 작동)
   return `https://financialmodelingprep.com/image-stock/${ticker.toUpperCase()}.png`;
 }
 

@@ -17,10 +17,10 @@ export const TICKER_METADATA: Record<string, TickerMetadata> = {
     // ── US 빅테크 ─────────────────────────────────────────────────────
     AAPL: { name: "Apple Inc.", domain: "apple.com", color: "#A3AAAE", sector: "Technology" },
     MSFT: { name: "Microsoft Corporation", domain: "microsoft.com", color: "#00A4EF", sector: "Technology" },
-    GOOGL: { name: "Alphabet Inc. (Class A)", domain: "google.com", color: "#EA4335", sector: "Technology" },
-    GOOG: { name: "Alphabet Inc. (Class C)", domain: "google.com", color: "#EA4335", sector: "Technology" },
+    GOOGL: { name: "Alphabet Inc. (Class A)", domain: "google.com", color: "#EA4335", sector: "Communication Services" },
+    GOOG: { name: "Alphabet Inc. (Class C)", domain: "google.com", color: "#EA4335", sector: "Communication Services" },
     AMZN: { name: "Amazon.com Inc.", domain: "amazon.com", color: "#FF9900", sector: "Consumer Discretionary" },
-    META: { name: "Meta Platforms Inc.", domain: "meta.com", color: "#0866FF", sector: "Technology" },
+    META: { name: "Meta Platforms Inc.", domain: "meta.com", color: "#0866FF", sector: "Communication Services" },
     NVDA: { name: "NVIDIA Corporation", domain: "nvidia.com", color: "#76B900", sector: "Technology" },
     TSLA: { name: "Tesla Inc.", domain: "tesla.com", color: "#E82127", sector: "Consumer Discretionary" },
     NFLX: { name: "Netflix Inc.", domain: "netflix.com", color: "#E50914", sector: "Communication Services" },

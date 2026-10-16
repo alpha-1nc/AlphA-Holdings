@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Moon, Sun } from "lucide-react";
+import { AnimatedThemeToggle } from "@/components/ui/animated-theme-toggle";
 import { useTheme } from "@/components/layout/theme-provider";
 import clsx from "clsx";
 import { useState } from "react";
@@ -35,17 +35,17 @@ function NavIconButton({ href, icon: Icon, label, isActive }: NavIconButtonProps
                     "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
                     isActive
                         ? [
-                              "bg-neutral-100 text-neutral-900",
-                              "ring-1 ring-neutral-200/90 shadow-sm shadow-neutral-900/[0.06]",
-                              "dark:bg-white/12 dark:text-white",
-                              "dark:ring-white/20 dark:shadow-[0_1px_4px_rgba(0,0,0,0.55),inset_0_1px_0_0_rgba(255,255,255,0.07)]",
+                              "bg-black/[0.05] text-neutral-900",
+                              "ring-1 ring-black/[0.06] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.6)]",
+                              "dark:bg-white/[0.1] dark:text-white",
+                              "dark:ring-white/15 dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12)]",
                           ]
                         : [
                               "text-neutral-400 ring-1 ring-transparent",
-                              "hover:-translate-y-0.5 hover:bg-neutral-100 hover:text-neutral-800",
-                              "hover:ring-neutral-200/70 hover:shadow-sm hover:shadow-neutral-900/[0.05]",
-                              "dark:text-neutral-500 dark:hover:bg-white/10 dark:hover:text-neutral-200",
-                              "dark:hover:ring-white/12 dark:hover:shadow-[0_1px_3px_rgba(0,0,0,0.45)]",
+                              "hover:-translate-y-0.5 hover:bg-black/[0.04] hover:text-neutral-800",
+                              "hover:ring-black/[0.05] hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.45)]",
+                              "dark:text-neutral-500 dark:hover:bg-white/[0.07] dark:hover:text-neutral-200",
+                              "dark:hover:ring-white/10 dark:hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)]",
                           ]
                 )}
             >
@@ -70,14 +70,60 @@ function NavIconButton({ href, icon: Icon, label, isActive }: NavIconButtonProps
     );
 }
 
+function ThemeToggleWithTooltip({
+    hovered,
+    onHoverChange,
+}: {
+    hovered: boolean;
+    onHoverChange: (hovered: boolean) => void;
+}) {
+    const { theme } = useTheme();
+
+    return (
+        <div className="relative flex flex-col items-center">
+            <AnimatedThemeToggle
+                iconSize={20}
+                onMouseEnter={() => onHoverChange(true)}
+                onMouseLeave={() => onHoverChange(false)}
+                className={clsx(
+                    "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
+                    "ring-1 ring-transparent hover:-translate-y-0.5",
+                    theme === "dark"
+                        ? "hover:bg-violet-500/15 hover:ring-violet-400/30 hover:shadow-[0_1px_4px_rgba(0,0,0,0.45)]"
+                        : "hover:bg-orange-500/10 hover:ring-orange-400/40 hover:shadow-sm hover:shadow-orange-900/10",
+                )}
+            />
+
+            <div
+                className={clsx(
+                    "pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap",
+                    "hidden rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg sm:block",
+                    "dark:bg-white dark:text-neutral-900",
+                    "transition-all duration-150",
+                    hovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1",
+                )}
+            >
+                {theme === "dark" ? "라이트 모드" : "다크 모드"}
+                <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-neutral-900 dark:border-b-white" />
+            </div>
+        </div>
+    );
+}
+
 export function TopNavbar() {
     const pathname = usePathname();
-    const { theme, toggleTheme } = useTheme();
     const [themeHovered, setThemeHovered] = useState(false);
     const { start: startLogoHome, portal: logoHomePortal } = useLogoHomeCinematic();
 
     return (
-        <header className="sticky top-0 z-50 w-full border-b border-neutral-200/60 bg-white/85 backdrop-blur-xl dark:border-white/10 dark:bg-neutral-950/85">
+        <header
+            className="sticky top-0 z-50 w-full backdrop-blur-2xl backdrop-saturate-150"
+            style={{
+                backgroundColor: "var(--glass-card-bg)",
+                boxShadow:
+                    "inset 0 1px 0 0 color-mix(in srgb, white 14%, transparent), 0 1px 0 0 var(--ah-border)",
+            }}
+        >
             {logoHomePortal}
             <div className="mx-auto max-w-screen-2xl px-4 md:px-10">
                 {/* 모바일 전용: 좌 로고 · 가운데 메뉴 아이콘+제목 · 우 프로필 */}
@@ -138,44 +184,13 @@ export function TopNavbar() {
                     })}
 
                     {/* Divider */}
-                    <div className="mx-2 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
+                    <div className="mx-2 h-5 w-px" style={{ background: "var(--ah-border)" }} />
 
                     {/* Theme Toggle */}
-                    <div className="relative flex flex-col items-center">
-                        <button
-                            onClick={toggleTheme}
-                            aria-label={theme === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"}
-                            onMouseEnter={() => setThemeHovered(true)}
-                            onMouseLeave={() => setThemeHovered(false)}
-                            className={clsx(
-                                "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200",
-                                "ring-1 ring-transparent hover:-translate-y-0.5",
-                                theme === "dark"
-                                    ? "text-amber-400 hover:bg-amber-500/15 hover:text-amber-300 hover:ring-amber-400/30 hover:shadow-[0_1px_4px_rgba(0,0,0,0.45)]"
-                                    : "text-violet-600 hover:bg-violet-100 hover:text-violet-700 hover:ring-violet-300/55 hover:shadow-sm hover:shadow-violet-900/10"
-                            )}
-                        >
-                            {theme === "dark" ? (
-                                <Sun size={20} strokeWidth={1.8} />
-                            ) : (
-                                <Moon size={20} strokeWidth={1.8} />
-                            )}
-                        </button>
-
-                        {/* Theme Tooltip — hidden on touch devices */}
-                        <div
-                            className={clsx(
-                                "pointer-events-none absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap",
-                                "hidden rounded-md bg-neutral-900 px-2 py-1 text-[11px] font-medium text-white shadow-lg sm:block",
-                                "dark:bg-white dark:text-neutral-900",
-                                "transition-all duration-150",
-                                themeHovered ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
-                            )}
-                        >
-                            {theme === "dark" ? "라이트 모드" : "다크 모드"}
-                            <span className="absolute -top-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-b-neutral-900 dark:border-b-white" />
-                        </div>
-                    </div>
+                    <ThemeToggleWithTooltip
+                        hovered={themeHovered}
+                        onHoverChange={setThemeHovered}
+                    />
                 </nav>
                 </div>
             </div>

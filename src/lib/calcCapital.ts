@@ -45,4 +45,25 @@ export async function calcAccountCapital(
   return initialSum + investSum;
 }
 
+/** 계좌 유형별 누적 납입액(IC + PI) */
+export async function calcDepositsByAccountType(
+  profileId: string | null,
+): Promise<Partial<Record<AccountType, number>>> {
+  if (!profileId) return {};
+
+  const [initialCapitals, investments] = await Promise.all([
+    prisma.accountInitialCapital.findMany({ where: { profileId } }),
+    prisma.profileInvestment.findMany({ where: { profileId } }),
+  ]);
+
+  const map: Partial<Record<AccountType, number>> = {};
+  for (const row of initialCapitals) {
+    map[row.accountType] = (map[row.accountType] ?? 0) + row.krwAmount;
+  }
+  for (const row of investments) {
+    map[row.accountType] = (map[row.accountType] ?? 0) + row.amountKrw;
+  }
+  return map;
+}
+
 export { sumNewInvestmentsForAccounts };
