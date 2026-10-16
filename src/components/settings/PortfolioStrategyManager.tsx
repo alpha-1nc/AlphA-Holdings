@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type CSSProperties } from "react";
 import { Trash2, Plus, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,8 +23,11 @@ import {
 } from "@/lib/accountGroups";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import "@/components/dashboard/account-glass-switcher.css";
 import { TickerSearchInput, type TickerSearchChangeMeta } from "@/components/dashboard/ticker-search-input";
 import { getPortfolioItemDisplayLabel } from "@/lib/ticker-metadata";
 import {
@@ -77,6 +80,15 @@ const ROLE_BADGE_STYLES: Record<AssetRole, string> = {
 
 const TAB_ORDER: AccountGroupKey[] = ["직투", "ISA", "연금저축"];
 
+const SECTION_LABEL_CLASS =
+    "mb-4 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.2em] text-foreground/40";
+
+const PRIMARY_ACTION_CLASS =
+    "inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-foreground px-5 text-base font-semibold text-background transition hover:opacity-90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 md:h-10 md:gap-2 md:px-4 md:text-[0.9375rem]";
+
+const ICON_ACTION_CLASS =
+    "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-border/80 bg-background/80 p-2 text-muted-foreground transition hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/15 disabled:opacity-40 md:min-h-0 md:min-w-0";
+
 /** md 미만: iOS 등에서 시스템 피커 사용. md 이상: Base UI 커스텀 셀렉트 */
 const nativeSelectTriggerClass = cn(
     "rounded-lg border border-input bg-transparent py-2 text-base whitespace-nowrap",
@@ -104,6 +116,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
     const [editingAccountType, setEditingAccountType] = useState<AccountType | null>(null);
     /** 직투 탭 종목 추가 시에만 사용 */
     const [directAccountType, setDirectAccountType] = useState<AccountType>("US_DIRECT");
+    const [deleteTarget, setDeleteTarget] = useState<PortfolioStrategy | null>(null);
 
     const tabAccountTypes = [...ACCOUNT_GROUPS[activeTab]];
 
@@ -220,7 +233,10 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
         });
     }
 
-    function handleDelete(strategy: PortfolioStrategy) {
+    function handleConfirmDelete() {
+        if (!deleteTarget) return;
+        const strategy = deleteTarget;
+
         startTransition(async () => {
             try {
                 await deletePortfolioStrategy({
@@ -229,6 +245,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                     accountType: strategy.accountType,
                 });
                 toast.success(`${strategy.ticker} 목표가 삭제되었습니다.`);
+                setDeleteTarget(null);
                 await loadStrategies();
             } catch {
                 toast.error("삭제 중 오류가 발생했습니다.");
@@ -260,57 +277,81 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
             ? "grid-cols-[minmax(0,1fr)_auto_auto_minmax(3.25rem,3.5rem)_minmax(6rem,auto)]"
             : "grid-cols-[minmax(0,1fr)_auto_minmax(3.25rem,3.5rem)_minmax(6rem,auto)]";
 
+    const tabActiveIndex = Math.max(0, TAB_ORDER.indexOf(activeTab));
+
     return (
         <section className="mb-10">
-            <p className="mb-4 text-sm font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-500 md:text-xs">
-                목표 포트폴리오
-            </p>
+            <ConfirmDialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open && !isPending) setDeleteTarget(null);
+                }}
+                title="목표 삭제"
+                description={
+                    deleteTarget
+                        ? `${deleteTarget.ticker} 목표를 삭제할까요?`
+                        : ""
+                }
+                confirmLabel="삭제"
+                cancelLabel="취소"
+                onConfirm={handleConfirmDelete}
+                loading={isPending}
+                tone="destructive"
+            />
+
+            <p className={SECTION_LABEL_CLASS}>목표 포트폴리오</p>
 
             <div
-                className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800"
+                className="ag-switcher mb-3 w-full max-w-none"
+                data-idx={tabActiveIndex}
                 role="tablist"
                 aria-label="계좌 유형"
+                style={
+                    {
+                        "--ag-idx": tabActiveIndex,
+                        "--ag-count": TAB_ORDER.length,
+                    } as CSSProperties
+                }
             >
-                {TAB_ORDER.map((tab) => (
-                    <button
-                        key={tab}
-                        type="button"
-                        role="tab"
-                        aria-selected={activeTab === tab}
-                        onClick={() => {
-                            setActiveTab(tab);
-                            handleCancelEdit();
-                        }}
-                        className={[
-                            "flex min-h-12 items-center justify-center rounded-lg px-3 py-2.5 text-center text-sm font-semibold leading-tight transition md:min-h-9 md:px-3 md:py-2 md:text-xs",
-                            activeTab === tab
-                                ? "bg-white text-neutral-900 shadow-sm ring-1 ring-black/5 dark:bg-neutral-900 dark:text-neutral-100 dark:ring-white/10"
-                                : "text-neutral-500 hover:bg-neutral-200/60 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700/50 dark:hover:text-neutral-100",
-                        ].join(" ")}
-                    >
-                        {tab === "연금저축" ? "연금저축" : tab}
-                    </button>
-                ))}
+                <span className="ag-switcher__indicator" aria-hidden />
+                {TAB_ORDER.map((tab) => {
+                    const active = activeTab === tab;
+                    return (
+                        <button
+                            key={tab}
+                            type="button"
+                            role="tab"
+                            aria-selected={active}
+                            data-active={active}
+                            className="ag-switcher__option"
+                            onClick={() => {
+                                setActiveTab(tab);
+                                handleCancelEdit();
+                            }}
+                        >
+                            {tab === "연금저축" ? "연금" : tab}
+                        </button>
+                    );
+                })}
             </div>
 
-            <div className="overflow-hidden rounded-2xl bg-white ring-1 ring-neutral-200/80 dark:bg-neutral-900 dark:ring-neutral-800">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
                 {activeTab === "연금저축" && (
-                    <div className="border-b border-neutral-100 px-5 py-3.5 text-sm leading-snug text-neutral-600 dark:border-neutral-800 dark:text-neutral-400 md:px-6 md:py-3 md:text-xs md:leading-normal">
+                    <div className="border-b border-border px-5 py-3.5 text-sm leading-snug text-muted-foreground md:px-6 md:py-3 md:text-xs md:leading-normal">
                         세액공제 한도: 월 50만원 (연 600만원) / 투자 대상: 지수 ETF 권장
                     </div>
                 )}
                 {/* ── 입력 폼 ──────────────────────────────────────────── */}
                 <form onSubmit={handleSubmit} className="px-5 py-6 md:px-6 md:py-5">
-                    <p className="mb-4 text-[1.0625rem] font-medium text-neutral-900 dark:text-neutral-100 md:mb-3 md:text-base">
+                    <p className="mb-4 text-[1.0625rem] font-medium text-foreground md:mb-3 md:text-base">
                         {editingId ? "목표 수정" : "종목 목표 추가"}
                     </p>
 
                     <div className="flex min-w-0 flex-wrap items-end gap-3 md:gap-2 lg:flex-nowrap lg:gap-1.5 xl:gap-2">
-                        {/* Ticker — 남은 폭을 차지하고 min-w-0으로 한 줄 레이아웃에서 가로 스크롤 없이 축소 가능 */}
                         <div className="flex w-full min-w-0 basis-full flex-col gap-1.5 md:gap-1 lg:basis-auto lg:flex-1 lg:min-w-0">
-                            <label className="whitespace-nowrap text-sm text-neutral-400 dark:text-neutral-500">
+                            <Label className="text-xs font-normal text-muted-foreground">
                                 종목 심볼
-                            </label>
+                            </Label>
                             {editingId ? (
                                 <Input
                                     value={ticker}
@@ -338,9 +379,9 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
                         {activeTab === "직투" && !editingId && (
                             <div className="flex shrink-0 flex-col gap-1.5 md:gap-1">
-                                <label className="text-sm text-neutral-400 dark:text-neutral-500">
+                                <Label className="text-xs font-normal text-muted-foreground">
                                     계좌
-                                </label>
+                                </Label>
                                 <div className="w-[10rem] shrink-0 md:w-[9rem] lg:w-[8.25rem] xl:w-[9rem]">
                                     <select
                                         aria-label="계좌 유형"
@@ -392,9 +433,9 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             activeTab === "ISA" ||
                             activeTab === "연금저축") && (
                             <div className="flex shrink-0 flex-col gap-1.5 md:gap-1">
-                                <label className="text-sm text-neutral-400 dark:text-neutral-500">
+                                <Label className="text-xs font-normal text-muted-foreground">
                                     역할
-                                </label>
+                                </Label>
                                 <div className="w-[8rem] shrink-0 md:w-[7rem] xl:w-28">
                                     <select
                                         aria-label="역할"
@@ -450,9 +491,9 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
                         {/* Target Weight */}
                         <div className="flex shrink-0 flex-col gap-1.5 md:gap-1">
-                            <label className="text-sm text-neutral-400 dark:text-neutral-500">
+                            <Label className="text-xs font-normal text-muted-foreground">
                                 목표 비중 (%)
-                            </label>
+                            </Label>
                             {/* 네이티브 input: Base UI Input(FieldControl)의 controlled 고정 ref 이슈로 편집 시 값이 갱신되지 않는 경우 방지 */}
                             <input
                                 type="text"
@@ -472,11 +513,10 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
 
                         {/* Submit + 취소 — 한 줄에서 버튼만 떨어지지 않도록 묶음 */}
                         <div className="flex shrink-0 items-end gap-2 md:gap-1.5">
-                            <Button
+                            <button
                                 type="submit"
-                                size="sm"
                                 disabled={isPending}
-                                className="h-11 shrink-0 gap-2 px-5 text-base md:h-10 md:gap-2 md:px-4 md:text-[0.9375rem]"
+                                className={PRIMARY_ACTION_CLASS}
                             >
                                 {editingId ? (
                                     <>
@@ -489,7 +529,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                         추가
                                     </>
                                 )}
-                            </Button>
+                            </button>
 
                             {editingId && (
                                 <Button
@@ -497,7 +537,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                     variant="ghost"
                                     size="sm"
                                     onClick={handleCancelEdit}
-                                    className="h-11 shrink-0 text-base text-neutral-500 md:h-10 md:text-[0.9375rem]"
+                                    className="h-11 shrink-0 rounded-full text-base text-muted-foreground md:h-10 md:text-[0.9375rem]"
                                 >
                                     취소
                                 </Button>
@@ -506,7 +546,7 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                     </div>
                 </form>
 
-                <div className="mx-5 h-px bg-neutral-100 dark:bg-neutral-800 md:mx-6" />
+                <div className="mx-5 h-px bg-border md:mx-6" />
 
                 {/* ── 목표 리스트 ───────────────────────────────────────── */}
                 <div className="px-5 py-5 md:px-6 md:py-4">
@@ -515,12 +555,12 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             {[1, 2, 3].map((i) => (
                                 <div
                                     key={i}
-                                    className="h-11 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800 md:h-9"
+                                    className="h-11 animate-pulse rounded-lg bg-muted/60 md:h-9"
                                 />
                             ))}
                         </div>
                     ) : strategies.length === 0 ? (
-                        <p className="py-6 text-center text-base text-neutral-400 dark:text-neutral-500 md:py-4 md:text-sm">
+                        <p className="py-6 text-center text-base text-muted-foreground md:py-4 md:text-sm">
                             이 탭에 등록된 목표가 없습니다.
                         </p>
                     ) : (
@@ -529,14 +569,14 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                             <div
                                 className={`grid ${strategyGridMobile} items-center gap-2 px-1 pb-1.5 text-sm md:gap-3 md:pb-1 md:text-xs ${strategyGridMd}`}
                             >
-                                <span className="font-medium text-neutral-400 dark:text-neutral-500">종목</span>
+                                <span className="font-medium text-muted-foreground">종목</span>
                                 {activeTab === "직투" && (
-                                    <span className="w-12 text-center font-medium text-neutral-400 dark:text-neutral-500 md:w-16">
+                                    <span className="w-12 text-center font-medium text-muted-foreground md:w-16">
                                         계좌
                                     </span>
                                 )}
-                                <span className="w-14 text-right font-medium text-neutral-400 dark:text-neutral-500 md:w-16">역할</span>
-                                <span className="w-12 text-right font-medium text-neutral-400 dark:text-neutral-500 md:w-14">비중</span>
+                                <span className="w-14 text-right font-medium text-muted-foreground md:w-16">역할</span>
+                                <span className="w-12 text-right font-medium text-muted-foreground md:w-14">비중</span>
                                 <span className="w-12 md:w-14" />
                             </div>
 
@@ -548,27 +588,27 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                 return (
                                 <div
                                     key={s.id}
-                                    className={`grid ${strategyGridMobile} items-center gap-2 rounded-lg px-1 py-2.5 text-xs transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50 md:gap-3 md:py-2 md:text-sm ${strategyGridMd}`}
+                                    className={`grid ${strategyGridMobile} items-center gap-2 rounded-lg px-1 py-2.5 text-xs transition-colors hover:bg-muted/40 md:gap-3 md:py-2 md:text-sm ${strategyGridMd}`}
                                 >
-                                    <span className="min-w-0 font-medium text-neutral-900 dark:text-neutral-100">
+                                    <span className="min-w-0 font-medium text-foreground">
                                         {rowLabel}
                                         {rowLabel.trim().toUpperCase() !== s.ticker.trim().toUpperCase() && (
-                                            <span className="ml-1 font-mono text-[11px] text-neutral-500 dark:text-neutral-400 md:text-xs">
+                                            <span className="ml-1 font-mono text-[11px] text-muted-foreground md:text-xs">
                                                 ({s.ticker})
                                             </span>
                                         )}
                                     </span>
                                     {activeTab === "직투" && (
-                                        <span className="w-12 shrink-0 text-center text-[11px] font-medium text-neutral-600 dark:text-neutral-400 md:w-16 md:text-[10px]">
+                                        <span className="w-12 shrink-0 text-center text-[11px] font-medium text-muted-foreground md:w-16 md:text-[10px]">
                                             {ACCOUNT_TYPE_LABEL[s.accountType]}
                                         </span>
                                     )}
                                     <span
-                                        className={`inline-flex w-14 items-center justify-center rounded-full px-2 py-1 text-[11px] font-medium md:w-16 md:px-2 md:py-0.5 md:text-xs ${ROLE_BADGE_STYLES[s.role]}`}
+                                        className={`inline-flex w-14 items-center justify-center rounded-md px-2 py-1 text-[11px] font-medium md:w-16 md:px-2 md:py-0.5 md:text-xs ${ROLE_BADGE_STYLES[s.role]}`}
                                     >
                                         {ASSET_ROLE_LABELS[s.role]}
                                     </span>
-                                    <span className="min-w-0 justify-self-end text-right text-sm font-mono tabular-nums text-neutral-700 dark:text-neutral-300 md:w-14 md:text-sm">
+                                    <span className="min-w-0 justify-self-end text-right text-sm font-mono tabular-nums text-foreground md:w-14 md:text-sm">
                                         {Math.round(s.targetWeight)}%
                                     </span>
                                     <div className="flex min-w-0 shrink-0 justify-end gap-0.5 justify-self-end md:w-14 md:gap-1">
@@ -576,16 +616,16 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                                             type="button"
                                             onClick={() => handleEdit(s)}
                                             disabled={isPending}
-                                            className="flex min-h-11 min-w-11 items-center justify-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200 disabled:opacity-40 md:min-h-0 md:min-w-0"
+                                            className={ICON_ACTION_CLASS}
                                             aria-label="수정"
                                         >
                                             <Pencil className="size-4 md:size-3.5" />
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => handleDelete(s)}
+                                            onClick={() => setDeleteTarget(s)}
                                             disabled={isPending}
-                                            className="flex min-h-11 min-w-11 items-center justify-center rounded p-1 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400 disabled:opacity-40 md:min-h-0 md:min-w-0"
+                                            className={ICON_ACTION_CLASS}
                                             aria-label="삭제"
                                         >
                                             <Trash2 className="size-4 md:size-3.5" />
@@ -601,38 +641,31 @@ export function PortfolioStrategyManager({ workspaceProfile }: Props) {
                 {/* ── 비중 합계 표시 ────────────────────────────────────── */}
                 {strategies.length > 0 && weightStatus !== "skip" && (
                     <>
-                        <div className="mx-5 h-px bg-neutral-100 dark:bg-neutral-800 md:mx-6" />
+                        <div className="mx-5 h-px bg-border md:mx-6" />
                         <div className="flex items-center justify-between px-5 py-4 md:px-6 md:py-3.5">
-                            <span className="text-sm text-neutral-400 dark:text-neutral-500 md:text-xs">
+                            <span className="text-sm text-muted-foreground md:text-xs">
                                 목표 비중 합계 ({activeTab})
                             </span>
                             <div className="flex items-center gap-2">
                                 <span
-                                    className={`font-mono text-base font-semibold md:text-sm ${
+                                    className={cn(
+                                        "font-mono text-base font-semibold tabular-nums md:text-sm",
                                         weightStatus === "exact"
-                                            ? "text-emerald-600 dark:text-emerald-400"
-                                            : weightStatus === "over"
-                                            ? "text-red-500 dark:text-red-400"
-                                            : "text-amber-500 dark:text-amber-400"
-                                    }`}
+                                            ? "text-foreground"
+                                            : "text-muted-foreground",
+                                    )}
                                 >
                                     {Math.round(totalWeight)}%
                                 </span>
                                 {weightStatus !== "exact" && (
-                                    <span
-                                        className={`text-sm md:text-xs ${
-                                            weightStatus === "over"
-                                                ? "text-red-400 dark:text-red-500"
-                                                : "text-amber-400 dark:text-amber-500"
-                                        }`}
-                                    >
+                                    <span className="text-sm text-muted-foreground md:text-xs">
                                         {weightStatus === "over"
                                             ? `+${Math.round(weightDiff)}% 초과`
                                             : `${Math.abs(Math.round(weightDiff))}% 부족`}
                                     </span>
                                 )}
                                 {weightStatus === "exact" && (
-                                    <span className="text-sm text-emerald-500 dark:text-emerald-400 md:text-xs">
+                                    <span className="text-sm text-muted-foreground md:text-xs">
                                         ✓ 100%
                                     </span>
                                 )}

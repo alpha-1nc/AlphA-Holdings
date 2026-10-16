@@ -1,4 +1,5 @@
 import type { JournalSnapshotSummary } from "@/lib/journal-snapshot";
+import { cn } from "@/lib/utils";
 
 const krwFmt = (n: number) =>
   new Intl.NumberFormat("ko-KR", {
@@ -20,11 +21,9 @@ type JournalSnapshotCardProps = {
 export function JournalSnapshotCard({ summary, snapshotDate }: JournalSnapshotCardProps) {
   if (!summary) {
     return (
-      <div className="rounded-2xl border border-dashed border-neutral-200 bg-white/80 px-5 py-8 text-center dark:border-zinc-800 dark:bg-zinc-900/60">
-        <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
-          이 기간 자산 데이터 없음
-        </p>
-        <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+      <div className="shell-metric-card border-dashed text-center">
+        <p className="text-sm font-medium text-foreground/70">이 기간 자산 데이터 없음</p>
+        <p className="mt-1 text-xs text-muted-foreground">
           스냅샷이 없어도 글은 저장할 수 있습니다.
         </p>
       </div>
@@ -50,49 +49,45 @@ export function JournalSnapshotCard({ summary, snapshotDate }: JournalSnapshotCa
 
   const returnColor =
     summary.returnRate == null
-      ? "text-neutral-500 dark:text-neutral-400"
+      ? "text-muted-foreground"
       : summary.returnRate >= 0
         ? "text-emerald-600 dark:text-emerald-400"
         : "text-rose-600 dark:text-rose-400";
 
   return (
-    <div className="rounded-2xl border border-neutral-200/90 bg-white/80 p-5 dark:border-zinc-800 dark:bg-zinc-900/60">
+    <div className="shell-metric-card">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400 dark:text-neutral-500">
-          자산 스냅샷
-        </p>
-        <span className="text-xs text-neutral-400 dark:text-neutral-500">{dateLabel} 기준</span>
+        <p className="shell-label">자산 스냅샷</p>
+        <span className="text-xs text-muted-foreground">{dateLabel} 기준</span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
+      <div className="mt-5 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">총 평가금</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-neutral-900 dark:text-white">
-            {krwFmtMan(summary.totalValueKrw)}
-          </p>
-          <p className="text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
+          <p className="shell-label">총 평가금</p>
+          <p className="shell-num-lg mt-1.5 tabular-nums">{krwFmtMan(summary.totalValueKrw)}</p>
+          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
             {krwFmt(summary.totalValueKrw)}
           </p>
         </div>
-        <div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400">수익률</p>
-          <p className={`mt-1 text-lg font-semibold tabular-nums ${returnColor}`}>{returnLabel}</p>
+        <div className="sm:text-right">
+          <p className="shell-label sm:max-w-[220px] sm:ml-auto">
+            {summary.isIntervalReturn ? "이 달 수익률" : "수익률 (구간 산출 불가·매입원가 기준)"}
+          </p>
+          <p className={cn("shell-num-lg mt-1.5 tabular-nums", returnColor)}>{returnLabel}</p>
         </div>
       </div>
 
-      <div className="mt-5 space-y-2.5">
-        <p className="text-xs text-neutral-500 dark:text-neutral-400">계좌별 비중</p>
+      <div className="mt-6 space-y-2.5 border-t border-border/60 pt-5">
+        <p className="shell-label">계좌별 비중</p>
         {summary.accountWeights.map((w) => (
           <div key={w.key} className="space-y-1">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-medium text-neutral-700 dark:text-neutral-200">{w.label}</span>
-              <span className="tabular-nums text-neutral-500 dark:text-neutral-400">
-                {Math.round(w.pct)}%
-              </span>
+              <span className="font-medium text-foreground/80">{w.label}</span>
+              <span className="tabular-nums text-muted-foreground">{Math.round(w.pct)}%</span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+            <div className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.06]">
               <div
-                className="h-full rounded-full bg-neutral-700 transition-all dark:bg-neutral-300"
+                className="h-full rounded-full bg-foreground/70 transition-all dark:bg-foreground/50"
                 style={{ width: `${Math.min(100, Math.max(0, w.pct))}%` }}
               />
             </div>

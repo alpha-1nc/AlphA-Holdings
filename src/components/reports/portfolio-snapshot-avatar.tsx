@@ -56,7 +56,7 @@ export function PortfolioSnapshotAvatar({
       displayName={displayName}
       logoUrl={logoUrl}
       size={size}
-      autoFmpLogo
+      autoLocalLogo
       initialCharCount={1}
     />
   );

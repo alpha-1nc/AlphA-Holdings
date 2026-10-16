@@ -3,16 +3,14 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PenLine } from "lucide-react";
 import { toast } from "sonner";
 import {
   createOrUpdateJournal,
   getJournalNewPageDefaults,
-  getSnapshotSummaryForPeriod,
   type JournalFormData,
 } from "@/app/actions/journal";
 import { JournalSnapshotCard } from "@/components/journal/journal-snapshot-card";
-import { PageMainTitle } from "@/components/layout/page-main-title";
+import { PageHeader } from "@/components/layout/page-header";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import { generatePeriodOptions } from "@/lib/journal-snapshot";
 import type { JournalSnapshotSummary } from "@/lib/journal-snapshot";
@@ -37,6 +35,14 @@ const textareaCls = [
   "dark:focus:ring-neutral-500",
 ].join(" ");
 
+const EMPTY_FORM: JournalFormData = {
+  journalKeyword: "",
+  journalMarket: "",
+  journalReview: "",
+  journalPlan: "",
+  journalNote: "",
+};
+
 function FormField({
   label,
   children,
@@ -53,39 +59,46 @@ function FormField({
 }
 
 type JournalNewClientProps = {
+  /** URL ?period= — 있으면 수정(edit), 없으면 새 작성(new) */
   initialPeriod?: string;
 };
 
 export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
   const router = useRouter();
+  const pageMode = initialPeriod?.trim() ? "edit" : "new";
+
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [periodLabel, setPeriodLabel] = useState("");
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [existingId, setExistingId] = useState<number | null>(null);
   const [snapshotSummary, setSnapshotSummary] = useState<JournalSnapshotSummary | null>(null);
-  const [form, setForm] = useState<JournalFormData>({
-    journalKeyword: "",
-    journalMarket: "",
-    journalReview: "",
-    journalPlan: "",
-    journalNote: "",
-  });
+  const [form, setForm] = useState<JournalFormData>(EMPTY_FORM);
 
   const periodOptions = generatePeriodOptions(24);
+  const isEditMode = pageMode === "edit";
 
-  const loadPeriodData = useCallback(async (period: string, profileLabel: string) => {
-    setLoading(true);
-    try {
-      const data = await getJournalNewPageDefaults(profileLabel, period);
-      setPeriodLabel(data.periodLabel);
-      setIsEditMode(data.isEditMode);
-      setForm(data.form);
-      setSnapshotSummary(data.snapshotSummary);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadPeriodData = useCallback(
+    async (period: string | undefined, mode: "new" | "edit") => {
+      setLoading(true);
+      try {
+        const profileLabel = getProfileLabel(getCurrentProfile());
+        const data = await getJournalNewPageDefaults(profileLabel, {
+          periodLabel: period,
+          mode,
+        });
+        setPeriodLabel(data.periodLabel);
+        setExistingId(data.existingId);
+        setSnapshotSummary(data.snapshotSummary);
+        if (mode === "edit") {
+          setForm(data.form);
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -93,22 +106,23 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
 
   useEffect(() => {
     if (!mounted) return;
-    const profileLabel = getProfileLabel(getCurrentProfile());
-    loadPeriodData(initialPeriod ?? "", profileLabel);
-  }, [mounted, initialPeriod, loadPeriodData]);
+    loadPeriodData(initialPeriod, pageMode);
+  }, [mounted, initialPeriod, pageMode, loadPeriodData]);
 
   const handlePeriodChange = async (nextPeriod: string) => {
     setPeriodLabel(nextPeriod);
-    const profileLabel = getProfileLabel(getCurrentProfile());
     setLoading(true);
     try {
-      const [defaults, summary] = await Promise.all([
-        getJournalNewPageDefaults(profileLabel, nextPeriod),
-        getSnapshotSummaryForPeriod(nextPeriod),
-      ]);
-      setIsEditMode(defaults.isEditMode);
-      setForm(defaults.form);
-      setSnapshotSummary(summary);
+      const profileLabel = getProfileLabel(getCurrentProfile());
+      const data = await getJournalNewPageDefaults(profileLabel, {
+        periodLabel: nextPeriod,
+        mode: pageMode,
+      });
+      setExistingId(data.existingId);
+      setSnapshotSummary(data.snapshotSummary);
+      if (pageMode === "edit") {
+        setForm(data.form);
+      }
     } finally {
       setLoading(false);
     }
@@ -120,6 +134,17 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (pageMode === "new" && existingId) {
+      toast.error("이 달 일지가 이미 있습니다. 수정 화면에서 저장해 주세요.", {
+        action: {
+          label: "수정하기",
+          onClick: () => router.push(`/journal/new?period=${encodeURIComponent(periodLabel)}`),
+        },
+      });
+      return;
+    }
+
     const profileLabel = getProfileLabel(getCurrentProfile());
 
     startTransition(async () => {
@@ -128,6 +153,9 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
         toast.error(result.error);
         return;
       }
+      if (result.syncWarning) {
+        toast.warning(result.syncWarning);
+      }
       toast.success(isEditMode ? "일지가 수정되었습니다." : "일지가 저장되었습니다.");
       router.push(`/journal/${result.id}`);
     });
@@ -135,23 +163,27 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
 
   if (!mounted || (loading && !periodLabel)) {
     return (
-      <div className="space-y-8">
-        <div className="h-10 w-56 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
+      <>
+        <div className="mb-6 sm:mb-8">
+          <div className="mb-2 h-8 w-40 animate-pulse rounded-lg bg-neutral-200 sm:h-9 dark:bg-neutral-800" />
+          <div className="h-4 w-56 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-700" />
+        </div>
         <div className="h-48 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
-        <div className="space-y-4">
+        <div className="mt-8 space-y-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-24 animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800" />
           ))}
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <PageMainTitle icon={PenLine}>
-        {isEditMode ? "일지 수정" : "새 일지 작성"}
-      </PageMainTitle>
+    <>
+      <PageHeader
+        title={isEditMode ? "Edit Journal" : "New Journal"}
+        subtitle={isEditMode ? periodLabel : "새 월간 기록"}
+      />
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <section className="space-y-4">
@@ -169,6 +201,18 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
               ))}
             </select>
           </FormField>
+
+          {pageMode === "new" && existingId ? (
+            <p className="text-xs text-muted-foreground">
+              이 달 일지가 이미 있어요 ·{" "}
+              <Link
+                href={`/journal/new?period=${encodeURIComponent(periodLabel)}`}
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                수정하기
+              </Link>
+            </p>
+          ) : null}
 
           {loading ? (
             <div className="h-48 animate-pulse rounded-2xl bg-neutral-100 dark:bg-neutral-800" />
@@ -233,11 +277,10 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={isPending}
-            className="inline-flex items-center rounded-full px-5 py-2.5 text-sm font-semibold transition hover:opacity-80 disabled:opacity-50"
-            style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
+            disabled={isPending || loading || (pageMode === "new" && !!existingId)}
+            className="inline-flex items-center rounded-full bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
           >
-            {isPending ? "저장 중…" : "저장"}
+            {isPending ? "동기화 · 저장 중…" : "저장"}
           </button>
           <Link
             href="/journal"
@@ -247,6 +290,6 @@ export function JournalNewClient({ initialPeriod }: JournalNewClientProps) {
           </Link>
         </div>
       </form>
-    </div>
+    </>
   );
 }

@@ -1,60 +1,34 @@
 "use client";
 
-import clsx from "clsx";
-
-import type { WorkspaceProfile } from "@/lib/profile";
 import { WORKSPACE_PROFILE_INTRO } from "@/lib/profile";
 import { WorkspaceProfileAvatar } from "@/components/settings/workspace-profile-avatar";
 
-type WorkspaceProfileIntroCardProps = {
-    profile: WorkspaceProfile;
-};
-
-/**
- * 운용 프로필 선택 아래에 표시되는 글래스모피즘 소개 카드 (소셜·CTA 없음).
- * AlphA Holdings: 로고 아바타 + 이미지와 띄어진 민트 링.
- */
-export function WorkspaceProfileIntroCard({ profile }: WorkspaceProfileIntroCardProps) {
-    const { name, title, bio } = WORKSPACE_PROFILE_INTRO[profile];
-    const mintHeading = profile === "partner";
+/** Settings — AlphA Holdings 운용 프로필 소개 카드 (무채색, 글래스·그라데이션 없음) */
+export function WorkspaceProfileIntroCard() {
+    const { name, title, bioLines } = WORKSPACE_PROFILE_INTRO["alpha-ceo"];
 
     return (
-        <div className="relative mt-6 w-full">
-            <div
-                className="relative flex flex-col items-center rounded-3xl border border-white/10 bg-card/40 p-6 backdrop-blur-xl transition-all duration-500 ease-out md:p-8 dark:border-white/10"
-                style={{ boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)" }}
-            >
-                <WorkspaceProfileAvatar profile={profile} size="lg" />
+        <div className="rounded-2xl border border-border bg-card">
+            <div className="flex flex-col items-center px-5 py-6 text-center sm:px-6 sm:py-7 md:px-8 md:py-8">
+                <WorkspaceProfileAvatar
+                    profile="alpha-ceo"
+                    size="lg"
+                    className="mb-0"
+                />
 
-                <h2
-                    className={clsx(
-                        "text-center text-xl font-bold md:text-2xl",
-                        mintHeading
-                            ? "text-teal-600 dark:text-teal-400"
-                            : "text-card-foreground",
-                    )}
-                >
-                    {name}
-                </h2>
-                <p
-                    className={clsx(
-                        "mt-1 text-center text-sm font-medium md:text-sm",
-                        mintHeading
-                            ? "text-teal-600 dark:text-teal-400"
-                            : "text-primary",
-                    )}
-                >
-                    {title}
-                </p>
-                <p className="mt-4 text-center text-sm leading-relaxed text-muted-foreground md:text-sm md:leading-relaxed">
-                    {bio}
+                <div className="mt-4 flex max-w-md flex-col gap-0.5">
+                    <h2 className="text-lg font-bold tracking-tight text-foreground md:text-xl">
+                        {name}
+                    </h2>
+                    <p className="text-xs text-muted-foreground md:text-sm">
+                        {title}
+                    </p>
+                </div>
+
+                <p className="mt-3 max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
+                    {bioLines.join(" ")}
                 </p>
             </div>
-
-            <div
-                className="pointer-events-none absolute inset-0 -z-10 rounded-3xl bg-gradient-to-r from-indigo-500/50 to-purple-500/50 opacity-30 blur-2xl transition-all duration-500 ease-out"
-                aria-hidden
-            />
         </div>
     );
 }

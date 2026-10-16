@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, PenLine, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { getReportsByProfileAndType } from "@/app/actions/reports";
 import { getCurrentProfile, getProfileLabel } from "@/lib/profile";
 import type { Report, PortfolioItem, NewInvestment } from "@/generated/prisma";
-import { PageMainTitle } from "@/components/layout/page-main-title";
+import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 
 type ReportWithItems = Report & {
@@ -152,33 +153,41 @@ export default function JournalPage() {
     [journalReports],
   );
 
+  const newJournalButton = (
+    <Link
+      href="/journal/new"
+      className="inline-flex shrink-0 items-center gap-2 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background transition hover:opacity-90 active:scale-[0.98] md:px-[1.125rem] md:text-[0.9375rem]"
+    >
+      <Plus className="h-4 w-4 md:h-[1.125rem] md:w-[1.125rem]" />
+      새 일지 작성
+    </Link>
+  );
+
   if (!mounted || loading) {
     return (
-      <div className="space-y-8">
-        <div className="h-10 w-56 animate-pulse rounded-lg bg-neutral-200 dark:bg-neutral-800" />
+      <PageContainer>
+        <div className="mb-6 sm:mb-8">
+          <div className="mb-2 h-8 w-40 animate-pulse rounded-lg bg-neutral-200 sm:h-9 dark:bg-neutral-800" />
+          <div className="h-4 w-56 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-700" />
+        </div>
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="h-16 animate-pulse rounded-xl bg-neutral-100 dark:bg-neutral-800" />
           ))}
         </div>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-center justify-between gap-4">
-        <PageMainTitle icon={PenLine}>일지</PageMainTitle>
-        <Link
-          href="/journal/new"
-          className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold md:px-[1.125rem] md:text-[0.9375rem] transition-all hover:opacity-80"
-          style={{ background: "var(--ah-accent)", color: "var(--ah-accent-fg)" }}
-        >
-          <Plus className="h-4 w-4 md:h-[1.125rem] md:w-[1.125rem]" />
-          새 일지 작성
-        </Link>
-      </div>
+    <PageContainer>
+      <PageHeader
+        title="Journal"
+        subtitle="월간 투자 기록"
+        actions={newJournalButton}
+      />
 
+      <div className="space-y-10">
       <section className="space-y-4">
         <h2 className="text-sm font-semibold tracking-tight text-neutral-500 dark:text-neutral-400">
           일지
@@ -232,6 +241,7 @@ export default function JournalPage() {
           </div>
         )}
       </section>
-    </div>
+      </div>
+    </PageContainer>
   );
 }
